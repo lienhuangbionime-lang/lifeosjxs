@@ -1,15 +1,14 @@
-// 檔案位置: app/page.tsx
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { 
-    Layers, PenTool, List as ListIcon, Activity, 
+    Layers, PenTool, List as ListIcon, 
     Terminal, Cpu, Filter, CheckCircle, ArrowRight, Zap, TrendingUp, Clock, Upload 
 } from 'lucide-react';
 import { CoreEngine, DEFAULT_HABITS } from '@/lib/ai/core';
 import { NeuralGraph } from '@/components/NeuralGraph';
 
-// --- [Fix 1] 補回 MOCK_LOGS 定義，防止編譯崩潰 ---
+// MOCK_LOGS 定義
 const MOCK_LOGS = [
   { date: '2024-01-28', note: 'Project LifeOS: Fix Vercel deploy #coding', metrics: { mood: 6, focus: 8, energy: 7, deepWork: 4 }, graphSeeds: { tags: ['coding', 'project'], links: [] }, habits: { h4: true }, isSignal: false },
   { date: '2024-01-29', note: 'Family dinner at Taichung #life', metrics: { mood: 9, focus: 3, energy: 8, deepWork: 0 }, graphSeeds: { tags: ['life', 'family'], links: [] }, habits: {}, isSignal: false },
@@ -35,14 +34,11 @@ export default function Home() {
   const [searchTerm, setSearchTerm] = useState('');
   const [historyPage, setHistoryPage] = useState(1);
   
-  // 隱藏的檔案輸入框
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // [Fix 2] Hydration mismatch fix
+  // Hydration mismatch fix
   useEffect(() => {
       setEntry((prev: any) => ({ ...prev, date: new Date().toISOString().split('T')[0] }));
-      
-      // 嘗試從 LocalStorage 載入
       const saved = localStorage.getItem('life_os_logs_v8_0');
       if (saved) {
           try {
@@ -51,7 +47,6 @@ export default function Home() {
       }
   }, []);
 
-  // 當 logs 變更時，自動存入 LocalStorage
   useEffect(() => {
       if (logs !== MOCK_LOGS) {
           localStorage.setItem('life_os_logs_v8_0', JSON.stringify(logs));
@@ -71,8 +66,9 @@ export default function Home() {
               const content = ev.target?.result as string;
               const json = JSON.parse(content);
               
-              // 支援兩種格式：全備份 ({ logs: [] }) 或 純陣列 ([])
-              let newLogs = [];
+              // [Fix] 這裡加入明確的型別定義 : any[]
+              let newLogs: any[] = [];
+              
               if (Array.isArray(json)) {
                   newLogs = json;
               } else if (json.logs && Array.isArray(json.logs)) {
@@ -81,7 +77,6 @@ export default function Home() {
                   throw new Error("Invalid JSON format");
               }
 
-              // 合併並去重 (依日期)
               setLogs(prev => {
                   const existingDates = new Set(prev.map(l => l.date));
                   const filteredNew = newLogs.filter((l: any) => !existingDates.has(l.date));
@@ -96,7 +91,6 @@ export default function Home() {
           }
       };
       reader.readAsText(file);
-      // 清空 input 讓同一檔案可重複選取
       e.target.value = '';
   };
 
