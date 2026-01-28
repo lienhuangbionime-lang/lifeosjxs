@@ -1,61 +1,63 @@
-import { BookOpen, Activity, Zap, Brain, Star, TrendingUp, Target, Heart, Rocket, Terminal } from 'lucide-react';
+// lib/ai/core.ts
 
-export const VERSION = "10.3 (Cloud Agent)"; 
-
+/**
+ * Neon Palette for D3 Graph
+ */
 export const NEON_PALETTE = {
-    EMERALD: '#10b981', ROSE: '#f43f5e', BLUE: '#3b82f6', 
-    INDIGO: '#6366f1', SLATE: '#475569', AMBER: '#f59e0b', PINK: '#ec4899'
+    INDIGO: "#818cf8",  // Default Node
+    EMERALD: "#34d399", // High Mood
+    ROSE: "#fb7185",    // Low Mood
+    AMBER: "#fbbf24",   // Warning / High Energy
+    CYAN: "#22d3ee",    // Tech / Code
+    PINK: "#f472b6",    // Tags
+    SLATE: "#94a3b8"    // Inactive
 };
 
 export const DEFAULT_HABITS = [
-    { id: 'reading', label: '閱讀 Input', icon: 'BookOpen', active: true },
-    { id: 'native_coding', label: 'Native Logic', icon: 'Terminal', active: true },
-    { id: 'creation', label: '創作 Output', icon: 'Zap', active: true },
-    { id: 'exercise', label: '運動 Health', icon: 'Activity', active: true },
-    { id: 'meditation', label: '反思 Meta', icon: 'Brain', active: true }
+    { id: 'h1', label: 'Deep Work', icon: '⚡' },
+    { id: 'h2', label: 'Workout', icon: '💪' },
+    { id: 'h3', label: 'Reading', icon: '📚' },
+    { id: 'h4', label: 'Coding', icon: '💻' }
 ];
 
 export class CoreEngine {
-    // 加入 'static' 關鍵字
-    static getIconComponent(iconName: string) {
-        const map: any = { BookOpen, Activity, Zap, Brain, Star, TrendingUp, Target, Heart, Rocket, Terminal };
-        return map[iconName] || Star; 
-    }
-    
-    // 加入 'static' 關鍵字
-    static sanitizeLogEntry(entry: any) {
+    /**
+     * 從原始筆記中提取標籤 (#tag) 與連結 ([link])
+     * 這是建立知識圖譜的關鍵步驟
+     */
+    static parseGraphSeeds(rawText: string, aiContent?: any) {
+        const tags = new Set<string>();
+        const links = new Set<string>();
+
+        // 1. Regex 解析 Hashtags (#React, #Life)
+        const tagRegex = /#([\w\u4e00-\u9fa5]+)/g;
+        let match;
+        while ((match = tagRegex.exec(rawText)) !== null) {
+            tags.add(match[1]);
+        }
+
+        // 2. Regex 解析 Wiki Links ([[ProjectA]])
+        const linkRegex = /\[\[(.*?)\]\]/g;
+        while ((match = linkRegex.exec(rawText)) !== null) {
+            links.add(match[1]);
+        }
+        
+        // 3. 整合 AI 分析的結果 (如果有)
+        if (aiContent?.tags) {
+            aiContent.tags.forEach((t: string) => tags.add(t));
+        }
+
         return {
-            ...entry,
-            date: entry.date || new Date().toISOString().split('T')[0],
-            metrics: { 
-                mood: Number(entry.metrics?.mood || 5), 
-                focus: Number(entry.metrics?.focus || 5), 
-                energy: Number(entry.metrics?.energy || 5),
-                deepWork: Number(entry.metrics?.deepWork || 0)
-            },
-            graphSeeds: {
-                tags: entry.graphSeeds?.tags || '',
-                links: entry.graphSeeds?.links || '',
-                content: entry.graphSeeds?.content || ''
-            }
+            tags: Array.from(tags),
+            links: Array.from(links)
         };
     }
 
-    // 加入 'static' 關鍵字
-    static extractInsight(content: string) {
-        if (!content) return { type: 'empty', text: '無文字紀錄' };
-        if (content.includes('Core Weakness')) return { type: 'bias', text: 'Core Weakness Detected', label: 'Bias' };
-        const lines = content.split('\n');
-        const preview = lines.find(l => l.length > 5 && !l.startsWith('#') && !l.startsWith('>')) || '無詳細內容';
-        return { type: 'general', text: preview.slice(0, 60), label: 'Log' };
-    }
-
-    // 加入 'static' 關鍵字
-    static parseGraphSeeds(note: string, graphContent = '') {
-        if (!note) return { tags: [], links: [] };
-        const combined = note + ' ' + graphContent;
-        const tags = (combined.match(/#([\w\u4e00-\u9fa5]+)/g) || []).map(t => t.slice(1));
-        const links = (combined.match(/\[\[(\d{4}-\d{2}-\d{2})\]\]/g) || []).map(l => l.slice(2, -2));
-        return { tags: [...new Set(tags)], links: [...new Set(links)] };
+    /**
+     * 計算節點的物理權重 (由 Metrics 決定)
+     */
+    static calculateNodeWeight(metrics: any) {
+        // 基礎大小 10 + 專注度加權
+        return 10 + (metrics?.focus || 0) * 1.5;
     }
 }
