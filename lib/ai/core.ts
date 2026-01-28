@@ -1,5 +1,7 @@
 // lib/ai/core.ts
 
+import { LucideIcon, Zap, BookOpen, Dumbbell, Code, Layout, Calendar, CheckCircle } from 'lucide-react';
+
 /**
  * Neon Palette for D3 Graph
  */
@@ -59,5 +61,43 @@ export class CoreEngine {
     static calculateNodeWeight(metrics: any) {
         // 基礎大小 10 + 專注度加權
         return 10 + (metrics?.focus || 0) * 1.5;
+    }
+
+    /**
+     * 從文本中提取待辦事項 (- [ ] task)
+     */
+    static extractTasks(text: string): string[] {
+        const taskRegex = /- \[ \] (.*)/g;
+        const tasks: string[] = [];
+        let match;
+        while ((match = taskRegex.exec(text)) !== null) {
+            tasks.push(match[1]);
+        }
+        return tasks;
+    }
+
+    /**
+     * 提取簡短摘要或洞察
+     */
+    static extractInsight(text: string): { type: 'normal' | 'drift', text: string } {
+        // 簡單邏輯：如果過短，視為 drift (這裡僅為範例)
+        if (text.length < 10) {
+            return { type: 'drift', text: 'Low information density' };
+        }
+        return { type: 'normal', text: text.substring(0, 50) + (text.length > 50 ? '...' : '') };
+    }
+
+    /**
+     * 獲取 Icon 組件
+     */
+    static getIconComponent(iconStr: string): LucideIcon {
+        // 簡單映射，實際專案可能需要更完整的映射表
+        switch (iconStr) {
+            case '⚡': return Zap;
+            case '💪': return Dumbbell;
+            case '📚': return BookOpen;
+            case '💻': return Code;
+            default: return CheckCircle;
+        }
     }
 }
