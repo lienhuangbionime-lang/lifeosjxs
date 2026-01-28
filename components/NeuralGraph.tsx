@@ -140,7 +140,7 @@ export const NeuralGraph = ({ logs, onNodeClick }: { logs: any[], onNodeClick: (
         svg.call(zoom as any);
 
         return () => simulation.stop();
-    }, [nodes, links]);
+    }, [nodes, links, onNodeClick]);
 
     return (
         <div ref={containerRef} className="w-full h-[500px] bg-[#0b1120] rounded-3xl overflow-hidden relative border border-slate-800 shadow-2xl">
