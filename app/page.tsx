@@ -372,7 +372,7 @@ export default function Home() {
                     
                     {currentLogs.length === 0 && (
                         <div className="text-center py-10 text-slate-500 text-sm">
-                            No logs found matching "{searchTerm}"
+                            {`No logs found matching "${searchTerm}"`}
                         </div>
                     )}
                 </div>
