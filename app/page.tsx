@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { NeuralGraph } from '@/components/NeuralGraph'; // 指向 components/NeuralGraph.tsx
 import { InputInterface } from '@/components/InputInterface';
 import { Activity, Network, Edit3, Settings } from 'lucide-react';
-import { CoreEngine } from '@/lib/core';
+import { CoreEngine } from '@/lib/ai/core';
 
 export default function LifeOS() {
     const [activeTab, setActiveTab] = useState('input');
@@ -32,7 +32,7 @@ export default function LifeOS() {
             </header>
 
             <main className="flex-1 overflow-y-auto p-4 scroll-smooth custom-scrollbar">
-                {activeTab === 'input' && <InputInterface onSaveEntry={handleSaveEntry} />}
+                {activeTab === 'input' && <InpcoreutInterface onSaveEntry={handleSaveEntry} />}
                 {activeTab === 'graph' && (
                     <div className="h-full flex flex-col">
                         <div className="bg-[#1e293b] p-1 rounded-3xl shadow-sm border border-slate-700 flex-1 flex flex-col">

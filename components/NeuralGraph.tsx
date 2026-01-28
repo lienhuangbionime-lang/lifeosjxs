@@ -3,7 +3,7 @@
 import React, { useEffect, useRef, useMemo, useState, useCallback } from 'react';
 import * as d3 from 'd3';
 import { Activity, Layers, LayoutGrid, GitGraph, Brain } from 'lucide-react';
-import { NEON_PALETTE, CoreEngine } from '@/lib/core';
+import { NEON_PALETTE, CoreEngine } from '@/lib/ai/core';
 
 export const NeuralGraph = ({ logs, onNodeClick }: { logs: any[], onNodeClick: (n:any)=>void }) => {
     const svgRef = useRef<SVGSVGElement>(null);

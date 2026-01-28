@@ -2,7 +2,7 @@
 "use client";
 import React, { useState } from 'react';
 import { Edit3, Cpu, Save, Hash, Link as LinkIcon, GitGraph } from 'lucide-react';
-import { DEFAULT_HABITS, CoreEngine } from '@/lib/core';
+import { DEFAULT_HABITS, CoreEngine } from '@/lib/ai/core';
 
 export const InputInterface = ({ onSaveEntry }: { onSaveEntry: (data: any) => void }) => {
     const [note, setNote] = useState("");
