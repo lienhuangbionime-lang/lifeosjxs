@@ -4,24 +4,13 @@
 import React, { useEffect, useRef, memo, useState } from 'react';
 import * as d3 from 'd3';
 import { Activity, Layers, LayoutGrid } from 'lucide-react';
-import { NEON_PALETTE, CoreEngine } from '@/lib/ai/core';
+// [Fix] Fallback for missing palette
+import { NEON_PALETTE as IMPORTED_PALETTE, CoreEngine } from '@/lib/ai/core';
 
-interface LogNode extends d3.SimulationNodeDatum {
-  id: string;
-  val: number;
-  label: string;
-  color: string;
-  group?: string;
-  raw?: any;
-  isSignal?: boolean;
-  x?: number;
-  y?: number;
-}
-
-interface LogLink extends d3.SimulationLinkDatum<LogNode> {
-  type: string;
-  tag?: string;
-}
+const SAFE_PALETTE = IMPORTED_PALETTE || {
+    EMERALD: '#10b981', ROSE: '#f43f5e', BLUE: '#3b82f6', 
+    INDIGO: '#6366f1', SLATE: '#475569', AMBER: '#f59e0b', PINK: '#ec4899'
+};
 
 export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeClick: (n:any)=>void }) => {
     const svgRef = useRef<SVGSVGElement>(null);
@@ -44,49 +33,65 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
     }, []);
 
     useEffect(() => {
-        // 🔴 關鍵修正：捕捉當下的 ref，避免 cleanup 時 ref 已經變 null
-        const svgElement = svgRef.current;
-        if (!logs || logs.length === 0 || !svgElement || dimensions.width === 0) return;
+        // [Fix] 強制檢查 dimensions 防止 D3 在寬度為 0 時計算錯誤
+        if (!logs || logs.length === 0 || !svgRef.current || dimensions.width === 0) return;
         
         const { width, height } = dimensions;
-        let simulation: d3.Simulation<LogNode, LogLink> | null = null;
+        let simulation: d3.Simulation<any, any> | null = null;
 
         try {
-            // Data Processing
-            const nodesMap = new Map<string, LogNode>();
-            const links: LogLink[] = [];
+            const nodesMap = new Map();
+            const links: any[] = [];
 
             logs.forEach(log => {
                 const id = log.date;
-                const noteContent = typeof log.note === 'string' ? log.note : '';
-                const graphContent = log.graphSeeds?.content || '';
-                const seeds = CoreEngine ? CoreEngine.parseGraphSeeds(noteContent, graphContent) : { tags: [], links: [] };
+                // [Fix] CoreEngine 防禦
+                const seeds = CoreEngine && CoreEngine.parseGraphSeeds 
+                    ? CoreEngine.parseGraphSeeds(log.note || '', log.graphSeeds?.content || '') 
+                    : { tags: [], links: [] };
                 
                 if (!nodesMap.has(id)) {
                     const mood = Number(log.metrics?.mood || 5);
                     const focus = Number(log.metrics?.focus || 5);
-                    let color = NEON_PALETTE.INDIGO;
-                    if (log.isSignal) color = NEON_PALETTE.BLUE;
-                    else if (mood > 7) color = NEON_PALETTE.EMERALD;
-                    else if (mood < 4) color = NEON_PALETTE.ROSE;
+                    let color = SAFE_PALETTE.INDIGO;
+                    
+                    if (log.isSignal) color = SAFE_PALETTE.BLUE;
+                    else if (mood > 7) color = SAFE_PALETTE.EMERALD;
+                    else if (mood < 4) color = SAFE_PALETTE.ROSE;
 
                     nodesMap.set(id, { 
-                        id, val: 10 + (focus * 1.5), label: id.slice(5), color, raw: log,
-                        x: width/2 + (Math.random()-0.5)*10, y: height/2 + (Math.random()-0.5)*10
+                        id, 
+                        val: 10 + (focus * 1.5),
+                        label: id.slice(5), 
+                        color, 
+                        raw: log,
+                        x: width / 2 + (Math.random() - 0.5) * 50,
+                        y: height / 2 + (Math.random() - 0.5) * 50
                     });
                 }
+                
                 seeds.tags.forEach((tag: string) => {
-                    if(!nodesMap.has(tag)) nodesMap.set(tag, { id: tag, val: 8, label: tag, color: NEON_PALETTE.PINK, group: 'tag', x:width/2, y:height/2 });
+                    if(!nodesMap.has(tag)) {
+                        nodesMap.set(tag, { 
+                            id: tag, 
+                            val: 8, 
+                            label: tag, 
+                            color: SAFE_PALETTE.PINK, 
+                            group: 'tag',
+                            x: width / 2,
+                            y: height / 2
+                        });
+                    }
                     links.push({ source: id, target: tag, type: 'tag' });
                 });
             });
 
             const nodes = Array.from(nodesMap.values());
-            setStats({ nodes: nodes.length, links: links.length });
+            // [Fix] 避免在 useEffect 內頻繁 setState 導致迴圈，僅在數量改變時更新
+            setStats(prev => (prev.nodes === nodes.length ? prev : { nodes: nodes.length, links: links.length }));
 
-            // D3 Rendering
-            const svg = d3.select(svgElement);
-            svg.selectAll("*").remove(); // Clear previous render
+            const svg = d3.select(svgRef.current);
+            svg.selectAll("*").remove();
 
             const g = svg.append("g");
             
@@ -96,39 +101,70 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
                 .force("center", d3.forceCenter(width / 2, height / 2).strength(0.05))
                 .force("collide", d3.forceCollide().radius((d:any) => d.val + 4).iterations(2));
 
-            const link = g.append("g").selectAll("line").data(links).join("line")
-                .attr("stroke", "#6366f1").attr("stroke-opacity", 0.2).attr("stroke-width", 1);
+            const link = g.append("g")
+                .selectAll("line")
+                .data(links)
+                .join("line")
+                .attr("stroke", "#6366f1")
+                .attr("stroke-opacity", 0.2)
+                .attr("stroke-width", 1);
 
-            const node = g.append("g").selectAll("g").data(nodes).join("g")
+            const node = g.append("g")
+                .selectAll("g")
+                .data(nodes)
+                .join("g")
                 .call(d3.drag<any, any>()
                     .on("start", (e, d) => { if (!e.active) simulation?.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
                     .on("drag", (e, d) => { d.fx = e.x; d.fy = e.y; })
                     .on("end", (e, d) => { if (!e.active) simulation?.alphaTarget(0); d.fx = null; d.fy = null; })
                 )
-                .on("click", (e, d) => { e.stopPropagation(); onNodeClick(d.raw || d); });
+                .on("click", (e, d) => { 
+                    e.stopPropagation(); 
+                    onNodeClick(d.raw || { id: d.id, label: d.label }); 
+                });
 
-            node.append("circle").attr("r", (d:any) => d.val).attr("fill", (d:any) => d.color).attr("stroke", "#1e293b").attr("stroke-width", 2);
-            node.append("text").text((d:any) => d.label).attr("text-anchor", "middle").attr("dy", (d:any) => d.val + 12).attr("fill", "#94a3b8").attr("font-size", "10px").style("pointer-events", "none");
+            node.append("circle")
+                .attr("r", (d:any) => d.val)
+                .attr("fill", (d:any) => d.color)
+                .attr("stroke", "#1e293b")
+                .attr("stroke-width", 2);
+
+            node.append("text")
+                .text((d:any) => d.label)
+                .attr("text-anchor", "middle")
+                .attr("dy", (d:any) => d.val + 12)
+                .attr("fill", "#94a3b8")
+                .attr("font-size", "10px")
+                .style("pointer-events", "none");
 
             simulation.on("tick", () => {
-                link.attr("x1", (d:any) => d.source.x).attr("y1", (d:any) => d.source.y).attr("x2", (d:any) => d.target.x).attr("y2", (d:any) => d.target.y);
-                node.attr("transform", (d:any) => `translate(${d.x},${d.y})`);
+                link
+                    .attr("x1", (d:any) => d.source.x)
+                    .attr("y1", (d:any) => d.source.y)
+                    .attr("x2", (d:any) => d.target.x)
+                    .attr("y2", (d:any) => d.target.y);
+                node
+                    .attr("transform", (d:any) => `translate(${d.x},${d.y})`);
             });
 
+            const zoom = d3.zoom().scaleExtent([0.1, 5]).on("zoom", (e) => {
+                g.attr("transform", e.transform);
+            });
+            svg.call(zoom as any);
+
         } catch (error) {
-            console.error("D3 Error:", error);
+            console.error("D3 Graph Error:", error);
         }
 
-        // 🔴 關鍵修正：Cleanup Function (防止崩潰的主因)
-        // 當組件卸載 (Unmount) 時，強制停止 D3 運算
         return () => {
             if (simulation) simulation.stop();
-            if (svgElement) {
-                d3.select(svgElement).selectAll("*").remove();
+            if (svgRef.current) {
+                d3.select(svgRef.current).on(".zoom", null); // Cleanup listeners
+                svgRef.current.innerHTML = ""; // Force clear
             }
         };
 
-    }, [logs, mode, dimensions, onNodeClick]);
+    }, [logs, mode, dimensions]);
 
     return (
         <div ref={containerRef} className="w-full h-[500px] bg-[#0b1120] rounded-3xl overflow-hidden relative border border-slate-800 shadow-2xl">
@@ -136,14 +172,17 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
                 <div className="bg-slate-900/80 px-3 py-1 rounded-full text-xs text-emerald-400 font-mono flex items-center gap-2 border border-emerald-500/30 backdrop-blur">
                     <Activity size={12}/> Neon D3 Engine: ACTIVE
                 </div>
+                <div className="text-[10px] text-slate-500 font-mono ml-2">
+                    Nodes: {stats.nodes} | Links: {stats.links}
+                </div>
             </div>
+            
             <div className="absolute top-4 right-4 z-20 flex gap-2">
                 <button onClick={() => setMode('gravity')} className={`p-2 rounded-lg border transition-all ${mode==='gravity'?'bg-indigo-600 border-indigo-400 text-white':'bg-slate-800 border-slate-700 text-slate-400'}`}><Layers size={16}/></button>
                 <button onClick={() => setMode('cluster')} className={`p-2 rounded-lg border transition-all ${mode==='cluster'?'bg-indigo-600 border-indigo-400 text-white':'bg-slate-800 border-slate-700 text-slate-400'}`}><LayoutGrid size={16}/></button>
             </div>
+
             <svg ref={svgRef} className="w-full h-full cursor-move block"></svg>
         </div>
     );
 });
-// 🔴 關鍵修正：加入 DisplayName 讓 Vercel 不要報錯
-NeuralGraph.displayName = "NeuralGraph";
