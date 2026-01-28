@@ -12,7 +12,8 @@ export const NEON_PALETTE = {
     AMBER: "#fbbf24",   // Warning / High Energy
     CYAN: "#22d3ee",    // Tech / Code
     PINK: "#f472b6",    // Tags
-    SLATE: "#94a3b8"    // Inactive
+    SLATE: "#94a3b8",    // Inactive
+    BLUE: "#3b82f6"
 };
 
 export const DEFAULT_HABITS = [
