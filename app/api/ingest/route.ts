@@ -19,7 +19,7 @@ export async function POST(req: Request) {
     });
     const data = JSON.parse(result.response.text());
 
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       // 這裡不需要特別指定 tx: Prisma.TransactionClient，讓它自動推斷即可
       const log = await tx.logEntry.upsert({
         where: { date: new Date(data.meta.date) },
