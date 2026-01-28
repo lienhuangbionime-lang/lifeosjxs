@@ -1,29 +1,28 @@
 "use client";
-import React, { useState, useEffect } from 'react';
-import { NeuralGraph } from '@/components/NeuralGraph'; // 指向 components/NeuralGraph.tsx
-import { InputInterface } from '@/components/InputInterface';
-import { Activity, Network, Edit3, Settings } from 'lucide-react';
+
+import { useState, useEffect } from 'react';
 import { CoreEngine } from '@/lib/ai/core';
+import { NeuralGraph } from '@/components/NeuralGraph';
+import { InputInterface } from '@/components/InputInterface';
 
-export default function LifeOS() {
-    const [activeTab, setActiveTab] = useState('input');
-    const [logs, setLogs] = useState<any[]>([]);
+export default function Home() {
+    const [engine, setEngine] = useState<CoreEngine | null>(null);
+    const [activeTab, setActiveTab] = useState<'graph' | 'input' | 'memory'>('input');
+    const [isClient, setIsClient] = useState(false);
 
-    // 模擬從資料庫載入 (實際上你可以用 fetch('/api/logs') 或是 Prisma Server Component)
-    // 這裡為了讓前端先跑起來，我們用 localStorage 做快取
     useEffect(() => {
-        const saved = localStorage.getItem('life_os_logs_v8_0');
-        if (saved) setLogs(JSON.parse(saved));
+        setIsClient(true);
+        const core = new CoreEngine();
+        setEngine(core);
     }, []);
 
-    const handleSaveEntry = (newEntry: any) => {
-        // Optimistic Update (前端先顯示)
-        const processed = CoreEngine.sanitizeLogEntry(newEntry);
-        const newLogs = [...logs.filter(l => l.date !== processed.date), processed];
-        
-        setLogs(newLogs.sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime()));
-        localStorage.setItem('life_os_logs_v8_0', JSON.stringify(newLogs));
-    };
+    if (!isClient || !engine) {
+        return (
+            <div className="flex items-center justify-center h-screen bg-[#0f172a] text-slate-400">
+                Loading Neural Interface...
+            </div>
+        );
+    }
 
     return (
         <div className="max-w-md mx-auto h-screen bg-[#0f172a] flex flex-col font-sans text-slate-200 relative shadow-2xl overflow-hidden">
@@ -31,31 +30,31 @@ export default function LifeOS() {
                 <h1 className="text-lg font-black tracking-tight text-white">LifeOS <span className="text-indigo-400 text-xs align-top border border-indigo-500/30 px-1 rounded">v2.0 Cloud</span></h1>
             </header>
 
-            <main className="flex-1 overflow-y-auto p-4 scroll-smooth custom-scrollbar">
-                {activeTab === 'input' && <InputInterface onSend={handleSend} isProcessing={isProcessing} />
+            <main className="flex-1 overflow-hidden relative">
                 {activeTab === 'graph' && (
-                    <div className="h-full flex flex-col">
-                        <div className="bg-[#1e293b] p-1 rounded-3xl shadow-sm border border-slate-700 flex-1 flex flex-col">
-                            <NeuralGraph logs={logs} onNodeClick={(n) => alert(`Clicked: ${n.id}`)} />
-                        </div>
+                    <div className="absolute inset-0 z-0">
                     </div>
                 )}
-                {/* 其他 Tab 暫位符 */}
-                {activeTab === 'dashboard' && <div className="text-center text-slate-500 mt-20">Dashboard Loading...</div>}
+                
+                {activeTab === 'input' && (
+                    <div className="h-full overflow-y-auto pb-20 p-4">
+                    </div>
+                )}
             </main>
 
-            <nav className="bg-[#1e293b] border-t border-slate-800 p-2 flex justify-around items-center z-30 pb-safe">
-                {[
-                    {id:'input', icon:Edit3, label:'Log'},
-                    {id:'graph', icon:Network, label:'Graph'},
-                    {id:'dashboard', icon:Activity, label:'Dash'},
-                    {id:'settings', icon:Settings, label:'Sys'}
-                ].map(tab => (
-                    <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all w-16 ${activeTab === tab.id ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-500 hover:bg-slate-800'}`}>
-                        {React.createElement(tab.icon, { size: 20 })}
-                        <span className="text-[10px] font-bold">{tab.label}</span>
-                    </button>
-                ))}
+            <nav className="h-16 bg-[#0f172a] border-t border-slate-800 flex justify-around items-center z-30 shrink-0">
+                <button 
+                    onClick={() => setActiveTab('graph')}
+                    className={`p-2 rounded-xl transition-all duration-300 ${activeTab === 'graph' ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+                </button>
+                <button 
+                    onClick={() => setActiveTab('input')}
+                    className={`p-2 rounded-xl transition-all duration-300 ${activeTab === 'input' ? 'text-indigo-400 bg-indigo-500/10' : 'text-slate-500 hover:text-slate-300'}`}
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+                </button>
             </nav>
         </div>
     );

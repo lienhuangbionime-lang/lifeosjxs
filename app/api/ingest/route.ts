@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { prisma } from "@/lib/db";  // 指向 lib/db.ts
+import { Prisma } from '@prisma/client';
 import { AGENTIC_INGEST_SYSTEM_PROMPT } from "@/lib/ai/prompts";
 import { NextResponse } from "next/server";
 
@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     const data = JSON.parse(result.response.text());
 
     // 2. Parallel Write (Prisma Transaction)
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
       // Log Entry
       const log = await tx.logEntry.upsert({
         where: { date: new Date(data.meta.date) },

@@ -139,7 +139,7 @@ export const NeuralGraph = ({ logs, onNodeClick }: { logs: any[], onNodeClick: (
         });
         svg.call(zoom as any);
 
-        return () => simulation.stop();
+        return () => { simulation.stop(); };
     }, [nodes, links, onNodeClick]);
 
     return (
