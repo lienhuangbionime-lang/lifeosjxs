@@ -1,107 +1,226 @@
-// 檔案位置: app/page.tsx
 'use client';
 
-// ... (其他 imports 保持不變)
-// 確保正確 import
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
     Layers, PenTool, List as ListIcon, Activity, 
-    Terminal, Cpu, Filter, Zap, TrendingUp, Clock, ArrowRight, CheckCircle 
+    Terminal, Cpu, Filter, CheckCircle, ArrowRight, Zap, TrendingUp, Clock 
 } from 'lucide-react';
-import { CoreEngine, DEFAULT_HABITS } from '@/lib/ai/core'; 
+// 確保路徑正確，若你的檔案在根目錄 lib，請用 @/lib...
+import { CoreEngine, DEFAULT_HABITS } from '@/lib/ai/core';
 import { NeuralGraph } from '@/components/NeuralGraph';
 
-// ... (MOCK_LOGS 和其他常數保持不變)
+// --- [關鍵修復] 補回遺失的 MOCK_LOGS 定義 ---
+const MOCK_LOGS = [
+  { date: '2024-01-28', note: 'Project LifeOS: Fix Vercel deploy #coding', metrics: { mood: 6, focus: 8, energy: 7, deepWork: 4 }, graphSeeds: { tags: ['coding', 'project'], links: [] }, habits: { h4: true }, isSignal: false },
+  { date: '2024-01-29', note: 'Family dinner at Taichung #life', metrics: { mood: 9, focus: 3, energy: 8, deepWork: 0 }, graphSeeds: { tags: ['life', 'family'], links: [] }, habits: {}, isSignal: false },
+  { date: '2024-01-30', note: 'Deep work session on AI core logic #coding - [ ] Refactor core.ts', metrics: { mood: 7, focus: 9, energy: 6, deepWork: 6 }, graphSeeds: { tags: ['coding', 'ai'], links: [] }, habits: { h1: true, h4: true }, isSignal: true },
+  { date: '2024-01-31', note: 'Gym workout and reading science fiction #health', metrics: { mood: 8, focus: 6, energy: 9, deepWork: 2 }, graphSeeds: { tags: ['health', 'reading'], links: [] }, habits: { h2: true, h3: true }, isSignal: false },
+  { date: '2024-02-01', note: 'Planning next sprint', metrics: { mood: 5, focus: 7, energy: 5, deepWork: 3 }, graphSeeds: { tags: ['planning'], links: [] }, habits: {}, isSignal: false },
+  { date: '2024-02-02', note: 'Debug UI issues', metrics: { mood: 4, focus: 8, energy: 4, deepWork: 5 }, graphSeeds: { tags: ['coding', 'bugfix'], links: [] }, habits: { h4: true }, isSignal: false },
+];
+
+const ITEMS_PER_PAGE = 3;
+// 防止 config undefined 導致崩潰
+const safeConfig = { habits: DEFAULT_HABITS || [] };
 
 export default function Home() {
-  // ... (狀態 State 保持不變)
+  // [Fix] 使用 MOCK_LOGS 初始化
   const [logs, setLogs] = useState<any[]>(MOCK_LOGS);
   const [activeTab, setActiveTab] = useState<'capture' | 'graph' | 'list'>('capture');
   const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
   const [aiThinkingLogs, setAiThinkingLogs] = useState<string[]>([]);
+  
+  // [Fix] Hydration mismatch: 初始日期設為空字串，useEffect 再設為今天
   const [entry, setEntry] = useState<any>({ 
       date: '', 
       note: '', 
       mood: 5, focus: 5, energy: 5, deepWork: 0,
       habits: {} 
   });
+  
   const [detectedTasks, setDetectedTasks] = useState<string[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [historyPage, setHistoryPage] = useState(1);
 
+  // [Fix] 客戶端掛載後才設定日期，避免伺服器端渲染與客戶端不一致導致崩潰
   useEffect(() => {
       setEntry((prev: any) => ({ ...prev, date: new Date().toISOString().split('T')[0] }));
   }, []);
 
-  // [Fix] 使用 useCallback 包裹點擊處理函式，確保參照穩定
-  const handleNodeClick = useCallback((node: any) => {
-      alert(`Clicked: ${node.label}`);
-  }, []);
+  const handleSaveLog = (newLog: any) => {
+    // [Fix] CoreEngine 防禦檢查
+    const seeds = CoreEngine && CoreEngine.parseGraphSeeds 
+        ? CoreEngine.parseGraphSeeds(entry.note) 
+        : { tags: [], links: [] };
 
-  // ... (handleSaveLog, handleAIParse, renderAiTerminal, renderContent 邏輯保持不變)
-  // 僅需修改 renderContent 中 'graph' case 的部分:
+    const logToSave = newLog || {
+        ...entry,
+        graphSeeds: seeds
+    };
+    setLogs(prev => [logToSave, ...prev]);
+    setActiveTab('graph');
+    setEntry({ 
+      date: new Date().toISOString().split('T')[0], 
+      note: '', 
+      mood: 5, focus: 5, energy: 5, deepWork: 0,
+      habits: {} 
+    });
+    setAiThinkingLogs([]);
+    setDetectedTasks([]);
+  };
+
+  const showToast = (msg: string, type: 'success' | 'error' = 'success') => { alert(msg); };
+
+  const handleAIParse = async () => {
+    const text = entry.note;
+    if (!text) { showToast("❌ 請先輸入內容", "error"); return; }
+    
+    // [Fix] 明確檢查 CoreEngine 是否載入
+    if (!CoreEngine || !CoreEngine.parseGraphSeeds) { 
+        showToast("❌ 核心引擎未載入 (Check imports)", "error"); 
+        console.error("CoreEngine is undefined. Check src/lib/ai/core.ts export.");
+        return; 
+    }
+
+    setIsAiAnalyzing(true);
+    setAiThinkingLogs(["Initializing text parser..."]);
+    const wait = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+    try {
+        await wait(500);
+        setAiThinkingLogs(prev => [...prev, "Reading context..."]);
+        
+        // Regex logic
+        const mood = text.match(/(?:Mood|心情)[\s\S]*?(\d+(?:\.\d+)?)/i);
+        const focus = text.match(/(?:Focus|專注)[\s\S]*?(\d+(?:\.\d+)?)/i);
+        const energy = text.match(/(?:Energy|能量)[\s\S]*?(\d+(?:\.\d+)?)/i);
+        const deep = text.match(/(?:Deep|Reading|深度)[\s\S]*?(\d+(?:\.\d+)?)/i);
+        const dateMatch = text.match(/(?:Date|日期|^#\s*\[?)?\s*(\d{4}-\d{2}-\d{2})/m);
+        
+        const targetDate = dateMatch ? dateMatch[1] : entry.date;
+        const graphMatch = text.match(/(?:Graph|Connections|關聯)(?:[\s:：]*)(?:[\r\n]+)([\s\S]*?)(?:$|^#)/mi);
+        const graphContent = graphMatch ? graphMatch[1].trim() : '';
+        
+        const seeds = CoreEngine.parseGraphSeeds(graphContent || text);
+        
+        let detectedFocus = focus ? parseInt(focus[1]) : entry.focus;
+        if (text.includes('URGENT') || text.includes('TODO')) {
+            detectedFocus = Math.max(detectedFocus || 5, 8);
+        }
+
+        let detectedHabits = { ...entry.habits };
+        safeConfig.habits.forEach(h => {
+            if (text.toLowerCase().includes(h.id) || text.includes(h.label.split(' ')[0].toLowerCase())) {
+                detectedHabits[h.id] = true;
+            }
+        });
+
+        let tasks: string[] = [];
+        const taskRegex = /-\s*\[\s*\]\s*(.*)/g;
+        let match;
+        while ((match = taskRegex.exec(text)) !== null) {
+            tasks.push(match[1]);
+        }
+        setDetectedTasks(tasks);
+
+        setEntry((prev: any) => ({
+            ...prev,
+            date: targetDate,
+            mood: mood ? parseInt(mood[1]) : prev.mood,
+            focus: detectedFocus,
+            energy: energy ? parseInt(energy[1]) : prev.energy,
+            deepWork: deep ? parseInt(deep[1]) : prev.deepWork,
+            habits: detectedHabits,
+            graphSeeds: { tags: seeds.tags, links: seeds.links, content: graphContent } 
+        }));
+        showToast(`🪄 AI 分析完成`);
+
+    } catch (error: any) {
+        console.error(error);
+        setAiThinkingLogs(prev => [...prev, `❌ Error: ${error.message}`]);
+    } finally {
+        setIsAiAnalyzing(false);
+    }
+  };
+
+  const renderAiTerminal = () => {
+    if (!isAiAnalyzing && aiThinkingLogs.length === 0) return null;
+    return (
+        <div className="mb-4 bg-slate-900 rounded-xl p-4 border border-indigo-500/30 shadow-lg animate-fade-in">
+            <div className="flex items-center gap-2 mb-2 border-b border-slate-800 pb-2">
+                <Terminal size={14} className="text-emerald-400 animate-pulse"/>
+                <span className="text-xs font-mono text-emerald-400 font-bold">AI_CORE_PROCESSOR</span>
+            </div>
+            <div className="font-mono text-xs space-y-1 h-32 overflow-y-auto custom-scrollbar flex flex-col-reverse">
+                {isAiAnalyzing && <div className="text-emerald-500 animate-pulse">_</div>}
+                {[...aiThinkingLogs].reverse().map((log, i) => (
+                    <div key={i} className="text-slate-300">
+                        <span className="text-indigo-500 mr-2">➜</span>
+                        {log}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+  };
 
   const renderContent = () => {
     switch (activeTab) {
       case 'capture':
-        // ... (capture logic)
         return (
-            // ... (capture JSX)
-            <div className="h-full flex flex-col justify-center max-w-lg mx-auto w-full pb-20">
-                {/* ...內容保持不變... */}
-                <h2 className="text-2xl font-bold text-white mb-6 px-4 flex items-center gap-2">
-                   <PenTool className="text-indigo-400" /> Capture Flow
-                </h2>
-                {renderAiTerminal()}
-                <div className="bg-[#1e293b] p-6 rounded-3xl shadow-lg border border-slate-700">
-                    <div className="flex justify-between items-center mb-4">
-                        <span className="text-sm font-bold text-slate-300 flex items-center gap-2">DAILY LOG</span>
-                        <input type="date" value={entry.date} onChange={e => setEntry({...entry, date: e.target.value})} className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1 text-sm font-mono outline-none text-white"/>
-                    </div>
-                    <textarea 
-                        value={entry.note} onChange={e => setEntry({...entry, note: e.target.value})}
-                        placeholder="# 輸入你的想法...\n> Agent 會幫你整理成 Project 與 Life 雙軌"
-                        className="w-full h-48 p-4 bg-slate-900 border border-slate-700 rounded-xl text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none resize-none leading-relaxed text-slate-200 placeholder:text-slate-600"
-                    />
-                    {detectedTasks.length > 0 && (
-                        <div className="mt-4 p-3 bg-indigo-900/30 border border-indigo-500/30 rounded-xl">
-                            <div className="text-xs font-bold text-indigo-300 mb-2 flex items-center gap-2"><CheckCircle size={12}/> Extracted Tasks</div>
-                            <ul className="space-y-1">
-                                {detectedTasks.map((t, i) => (
-                                    <li key={i} className="text-xs text-slate-300 flex items-center gap-2">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>{t}
-                                    </li>
-                                ))}
-                            </ul>
-                        </div>
-                    )}
-                    <div className="flex justify-end gap-2 mt-4">
-                        <button onClick={handleAIParse} disabled={isAiAnalyzing} className={`px-4 py-2 rounded-xl bg-slate-700 text-indigo-300 text-xs font-bold hover:bg-slate-600 transition-colors flex items-center gap-2 border border-slate-600 ${isAiAnalyzing ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                            <Cpu className={`w-3 h-3 ${isAiAnalyzing ? 'animate-pulse' : ''}`}/> 
-                            {isAiAnalyzing ? "Analyzing..." : "AI Agent"}
-                        </button>
-                        <button onClick={() => handleSaveLog(null)} className="px-6 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 flex items-center gap-2">
-                            <Activity className="w-3 h-3"/> Save
-                        </button>
-                    </div>
+          <div className="h-full flex flex-col justify-center max-w-lg mx-auto w-full pb-20">
+            <h2 className="text-2xl font-bold text-white mb-6 px-4 flex items-center gap-2">
+               <PenTool className="text-indigo-400" /> Capture Flow
+            </h2>
+            {renderAiTerminal()}
+            <div className="bg-[#1e293b] p-6 rounded-3xl shadow-lg border border-slate-700">
+                <div className="flex justify-between items-center mb-4">
+                    <span className="text-sm font-bold text-slate-300 flex items-center gap-2">DAILY LOG</span>
+                    <input type="date" value={entry.date} onChange={e => setEntry({...entry, date: e.target.value})} className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-1 text-sm font-mono outline-none text-white"/>
                 </div>
-                 <div className="bg-[#1e293b] p-6 rounded-3xl shadow-lg border border-slate-700 space-y-4 mt-4">
-                    {['mood', 'focus', 'energy'].map(k => (
-                        <div key={k} className="flex items-center gap-4">
-                            <label className="w-16 text-xs font-bold text-slate-400 uppercase">{k}</label>
-                            <input type="range" min="0" max="10" value={entry[k]} onChange={e => setEntry({...entry, [k]: parseInt(e.target.value)})} className="flex-1 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"/>
-                            <span className="w-6 text-right text-sm font-bold text-indigo-400">{entry[k]}</span>
-                        </div>
-                    ))}
+                <textarea 
+                    value={entry.note} onChange={e => setEntry({...entry, note: e.target.value})}
+                    placeholder="# 輸入你的想法...\n> Agent 會幫你整理成 Project 與 Life 雙軌"
+                    className="w-full h-48 p-4 bg-slate-900 border border-slate-700 rounded-xl text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none resize-none leading-relaxed text-slate-200 placeholder:text-slate-600"
+                />
+                {detectedTasks.length > 0 && (
+                    <div className="mt-4 p-3 bg-indigo-900/30 border border-indigo-500/30 rounded-xl">
+                        <div className="text-xs font-bold text-indigo-300 mb-2 flex items-center gap-2"><CheckCircle size={12}/> Extracted Tasks</div>
+                        <ul className="space-y-1">
+                            {detectedTasks.map((t, i) => (
+                                <li key={i} className="text-xs text-slate-300 flex items-center gap-2">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>{t}
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                )}
+                <div className="flex justify-end gap-2 mt-4">
+                    <button onClick={handleAIParse} disabled={isAiAnalyzing} className={`px-4 py-2 rounded-xl bg-slate-700 text-indigo-300 text-xs font-bold hover:bg-slate-600 transition-colors flex items-center gap-2 border border-slate-600 ${isAiAnalyzing ? 'opacity-50 cursor-not-allowed' : ''}`}>
+                        <Cpu className={`w-3 h-3 ${isAiAnalyzing ? 'animate-pulse' : ''}`}/> 
+                        {isAiAnalyzing ? "Analyzing..." : "AI Agent"}
+                    </button>
+                    <button onClick={() => handleSaveLog(null)} className="px-6 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-500/30 flex items-center gap-2">
+                        <Activity className="w-3 h-3"/> Save
+                    </button>
                 </div>
             </div>
+             <div className="bg-[#1e293b] p-6 rounded-3xl shadow-lg border border-slate-700 space-y-4 mt-4">
+                {['mood', 'focus', 'energy'].map(k => (
+                    <div key={k} className="flex items-center gap-4">
+                        <label className="w-16 text-xs font-bold text-slate-400 uppercase">{k}</label>
+                        <input type="range" min="0" max="10" value={entry[k]} onChange={e => setEntry({...entry, [k]: parseInt(e.target.value)})} className="flex-1 h-2 bg-slate-800 rounded-lg appearance-none cursor-pointer accent-indigo-500"/>
+                        <span className="w-6 text-right text-sm font-bold text-indigo-400">{entry[k]}</span>
+                    </div>
+                ))}
+            </div>
+          </div>
         );
       case 'graph':
         return (
           <div className="h-full flex flex-col">
             <div className="flex-1 relative overflow-hidden rounded-2xl border border-slate-800 bg-[#0b1120]">
-               {/* [Fix] 傳遞 memoized 的 handler */}
-               <NeuralGraph logs={logs} onNodeClick={handleNodeClick} />
+               <NeuralGraph logs={logs} onNodeClick={(node: any) => alert(`Clicked: ${node.label}`)} />
             </div>
             <div className="p-4 text-center text-slate-500 text-xs">
                <Activity className="w-3 h-3 inline mr-1"/> 
@@ -110,7 +229,6 @@ export default function Home() {
           </div>
         );
       case 'list':
-        // ... (list logic - 保持不變)
         const filteredLogs = logs.filter(log => {
             const searchContent = (log.note + log.date).toLowerCase();
             return searchContent.includes(searchTerm.toLowerCase());
