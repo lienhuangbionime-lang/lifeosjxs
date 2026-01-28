@@ -2,6 +2,7 @@
 
 generator client {
   provider = "prisma-client-js"
+// Vercel 會自動偵測環境，不需要額外設定
 }
 
 datasource db {
@@ -47,3 +48,4 @@ model Task {
   
   createdAt   DateTime  @default(now())
 }
+
