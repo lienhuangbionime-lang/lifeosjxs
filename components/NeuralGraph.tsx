@@ -1,16 +1,32 @@
-// 檔案位置: components/NeuralGraph.tsx
 'use client';
 
 import React, { useEffect, useRef, memo, useState } from 'react';
 import * as d3 from 'd3';
 import { Activity, Layers, LayoutGrid } from 'lucide-react';
-// [Fix] Fallback for missing palette
-import { NEON_PALETTE as IMPORTED_PALETTE, CoreEngine } from '@/lib/ai/core';
+import { NEON_PALETTE, CoreEngine } from '@/lib/ai/core';
 
-const SAFE_PALETTE = IMPORTED_PALETTE || {
+// [Safety] 確保調色盤存在，防止 undefined 錯誤
+const SAFE_PALETTE = NEON_PALETTE || {
     EMERALD: '#10b981', ROSE: '#f43f5e', BLUE: '#3b82f6', 
     INDIGO: '#6366f1', SLATE: '#475569', AMBER: '#f59e0b', PINK: '#ec4899'
 };
+
+interface LogNode extends d3.SimulationNodeDatum {
+  id: string;
+  val: number;
+  label: string;
+  color: string;
+  group?: string;
+  raw?: any;
+  isSignal?: boolean;
+  x?: number;
+  y?: number;
+}
+
+interface LogLink extends d3.SimulationLinkDatum<LogNode> {
+  type: string;
+  tag?: string;
+}
 
 export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeClick: (n:any)=>void }) => {
     const svgRef = useRef<SVGSVGElement>(null);
@@ -19,6 +35,7 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
     const [stats, setStats] = useState({ nodes: 0, links: 0 });
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
+    // 1. 監聽容器大小 (防崩潰關鍵：寬度為0時不執行 D3)
     useEffect(() => {
         if (!containerRef.current) return;
         const resizeObserver = new ResizeObserver((entries) => {
@@ -32,22 +49,26 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
         return () => resizeObserver.disconnect();
     }, []);
 
+    // 2. D3 核心運算
     useEffect(() => {
-        // [Fix] 強制檢查 dimensions 防止 D3 在寬度為 0 時計算錯誤
-        if (!logs || logs.length === 0 || !svgRef.current || dimensions.width === 0) return;
+        const svgElement = svgRef.current;
+        // [Safety Check] 確保所有依賴都就緒，且寬度不為 0
+        if (!logs || logs.length === 0 || !svgElement || dimensions.width === 0) return;
         
         const { width, height } = dimensions;
-        let simulation: d3.Simulation<any, any> | null = null;
+        let simulation: d3.Simulation<LogNode, LogLink> | null = null;
 
         try {
-            const nodesMap = new Map();
-            const links: any[] = [];
+            const nodesMap = new Map<string, LogNode>();
+            const links: LogLink[] = [];
 
             logs.forEach(log => {
                 const id = log.date;
-                // [Fix] CoreEngine 防禦
+                const noteContent = typeof log.note === 'string' ? log.note : '';
+                const graphContent = log.graphSeeds?.content || '';
+                // [Safety Check] CoreEngine 防禦
                 const seeds = CoreEngine && CoreEngine.parseGraphSeeds 
-                    ? CoreEngine.parseGraphSeeds(log.note || '', log.graphSeeds?.content || '') 
+                    ? CoreEngine.parseGraphSeeds(noteContent, graphContent) 
                     : { tags: [], links: [] };
                 
                 if (!nodesMap.has(id)) {
@@ -84,13 +105,28 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
                     }
                     links.push({ source: id, target: tag, type: 'tag' });
                 });
+
+                seeds.links.forEach((target: string) => {
+                      if (!nodesMap.has(target)) {
+                          nodesMap.set(target, {
+                              id: target,
+                              val: 5,
+                              label: target,
+                              color: SAFE_PALETTE.SLATE,
+                              group: 'stub',
+                              x: width / 2,
+                              y: height / 2
+                          });
+                      }
+                      links.push({ source: id, target: target, type: 'manual' });
+                });
             });
 
             const nodes = Array.from(nodesMap.values());
-            // [Fix] 避免在 useEffect 內頻繁 setState 導致迴圈，僅在數量改變時更新
-            setStats(prev => (prev.nodes === nodes.length ? prev : { nodes: nodes.length, links: links.length }));
+            setStats({ nodes: nodes.length, links: links.length });
 
-            const svg = d3.select(svgRef.current);
+            // D3 Rendering
+            const svg = d3.select(svgElement);
             svg.selectAll("*").remove();
 
             const g = svg.append("g");
@@ -107,7 +143,16 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
                 .join("line")
                 .attr("stroke", "#6366f1")
                 .attr("stroke-opacity", 0.2)
-                .attr("stroke-width", 1);
+                .attr("stroke-width", (d:any) => d.type === 'manual' ? 1.5 : 1)
+                .attr("stroke-dasharray", (d:any) => d.type === 'tag' ? "3,3" : "");
+
+            // Filters
+            const defs = svg.append("defs");
+            const filter = defs.append("filter").attr("id", "glow");
+            filter.append("feGaussianBlur").attr("stdDeviation", "2.5").attr("result", "coloredBlur");
+            const feMerge = filter.append("feMerge");
+            feMerge.append("feMergeNode").attr("in", "coloredBlur");
+            feMerge.append("feMergeNode").attr("in", "SourceGraphic");
 
             const node = g.append("g")
                 .selectAll("g")
@@ -120,14 +165,16 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
                 )
                 .on("click", (e, d) => { 
                     e.stopPropagation(); 
-                    onNodeClick(d.raw || { id: d.id, label: d.label }); 
+                    onNodeClick(d.raw || { id: d.id, label: d.label, group: d.group }); 
                 });
 
             node.append("circle")
                 .attr("r", (d:any) => d.val)
                 .attr("fill", (d:any) => d.color)
                 .attr("stroke", "#1e293b")
-                .attr("stroke-width", 2);
+                .attr("stroke-width", 2)
+                .style("filter", "url(#glow)")
+                .style("cursor", "pointer");
 
             node.append("text")
                 .text((d:any) => d.label)
@@ -135,7 +182,8 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
                 .attr("dy", (d:any) => d.val + 12)
                 .attr("fill", "#94a3b8")
                 .attr("font-size", "10px")
-                .style("pointer-events", "none");
+                .style("pointer-events", "none")
+                .style("user-select", "none");
 
             simulation.on("tick", () => {
                 link
@@ -156,15 +204,16 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
             console.error("D3 Graph Error:", error);
         }
 
+        // [Crucial Cleanup] 切換頁面時必須強制停止模擬，否則瀏覽器崩潰
         return () => {
             if (simulation) simulation.stop();
-            if (svgRef.current) {
-                d3.select(svgRef.current).on(".zoom", null); // Cleanup listeners
-                svgRef.current.innerHTML = ""; // Force clear
+            if (svgElement) {
+                d3.select(svgElement).selectAll("*").remove();
+                d3.select(svgElement).on(".zoom", null);
             }
         };
 
-    }, [logs, mode, dimensions]);
+    }, [logs, mode, dimensions, onNodeClick]);
 
     return (
         <div ref={containerRef} className="w-full h-[500px] bg-[#0b1120] rounded-3xl overflow-hidden relative border border-slate-800 shadow-2xl">
@@ -186,3 +235,6 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
         </div>
     );
 });
+
+// [Fix] 解決 ESLint component definition is missing display name
+NeuralGraph.displayName = "NeuralGraph";

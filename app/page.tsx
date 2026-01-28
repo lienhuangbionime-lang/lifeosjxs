@@ -1,13 +1,11 @@
-// 檔案位置: app/page.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
     Layers, PenTool, List as ListIcon, Activity, 
     Terminal, Cpu, Filter, Zap, TrendingUp, Clock, ArrowRight, CheckCircle 
 } from 'lucide-react';
-// [Fix] 嘗試使用相對路徑或 alias，並加入 fallback
-import { CoreEngine, DEFAULT_HABITS } from '@/lib/ai/core'; 
+import { CoreEngine, DEFAULT_HABITS } from '@/lib/ai/core';
 import { NeuralGraph } from '@/components/NeuralGraph';
 
 // --- MOCK DATA ---
@@ -17,7 +15,7 @@ const MOCK_LOGS = [
   { date: '2024-01-30', note: 'Deep work session on AI core logic #coding - [ ] Refactor core.ts', metrics: { mood: 7, focus: 9, energy: 6, deepWork: 6 }, graphSeeds: { tags: ['coding', 'ai'], links: [] }, habits: { h1: true, h4: true }, isSignal: true },
 ];
 
-// [Fix] 防止 config undefined
+const ITEMS_PER_PAGE = 3;
 const safeConfig = { habits: DEFAULT_HABITS || [] };
 
 export default function Home() {
@@ -25,7 +23,8 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'capture' | 'graph' | 'list'>('capture');
   const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
   const [aiThinkingLogs, setAiThinkingLogs] = useState<string[]>([]);
-  // [Fix] Hydration mismatch: 初始日期設為空，Mount 後再設定
+  
+  // [Fix] Hydration mismatch: 初始日期設為空字串，在 useEffect 補上
   const [entry, setEntry] = useState<any>({ 
       date: '', 
       note: '', 
@@ -41,8 +40,13 @@ export default function Home() {
       setEntry((prev: any) => ({ ...prev, date: new Date().toISOString().split('T')[0] }));
   }, []);
 
+  // [Fix] useCallback 防止 NeuralGraph 不必要的重繪 (效能關鍵)
+  const handleNodeClick = useCallback((node: any) => {
+      alert(`Clicked: ${node.label}`);
+  }, []);
+
   const handleSaveLog = (newLog: any) => {
-    // [Fix] CoreEngine 防禦檢查
+    // [Fix] CoreEngine 防禦
     const seeds = CoreEngine && CoreEngine.parseGraphSeeds 
         ? CoreEngine.parseGraphSeeds(entry.note) 
         : { tags: [], links: [] };
@@ -68,10 +72,8 @@ export default function Home() {
   const handleAIParse = async () => {
     const text = entry.note;
     if (!text) { showToast("❌ 請先輸入內容", "error"); return; }
-    // [Fix] 明確檢查 CoreEngine 是否載入
     if (!CoreEngine || !CoreEngine.parseGraphSeeds) { 
-        showToast("❌ 核心引擎未載入 (Check imports)", "error"); 
-        console.error("CoreEngine is undefined. Check src/lib/ai/core.ts export.");
+        showToast("❌ 核心引擎未載入", "error"); 
         return; 
     }
 
@@ -83,7 +85,7 @@ export default function Home() {
         await wait(500);
         setAiThinkingLogs(prev => [...prev, "Reading context..."]);
         
-        // Regex logic (Keep existing logic)
+        // Regex logic
         const mood = text.match(/(?:Mood|心情)[\s\S]*?(\d+(?:\.\d+)?)/i);
         const focus = text.match(/(?:Focus|專注)[\s\S]*?(\d+(?:\.\d+)?)/i);
         const energy = text.match(/(?:Energy|能量)[\s\S]*?(\d+(?:\.\d+)?)/i);
@@ -129,7 +131,6 @@ export default function Home() {
         showToast(`🪄 AI 分析完成`);
 
     } catch (error: any) {
-        console.error(error);
         setAiThinkingLogs(prev => [...prev, `❌ Error: ${error.message}`]);
     } finally {
         setIsAiAnalyzing(false);
@@ -204,7 +205,7 @@ export default function Home() {
         return (
           <div className="h-full flex flex-col">
             <div className="flex-1 relative overflow-hidden rounded-2xl border border-slate-800 bg-[#0b1120]">
-               <NeuralGraph logs={logs} onNodeClick={(node) => alert(`Clicked: ${node.label}`)} />
+               <NeuralGraph logs={logs} onNodeClick={handleNodeClick} />
             </div>
             <div className="p-4 text-center text-slate-500 text-xs">
                <Activity className="w-3 h-3 inline mr-1"/> 
@@ -214,7 +215,10 @@ export default function Home() {
         );
       case 'list':
         const filteredLogs = logs.filter(log => (log.note + log.date).toLowerCase().includes(searchTerm.toLowerCase()));
-        const ITEMS_PER_PAGE = 5;
+        
+        // [Fix] List View Pagination Logic
+        const totalPages = Math.ceil(filteredLogs.length / ITEMS_PER_PAGE);
+        if (historyPage > totalPages && totalPages > 0) setHistoryPage(1);
         const startIndex = (historyPage - 1) * ITEMS_PER_PAGE;
         const currentLogs = filteredLogs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
@@ -235,6 +239,13 @@ export default function Home() {
                         </div>
                     ))}
                 </div>
+                {totalPages > 1 && (
+                    <div className="flex justify-center gap-2 mt-4">
+                        {Array.from({ length: totalPages }).map((_, i) => (
+                            <button key={i} onClick={() => setHistoryPage(i + 1)} className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${historyPage === i + 1 ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>{i + 1}</button>
+                        ))}
+                    </div>
+                )}
             </div>
         );
     }
