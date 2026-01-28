@@ -1,8 +1,9 @@
-// src/app/api/ingest/route.ts
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { prisma } from "@/lib/db";
+import { prisma } from "@/lib/db";  // 指向 lib/db.ts
 import { AGENTIC_INGEST_SYSTEM_PROMPT } from "@/lib/ai/prompts";
 import { NextResponse } from "next/server";
+
+// ... (其餘代碼與之前相同)
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 const model = genAI.getGenerativeModel({ 
