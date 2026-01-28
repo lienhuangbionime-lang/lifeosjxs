@@ -1,13 +1,10 @@
-// prisma/schema.prisma
-
 generator client {
   provider = "prisma-client-js"
-  // Vercel 會自動偵測環境，不需要額外設定  
 }
 
 datasource db {
-  provider = "postgresql" // Vercel 會自動覆寫這個，本地開發可用 "sqlite"
-  url      = env("POSTGRES_PRISMA_URL")
+  provider  = "postgresql"
+  url       = env("POSTGRES_PRISMA_URL")
   directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
@@ -18,35 +15,33 @@ model LogEntry {
   mood      Int?
   focus     Int?
   energy    Int?
-  vtrRatio  Float?   // Value-Time Ratio
+  vtrRatio  Float?
   tasks     Task[]
   createdAt DateTime @default(now())
 }
 
 model Project {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  status      String   @default("ACTIVE")
-  tasks       Task[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String   @unique
+  status    String   @default("ACTIVE")
+  tasks     Task[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model Task {
-  id          String    @id @default(cuid())
-  title       String
-  context     String?
-  status      String    @default("PENDING")
-  dueDate     DateTime?
-  isUrgent    Boolean   @default(false)
+  id         String    @id @default(cuid())
+  title      String
+  context    String?
+  status     String    @default("PENDING")
+  dueDate    DateTime?
+  isUrgent   Boolean   @default(false)
   
-  logEntryId  String
-  logEntry    LogEntry  @relation(fields: [logEntryId], references: [id])
+  logEntryId String
+  logEntry   LogEntry  @relation(fields: [logEntryId], references: [id])
   
-  projectId   String?
-  project     Project?  @relation(fields: [projectId], references: [id])
+  projectId  String?
+  project    Project?  @relation(fields: [projectId], references: [id])
   
-  createdAt   DateTime  @default(now())
+  createdAt  DateTime  @default(now())
 }
-
-
