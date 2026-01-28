@@ -1,30 +1,22 @@
-// 檔案位置: lib/ai/prompts.ts
-
 export const PROMPT_VERSION = "v7.1";
 
-// [Fix] 確保導出 DAILY_INGEST_PROMPT
+// [Fix] 1. 導出 Daily Prompt
 export const DAILY_INGEST_PROMPT = `
 ::: SYSTEM: LIFE OS AGENTIC INGEST ${PROMPT_VERSION} :::
-
 # Role
-你是 LifeOS 的核心處理單元（Agentic Ingest Engine）。
-你的任務是將使用者的原始紀錄結構化，作為「秩序維持與推進引擎」。
+你是 LifeOS 的核心處理單元。任務：將原始紀錄結構化，維持秩序與推進專案。
 
 # Core Directive
-1. **結構化 (Structure)**: 嚴格拆解 Life 與 Project 雙軌。
-2. **判斷 (Judge)**: 區分訊號 (Signal) 與雜訊。只有具體、可單人執行、具時間意義的項目進入 Task。
-3. **推進 (Advance)**: 任務必須能推進專案狀態。
-4. **連結 (Link)**: 識別專案與 Graph Seeds。
+1. **結構化**: 拆解 Life/Project 雙軌。
+2. **判斷**: 區分訊號與雜訊。只有具體、可執行項目進入 Task。
+3. **推進**: 任務必須能推進專案狀態。
+4. **反幻覺**: 不確定的資訊保持模糊，不可腦補。
 
-# Hard Constraints (Must Follow)
-1. **主權原則**: 禁止任何心理推論、成長敘事、人格評價。
-2. **時間真實性**: 僅基於實際行為，不推論「可能/應該」。
-3. **反幻覺**: 不確定的資訊保持模糊或留空，不可腦補。
-4. **算術評分**: Mood/Focus/Energy 若無明示，僅能依照行為時間佔比 (Time Ratio) 進行算術推導，禁止心理歸因。
+# Hard Constraints
+- 禁止心理推論與成長敘事。
+- Mood/Focus/Energy 若無明示，僅能依照行為時間佔比 (Time Ratio) 算術推導。
 
 # Output Schema (Strict JSON)
-請輸出單一 JSON 物件，格式如下：
-
 {
   "meta": {
     "date": "YYYY-MM-DD",
@@ -35,7 +27,7 @@ export const DAILY_INGEST_PROMPT = `
       "vtr_ratio": number | null
     }
   },
-  "markdown_body": "完整的 Markdown 日記內容 (含 Highlights, Reflection, Behavior Path 等)",
+  "markdown_body": "完整的 Markdown 日記內容 (含 Highlights, Reflection, Behavior Path)",
   "tasks": [
     {
       "category": "task" | "urgent",
@@ -46,15 +38,15 @@ export const DAILY_INGEST_PROMPT = `
     }
   ],
   "graph_seeds": [
-    { "name": "關鍵字/專案名", "type": "TAG" | "PROJECT" | "PERSON" }
+    { "name": "關鍵字", "type": "tag" | "project" }
   ]
 }
 `;
 
-// [Fix] 確保導出 AGENTIC_INGEST_SYSTEM_PROMPT (兼容舊 API 引用)
+// [Fix] 2. 導出 System Alias (相容性)
 export const AGENTIC_INGEST_SYSTEM_PROMPT = DAILY_INGEST_PROMPT;
 
-// [Fix] 確保導出 MONTHLY_REVIEW_PROMPT
+// [Fix] 3. 導出 Monthly Prompt (CCA)
 export const MONTHLY_REVIEW_PROMPT = `
 ::: SYSTEM: LIFE OS ORACLE ENGINE v8.0 :::
 # Role

@@ -29,7 +29,27 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'capture' | 'graph' | 'list'>('capture');
   const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
   const [aiThinkingLogs, setAiThinkingLogs] = useState<string[]>([]);
-  
+
+// [Feature 1] 匯入舊 JSON 功能
+const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+        try {
+            const json = JSON.parse(ev.target?.result as string);
+            // 假設舊檔是 Array，直接合併進目前 Logs
+            if (Array.isArray(json)) {
+                setLogs(prev => [...json, ...prev]);
+                alert(`成功匯入 ${json.length} 筆歷史資料`);
+            }
+        } catch (err) {
+            alert("格式錯誤，無法解析");
+        }
+    };
+    reader.readAsText(file);
+};  
+
   // [Fix] Hydration mismatch: 初始日期設為空字串，useEffect 再設為今天
   const [entry, setEntry] = useState<any>({ 
       date: '', 
@@ -239,6 +259,47 @@ export default function Home() {
         if (historyPage > totalPages && totalPages > 0) setHistoryPage(1);
         const startIndex = (historyPage - 1) * ITEMS_PER_PAGE;
         const currentLogs = filteredLogs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+        case 'list':
+            // [Feature 4] 歷史足跡查詢 (已在上一版代碼中實作，這裡再次確認)
+            const filteredLogs = logs.filter(log => {
+                const content = (log.note || '') + (log.date || '');
+                return content.toLowerCase().includes(searchTerm.toLowerCase());
+            });
+            
+            return (
+                <div className="h-full flex flex-col pb-20">
+                    <div className="flex justify-between items-center mb-6 px-2">
+                        <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                            <ListIcon className="text-indigo-400" /> History
+                        </h2>
+                        {/* 搜尋框 */}
+                        <input type="text" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="bg-slate-800 rounded-full text-xs text-white border border-slate-700 px-4 py-2 w-32"/>
+                    </div>
+                    
+                    {/* [Feature 1 UI] 匯入按鈕放這裡 */}
+                    <div className="px-2 mb-4">
+                        <label className="text-xs text-indigo-400 cursor-pointer border border-indigo-500/30 px-3 py-1 rounded-lg hover:bg-indigo-500/10">
+                            📥 Import JSON
+                            <input type="file" className="hidden" onChange={handleImport} accept=".json"/>
+                        </label>
+                    </div>
+    
+                    <div className="flex-1 overflow-y-auto space-y-4 px-2 custom-scrollbar">
+                        {filteredLogs.map((log, i) => (
+                            <div key={i} className="bg-[#1e293b] p-4 rounded-xl border border-slate-700">
+                                <div className="flex justify-between mb-2">
+                                    <span className="text-white font-bold">{log.date}</span>
+                                    <span className="text-xs text-slate-400">Mood: {log.metrics?.mood}</span>
+                                </div>
+                                <p className="text-sm text-slate-300 line-clamp-2">{log.note}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        }
+      };
 
         return (
             <div className="h-full flex flex-col pb-20">
