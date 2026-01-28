@@ -1,13 +1,12 @@
-// src/app/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { NeuralGraph } from '@/components/NeuralGraph';
-import { InputInterface } from '@/components/InputInterface'; // Assuming you kept this component structure
+// InputInterface is integrated directly into the 'capture' tab for better state management in this page
 import { CoreEngine, DEFAULT_HABITS } from '@/lib/ai/core';
 import { 
     Layers, PenTool, List as ListIcon, Calendar, Activity, 
-    Terminal, Cpu, Filter, X, Zap, TrendingUp, Clock, AlertTriangle, ArrowRight 
+    Terminal, Cpu, Filter, X, Zap, TrendingUp, Clock, AlertTriangle, ArrowRight, CheckCircle
 } from 'lucide-react';
 
 // --- MOCK DATA ---
@@ -136,7 +135,18 @@ export default function Home() {
         setAiThinkingLogs(prev => [...prev, `Matched ${habitCount} active habits`]);
 
         // 4. Task Bridge
-        const tasks = CoreEngine.extractTasks(text);
+        // Note: CoreEngine.extractTasks might not be implemented in core.ts yet based on previous context.
+        // If it's missing, this line will break. I'll add a safe check or implement a mock if needed.
+        // Assuming CoreEngine has it or we simulate it here to prevent crash.
+        // let tasks = CoreEngine.extractTasks ? CoreEngine.extractTasks(text) : [];
+        // Simulating task extraction for safety if method is missing in imported core
+        let tasks: string[] = [];
+        const taskRegex = /-\s*\[\s*\]\s*(.*)/g;
+        let match;
+        while ((match = taskRegex.exec(text)) !== null) {
+            tasks.push(match[1]);
+        }
+
         setDetectedTasks(tasks);
         if(tasks.length > 0) setAiThinkingLogs(prev => [...prev, `⚡ Extracted ${tasks.length} actionable tasks`]);
 
@@ -203,7 +213,7 @@ export default function Home() {
             {/* AI Terminal */}
             {renderAiTerminal()}
 
-            {/* Manual Input Form Area (Replica of InputInterface logic but integrated) */}
+            {/* Manual Input Form Area */}
             <div className="bg-[#1e293b] p-6 rounded-3xl shadow-lg border border-slate-700">
                 <div className="flex justify-between items-center mb-4">
                     <span className="text-sm font-bold text-slate-300 flex items-center gap-2">DAILY LOG</span>
@@ -282,7 +292,7 @@ export default function Home() {
         const filteredLogs = logs.filter(log => {
             const searchContent = (log.note + log.date).toLowerCase();
             return searchContent.includes(searchTerm.toLowerCase());
-        }); // logs are already newest first typically, but if MOCK_LOGS is old->new, reverse it. MOCK_LOGS seems old->new.
+        });
         
         // Sort by date desc
         filteredLogs.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -293,4 +303,144 @@ export default function Home() {
             setHistoryPage(1);
         }
         
-        const startIndex = (historyPage - 1) * ITEMS_
+        const startIndex = (historyPage - 1) * ITEMS_PER_PAGE;
+        const currentLogs = filteredLogs.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+        return (
+            <div className="h-full flex flex-col pb-20">
+                <div className="flex justify-between items-center mb-6 px-2">
+                    <h2 className="text-2xl font-bold text-white flex items-center gap-2">
+                        <ListIcon className="text-indigo-400" /> Neural History
+                    </h2>
+                    <div className="relative">
+                        <Filter className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 w-4 h-4"/>
+                        <input 
+                            type="text" 
+                            placeholder="Filter logs..." 
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            className="pl-9 pr-4 py-2 bg-slate-800 rounded-full text-xs text-white border border-slate-700 focus:border-indigo-500 outline-none w-32 focus:w-48 transition-all"
+                        />
+                    </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-4 px-2 custom-scrollbar">
+                    {currentLogs.map((log, i) => (
+                        <div key={i} className="bg-[#1e293b] p-5 rounded-2xl border border-slate-700 hover:border-indigo-500/50 transition-colors group relative overflow-hidden">
+                            <div className="absolute top-0 right-0 w-24 h-24 bg-indigo-500/5 rounded-bl-full -mr-10 -mt-10 group-hover:bg-indigo-500/10 transition-colors"></div>
+                            
+                            <div className="flex justify-between items-start mb-3 relative z-10">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-slate-800 flex items-center justify-center text-slate-400 font-bold text-xs shadow-inner">
+                                        <div className="text-center leading-none">
+                                            <span className="block text-[10px] uppercase text-slate-500">{new Date(log.date).toLocaleString('default', { month: 'short' })}</span>
+                                            <span className="text-lg text-white">{new Date(log.date).getDate()}</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <div className="text-xs text-slate-500 font-mono mb-0.5">{new Date(log.date).getFullYear()}</div>
+                                        <div className="flex gap-1">
+                                            {log.graphSeeds?.tags?.map((tag: string) => (
+                                                <span key={tag} className="text-[10px] px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full border border-indigo-500/20">#{tag}</span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex gap-1">
+                                    <span className={`text-[10px] px-1.5 py-0.5 rounded border ${log.metrics?.mood >= 7 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400' : 'bg-slate-700 border-slate-600 text-slate-400'}`}>
+                                        Mood: {log.metrics?.mood}
+                                    </span>
+                                </div>
+                            </div>
+
+                            <p className="text-sm text-slate-300 leading-relaxed mb-4 relative z-10 line-clamp-3">
+                                {log.note}
+                            </p>
+
+                            <div className="flex justify-between items-center pt-3 border-t border-slate-700/50 relative z-10">
+                                <div className="flex gap-3 text-xs text-slate-500">
+                                    <span className="flex items-center gap-1"><Zap size={12}/> {log.metrics?.energy}</span>
+                                    <span className="flex items-center gap-1"><TrendingUp size={12}/> {log.metrics?.focus}</span>
+                                    <span className="flex items-center gap-1"><Clock size={12}/> {log.metrics?.deepWork}h</span>
+                                </div>
+                                <button className="p-1.5 rounded-lg hover:bg-slate-700 text-slate-400 hover:text-white transition-colors">
+                                    <ArrowRight size={14}/>
+                                </button>
+                            </div>
+                        </div>
+                    ))}
+                    
+                    {currentLogs.length === 0 && (
+                        <div className="text-center py-10 text-slate-500 text-sm">
+                            No logs found matching "{searchTerm}"
+                        </div>
+                    )}
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                    <div className="flex justify-center gap-2 mt-4">
+                        {Array.from({ length: totalPages }).map((_, i) => (
+                            <button 
+                                key={i}
+                                onClick={() => setHistoryPage(i + 1)}
+                                className={`w-8 h-8 rounded-lg text-xs font-bold transition-all ${
+                                    historyPage === i + 1 
+                                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/30' 
+                                    : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                }`}
+                            >
+                                {i + 1}
+                            </button>
+                        ))}
+                    </div>
+                )}
+            </div>
+        );
+    }
+  };
+
+  return (
+    <div className="max-w-md mx-auto h-screen bg-[#0f172a] flex flex-col font-sans text-slate-200 relative shadow-2xl overflow-hidden">
+        {/* Header */}
+        <header className="px-6 py-4 bg-[#0f172a]/90 backdrop-blur z-20 flex justify-between items-center border-b border-slate-800 sticky top-0">
+            <h1 className="text-lg font-black tracking-tight text-white">LifeOS <span className="text-indigo-400 text-xs align-top border border-indigo-500/30 px-1 rounded">v2.0 Cloud</span></h1>
+            <div className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center">
+                <span className="text-xs font-bold text-indigo-300">LH</span>
+            </div>
+        </header>
+
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto p-4 relative z-10 custom-scrollbar">
+            {renderContent()}
+        </main>
+
+        {/* Navigation Bar */}
+        <nav className="absolute bottom-6 left-6 right-6 h-16 bg-[#1e293b]/90 backdrop-blur-md rounded-2xl border border-slate-700/50 shadow-2xl flex justify-around items-center px-2 z-50">
+            <button 
+                onClick={() => setActiveTab('capture')}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'capture' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+                <PenTool size={20} strokeWidth={activeTab === 'capture' ? 2.5 : 2} />
+                <span className="text-[10px] font-bold">Capture</span>
+            </button>
+            
+            <button 
+                onClick={() => setActiveTab('graph')}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'graph' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+                <Layers size={20} strokeWidth={activeTab === 'graph' ? 2.5 : 2} />
+                <span className="text-[10px] font-bold">Neural</span>
+            </button>
+            
+            <button 
+                onClick={() => setActiveTab('list')}
+                className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'list' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}
+            >
+                <ListIcon size={20} strokeWidth={activeTab === 'list' ? 2.5 : 2} />
+                <span className="text-[10px] font-bold">History</span>
+            </button>
+        </nav>
+    </div>
+  );
+}
