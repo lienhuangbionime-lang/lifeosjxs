@@ -1,4 +1,3 @@
-// 檔案位置: lib/ai/core.ts
 import { BookOpen, Activity, Zap, Brain, Star, TrendingUp, Target, Heart, Rocket, Terminal } from 'lucide-react';
 
 export const VERSION = "10.3 (Cloud Agent)"; 
@@ -16,14 +15,15 @@ export const DEFAULT_HABITS = [
     { id: 'meditation', label: '反思 Meta', icon: 'Brain', active: true }
 ];
 
-// 修改：改成 Class 定義，讓 new CoreEngine() 合法
 export class CoreEngine {
-    getIconComponent(iconName: string) {
+    // 加入 'static' 關鍵字
+    static getIconComponent(iconName: string) {
         const map: any = { BookOpen, Activity, Zap, Brain, Star, TrendingUp, Target, Heart, Rocket, Terminal };
         return map[iconName] || Star; 
     }
     
-    sanitizeLogEntry(entry: any) {
+    // 加入 'static' 關鍵字
+    static sanitizeLogEntry(entry: any) {
         return {
             ...entry,
             date: entry.date || new Date().toISOString().split('T')[0],
@@ -41,7 +41,8 @@ export class CoreEngine {
         };
     }
 
-    extractInsight(content: string) {
+    // 加入 'static' 關鍵字
+    static extractInsight(content: string) {
         if (!content) return { type: 'empty', text: '無文字紀錄' };
         if (content.includes('Core Weakness')) return { type: 'bias', text: 'Core Weakness Detected', label: 'Bias' };
         const lines = content.split('\n');
@@ -49,7 +50,8 @@ export class CoreEngine {
         return { type: 'general', text: preview.slice(0, 60), label: 'Log' };
     }
 
-    parseGraphSeeds(note: string, graphContent = '') {
+    // 加入 'static' 關鍵字
+    static parseGraphSeeds(note: string, graphContent = '') {
         if (!note) return { tags: [], links: [] };
         const combined = note + ' ' + graphContent;
         const tags = (combined.match(/#([\w\u4e00-\u9fa5]+)/g) || []).map(t => t.slice(1));
