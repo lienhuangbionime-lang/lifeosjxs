@@ -6,10 +6,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "postinstall": "prisma generate", 
-    "//": "--- 下面是新增的清理指令 ---",
-    "clean": "rm -rf .next node_modules coverage .swc .cache prisma/generated && echo '🧹 Project Cleaned! Run npm install/yarn install to restart.'",
-    "nuke": "rm -rf .next node_modules package-lock.json yarn.lock && echo '☢️ Deep Clean Done. Re-install packages carefully.'"
+    "postinstall": "prisma generate",
+    "clean": "rm -rf .next node_modules coverage .swc .cache prisma/generated",
+    "nuke": "rm -rf .next node_modules package-lock.json yarn.lock"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
