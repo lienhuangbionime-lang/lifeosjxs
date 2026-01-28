@@ -5,7 +5,7 @@
   "main": "next.config.js",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
-    "@prisma/client": "^7.3.0",
+    "@prisma/client": "^5.10.0",
     "acorn": "^8.12.1",
     "acorn-jsx": "^5.3.2",
     "ajv": "^6.12.6",
