@@ -32,7 +32,7 @@ export default function LifeOS() {
             </header>
 
             <main className="flex-1 overflow-y-auto p-4 scroll-smooth custom-scrollbar">
-                {activeTab === 'input' && <InpcoreutInterface onSaveEntry={handleSaveEntry} />}
+                {activeTab === 'input' && <InputInterface onSend={handleSend} isProcessing={isProcessing} />
                 {activeTab === 'graph' && (
                     <div className="h-full flex flex-col">
                         <div className="bg-[#1e293b] p-1 rounded-3xl shadow-sm border border-slate-700 flex-1 flex flex-col">
