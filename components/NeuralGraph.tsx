@@ -1,15 +1,10 @@
+// 檔案位置: components/NeuralGraph.tsx
 'use client';
 
 import React, { useEffect, useRef, memo, useState } from 'react';
 import * as d3 from 'd3';
 import { Activity, Layers, LayoutGrid } from 'lucide-react';
 import { NEON_PALETTE, CoreEngine } from '@/lib/ai/core';
-
-// [Safety] 確保調色盤存在，防止 undefined 錯誤
-const SAFE_PALETTE = NEON_PALETTE || {
-    EMERALD: '#10b981', ROSE: '#f43f5e', BLUE: '#3b82f6', 
-    INDIGO: '#6366f1', SLATE: '#475569', AMBER: '#f59e0b', PINK: '#ec4899'
-};
 
 interface LogNode extends d3.SimulationNodeDatum {
   id: string;
@@ -28,14 +23,14 @@ interface LogLink extends d3.SimulationLinkDatum<LogNode> {
   tag?: string;
 }
 
-export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeClick: (n:any)=>void }) => {
+// [Fix 1] 命名元件函式，而不是使用匿名函式
+const NeuralGraphComponent = ({ logs, onNodeClick }: { logs: any[], onNodeClick: (n:any)=>void }) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [mode, setMode] = useState('gravity');
     const [stats, setStats] = useState({ nodes: 0, links: 0 });
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
-    // 1. 監聽容器大小 (防崩潰關鍵：寬度為0時不執行 D3)
     useEffect(() => {
         if (!containerRef.current) return;
         const resizeObserver = new ResizeObserver((entries) => {
@@ -49,12 +44,11 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
         return () => resizeObserver.disconnect();
     }, []);
 
-    // 2. D3 核心運算
     useEffect(() => {
-        const svgElement = svgRef.current;
-        // [Safety Check] 確保所有依賴都就緒，且寬度不為 0
-        if (!logs || logs.length === 0 || !svgElement || dimensions.width === 0) return;
+        if (!logs || logs.length === 0 || !svgRef.current || dimensions.width === 0) return;
         
+        // [Fix 2] 捕捉目前的 ref 值，確保 cleanup 時能正確存取
+        const currentSvgRef = svgRef.current;
         const { width, height } = dimensions;
         let simulation: d3.Simulation<LogNode, LogLink> | null = null;
 
@@ -66,19 +60,16 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
                 const id = log.date;
                 const noteContent = typeof log.note === 'string' ? log.note : '';
                 const graphContent = log.graphSeeds?.content || '';
-                // [Safety Check] CoreEngine 防禦
-                const seeds = CoreEngine && CoreEngine.parseGraphSeeds 
-                    ? CoreEngine.parseGraphSeeds(noteContent, graphContent) 
-                    : { tags: [], links: [] };
+                const seeds = CoreEngine ? CoreEngine.parseGraphSeeds(noteContent, graphContent) : { tags: [], links: [] };
                 
                 if (!nodesMap.has(id)) {
                     const mood = Number(log.metrics?.mood || 5);
                     const focus = Number(log.metrics?.focus || 5);
-                    let color = SAFE_PALETTE.INDIGO;
+                    let color = NEON_PALETTE.INDIGO;
                     
-                    if (log.isSignal) color = SAFE_PALETTE.BLUE;
-                    else if (mood > 7) color = SAFE_PALETTE.EMERALD;
-                    else if (mood < 4) color = SAFE_PALETTE.ROSE;
+                    if (log.isSignal) color = NEON_PALETTE.BLUE;
+                    else if (mood > 7) color = NEON_PALETTE.EMERALD;
+                    else if (mood < 4) color = NEON_PALETTE.ROSE;
 
                     nodesMap.set(id, { 
                         id, 
@@ -97,7 +88,7 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
                             id: tag, 
                             val: 8, 
                             label: tag, 
-                            color: SAFE_PALETTE.PINK, 
+                            color: NEON_PALETTE.PINK, 
                             group: 'tag',
                             x: width / 2,
                             y: height / 2
@@ -112,7 +103,7 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
                               id: target,
                               val: 5,
                               label: target,
-                              color: SAFE_PALETTE.SLATE,
+                              color: NEON_PALETTE.SLATE,
                               group: 'stub',
                               x: width / 2,
                               y: height / 2
@@ -123,10 +114,9 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
             });
 
             const nodes = Array.from(nodesMap.values());
-            setStats({ nodes: nodes.length, links: links.length });
+            setStats(prev => (prev.nodes === nodes.length ? prev : { nodes: nodes.length, links: links.length }));
 
-            // D3 Rendering
-            const svg = d3.select(svgElement);
+            const svg = d3.select(currentSvgRef);
             svg.selectAll("*").remove();
 
             const g = svg.append("g");
@@ -146,7 +136,7 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
                 .attr("stroke-width", (d:any) => d.type === 'manual' ? 1.5 : 1)
                 .attr("stroke-dasharray", (d:any) => d.type === 'tag' ? "3,3" : "");
 
-            // Filters
+            // SVG Defs (Glow Filter)
             const defs = svg.append("defs");
             const filter = defs.append("filter").attr("id", "glow");
             filter.append("feGaussianBlur").attr("stdDeviation", "2.5").attr("result", "coloredBlur");
@@ -204,15 +194,16 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
             console.error("D3 Graph Error:", error);
         }
 
-        // [Crucial Cleanup] 切換頁面時必須強制停止模擬，否則瀏覽器崩潰
         return () => {
             if (simulation) simulation.stop();
-            if (svgElement) {
-                d3.select(svgElement).selectAll("*").remove();
-                d3.select(svgElement).on(".zoom", null);
+            // 使用變數中的 ref 進行 cleanup
+            if (currentSvgRef) {
+                d3.select(currentSvgRef).on(".zoom", null);
+                currentSvgRef.innerHTML = "";
             }
         };
 
+    // [Fix 3] 加入 onNodeClick 到依賴陣列
     }, [logs, mode, dimensions, onNodeClick]);
 
     return (
@@ -234,7 +225,8 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: { logs: any[], onNodeCli
             <svg ref={svgRef} className="w-full h-full cursor-move block"></svg>
         </div>
     );
-});
+};
 
-// [Fix] 解決 ESLint component definition is missing display name
-NeuralGraph.displayName = "NeuralGraph";
+// [Fix 4] 設定 Display Name 並 Memo 化
+export const NeuralGraph = memo(NeuralGraphComponent);
+NeuralGraph.displayName = 'NeuralGraph';
