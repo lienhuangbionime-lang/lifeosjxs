@@ -1,9 +1,8 @@
+// 檔案位置: app/api/ingest/route.ts
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { Prisma } from '@prisma/client';
+import { prisma } from "@/lib/db";
 import { AGENTIC_INGEST_SYSTEM_PROMPT } from "@/lib/ai/prompts";
 import { NextResponse } from "next/server";
-
-// ... (其餘代碼與之前相同)
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 const model = genAI.getGenerativeModel({ 
@@ -15,15 +14,13 @@ export async function POST(req: Request) {
   try {
     const { text, date } = await req.json();
 
-    // 1. Agent Thought (Gemini)
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: AGENTIC_INGEST_SYSTEM_PROMPT + "\n\nINPUT:\n" + text }] }]
     });
     const data = JSON.parse(result.response.text());
 
-    // 2. Parallel Write (Prisma Transaction)
-    await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
-      // Log Entry
+    await prisma.$transaction(async (tx) => {
+      // 這裡不需要特別指定 tx: Prisma.TransactionClient，讓它自動推斷即可
       const log = await tx.logEntry.upsert({
         where: { date: new Date(data.meta.date) },
         update: { 
@@ -43,7 +40,6 @@ export async function POST(req: Request) {
         }
       });
 
-      // Tasks & Projects
       if (data.tasks?.length > 0) {
         for (const t of data.tasks) {
           let projectId = null;
