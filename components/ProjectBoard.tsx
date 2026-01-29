@@ -1,12 +1,16 @@
+// 檔案位置: components/ProjectBoard.tsx
 'use client';
 import React from 'react';
 import { LayoutTemplate, ChevronRight, Hash } from 'lucide-react';
 
 export const ProjectBoard = ({ logs }: { logs: any[] }) => {
-    // 簡單的專案聚合邏輯：統計 graphSeeds.tags
+    // [Fix] 安全聚合邏輯
     const projectMap = new Map();
-    logs.forEach(log => {
-        (log.graphSeeds?.tags || []).forEach((tag: string) => {
+    
+    (logs || []).forEach(log => {
+        // 安全存取 tags，若 undefined 則用空陣列
+        const tags = log.graphSeeds?.tags || [];
+        tags.forEach((tag: string) => {
             if (!projectMap.has(tag)) {
                 projectMap.set(tag, { name: tag, count: 0, lastUpdate: log.date });
             }
@@ -19,7 +23,7 @@ export const ProjectBoard = ({ logs }: { logs: any[] }) => {
     const projects = Array.from(projectMap.values()).sort((a,b) => b.count - a.count);
 
     return (
-        <div className="h-full overflow-y-auto pb-32 px-4 pt-6">
+        <div className="h-full overflow-y-auto pb-32 px-4 pt-6 custom-scrollbar">
             <div className="mb-6">
                 <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                    <LayoutTemplate className="text-indigo-500" /> Projects
@@ -45,7 +49,7 @@ export const ProjectBoard = ({ logs }: { logs: any[] }) => {
                         </div>
                     </div>
                 ))}
-                {projects.length === 0 && <div className="text-center py-10 text-slate-400">尚無專案標籤 (#Tag)</div>}
+                {projects.length === 0 && <div className="text-center py-10 text-slate-400">尚無專案標籤 (#Tag)，請在日記中使用 #專案名</div>}
             </div>
         </div>
     );

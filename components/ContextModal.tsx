@@ -1,3 +1,4 @@
+// 檔案位置: components/ContextModal.tsx
 'use client';
 import React from 'react';
 import { Network, X, Link as LinkIcon, Calendar, Hash } from 'lucide-react';
@@ -5,18 +6,23 @@ import { Network, X, Link as LinkIcon, Calendar, Hash } from 'lucide-react';
 export const ContextModal = ({ mainNode, logs, onClose }: { mainNode: any, logs: any[], onClose: () => void }) => {
     if (!mainNode) return null;
 
-    // 關聯邏輯：不僅篩選，還標記原因
+    // [Fix] 增強關聯邏輯：大小寫不敏感，並支援 Graph Link
     const relatedLogs = logs.map(log => {
         const note = (log.note || '').toLowerCase();
-        const nodeId = mainNode.id.toLowerCase();
+        const nodeId = (mainNode.id || '').toLowerCase();
         let reason = null;
 
-        if (mainNode.group === 'tag' && (note.includes(`#${nodeId}`) || (log.graphSeeds?.tags || []).includes(nodeId))) {
-            reason = { type: 'tag', label: `#${mainNode.id}` };
-        } else if (mainNode.group === 'date' && log.date === mainNode.id) {
+        // 1. Tag 匹配
+        if (mainNode.group === 'tag' && (note.includes(`#${nodeId}`) || (log.graphSeeds?.tags || []).some((t:string) => t.toLowerCase() === nodeId))) {
+            reason = { type: 'tag', label: `#${mainNode.label}` };
+        } 
+        // 2. 日期匹配
+        else if (mainNode.group === 'date' && log.date === mainNode.id) {
             reason = { type: 'date', label: 'Same Day' };
-        } else if (log.graphSeeds?.links?.includes(mainNode.id)) {
-            reason = { type: 'link', label: 'Direct Link' };
+        } 
+        // 3. 直接連結 (Link)
+        else if (log.graphSeeds?.links?.includes(mainNode.id)) {
+            reason = { type: 'link', label: 'Linked' };
         }
 
         return reason ? { ...log, matchReason: reason } : null;
@@ -26,7 +32,7 @@ export const ContextModal = ({ mainNode, logs, onClose }: { mainNode: any, logs:
         <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
             <div className="w-full max-w-lg max-h-[85vh] bg-white rounded-3xl shadow-2xl flex flex-col border border-slate-200" onClick={e => e.stopPropagation()}>
                 
-                {/* Header - Soft Theme */}
+                {/* Header */}
                 <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-3xl">
                     <div className="flex items-center gap-3">
                         <div className="p-2 bg-indigo-100 rounded-full text-indigo-600"><Network size={20}/></div>
@@ -46,7 +52,6 @@ export const ContextModal = ({ mainNode, logs, onClose }: { mainNode: any, logs:
                                 <div className="flex justify-between items-start mb-2">
                                     <span className="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-1 rounded">{log.date}</span>
                                     
-                                    {/* [Fix] 顯示連結原因 */}
                                     <span className={`text-[10px] px-2 py-1 rounded-full flex items-center gap-1 font-bold ${
                                         log.matchReason.type === 'tag' ? 'bg-pink-100 text-pink-600' :
                                         log.matchReason.type === 'date' ? 'bg-indigo-100 text-indigo-600' :
@@ -58,11 +63,13 @@ export const ContextModal = ({ mainNode, logs, onClose }: { mainNode: any, logs:
                                         {log.matchReason.label}
                                     </span>
                                 </div>
-                                <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">{log.note}</p>
+                                <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">{log.note || log.content}</p>
                             </div>
                         ))
                     ) : (
-                        <div className="text-center py-10 text-slate-400 italic">此節點是孤島，尚無直接關聯。</div>
+                        <div className="text-center py-10 text-slate-400 italic">
+                            此節點 ({mainNode.label}) 暫無關聯日記。
+                        </div>
                     )}
                 </div>
             </div>

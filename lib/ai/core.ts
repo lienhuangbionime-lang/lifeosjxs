@@ -1,104 +1,58 @@
-// lib/ai/core.ts
+// 檔案位置: lib/ai/core.ts
+import { BookOpen, Activity, Zap, Brain, Star, TrendingUp, Target, Heart, Rocket, Terminal } from 'lucide-react';
 
-import { LucideIcon, Zap, BookOpen, Dumbbell, Code, Layout, Calendar, CheckCircle } from 'lucide-react';
-
-/**
- * Neon Palette for D3 Graph
- */
-export const NEON_PALETTE = {
-    INDIGO: "#818cf8",  // Default Node
-    EMERALD: "#34d399", // High Mood
-    ROSE: "#fb7185",    // Low Mood
-    AMBER: "#fbbf24",   // Warning / High Energy
-    CYAN: "#22d3ee",    // Tech / Code
-    PINK: "#f472b6",    // Tags
-    SLATE: "#94a3b8",    // Inactive
-    BLUE: "#3b82f6"
-};
-
+// [核心設定]
 export const DEFAULT_HABITS = [
-    { id: 'h1', label: 'Deep Work', icon: '⚡' },
-    { id: 'h2', label: 'Workout', icon: '💪' },
-    { id: 'h3', label: 'Reading', icon: '📚' },
-    { id: 'h4', label: 'Coding', icon: '💻' }
+    { id: 'reading', label: '閱讀 Input', icon: 'BookOpen', active: true },
+    { id: 'native_coding', label: 'Native Logic', icon: 'Terminal', active: true },
+    { id: 'creation', label: '創作 Output', icon: 'Zap', active: true },
+    { id: 'exercise', label: '運動 Health', icon: 'Activity', active: true },
+    { id: 'meditation', label: '反思 Meta', icon: 'Brain', active: true }
 ];
 
-export class CoreEngine {
-    /**
-     * 從原始筆記中提取標籤 (#tag) 與連結 ([link])
-     * 這是建立知識圖譜的關鍵步驟
-     */
-    static parseGraphSeeds(rawText: string, aiContent?: any) {
-        const tags = new Set<string>();
-        const links = new Set<string>();
+export const NEON_PALETTE = {
+    EMERALD: '#10b981', ROSE: '#f43f5e', BLUE: '#3b82f6', 
+    INDIGO: '#6366f1', SLATE: '#475569', AMBER: '#f59e0b', PINK: '#ec4899'
+};
 
-        // 1. Regex 解析 Hashtags (#React, #Life)
-        const tagRegex = /#([\w\u4e00-\u9fa5]+)/g;
-        let match;
-        while ((match = tagRegex.exec(rawText)) !== null) {
-            tags.add(match[1]);
-        }
-
-        // 2. Regex 解析 Wiki Links ([[ProjectA]])
-        const linkRegex = /\[\[(.*?)\]\]/g;
-        while ((match = linkRegex.exec(rawText)) !== null) {
-            links.add(match[1]);
-        }
+export const CoreEngine = {
+    getIconComponent: (iconName: string) => {
+        const map: any = { BookOpen, Activity, Zap, Brain, Star, TrendingUp, Target, Heart, Rocket, Terminal };
+        return map[iconName] || Star; 
+    },
+    
+    // [Fix] 增強洞察提取邏輯，優先抓取 Drift Point
+    extractInsight: (content: string) => {
+        if (!content) return { type: 'empty', text: '無文字紀錄', label: 'Empty' };
         
-        // 3. 整合 AI 分析的結果 (如果有)
-        if (aiContent?.tags) {
-            aiContent.tags.forEach((t: string) => tags.add(t));
+        // 1. 優先偵測 Drift Point (偏移)
+        const driftMatch = content.match(/(?:Drift Point|Drift|偏移點)[:：]\s*(.+)/i);
+        if (driftMatch && driftMatch[1]) {
+            return { type: 'drift', text: driftMatch[1].trim(), label: '⚠️ Drift' };
         }
 
-        return {
-            tags: Array.from(tags),
-            links: Array.from(links)
-        };
-    }
-
-    /**
-     * 計算節點的物理權重 (由 Metrics 決定)
-     */
-    static calculateNodeWeight(metrics: any) {
-        // 基礎大小 10 + 專注度加權
-        return 10 + (metrics?.focus || 0) * 1.5;
-    }
-
-    /**
-     * 從文本中提取待辦事項 (- [ ] task)
-     */
-    static extractTasks(text: string): string[] {
-        const taskRegex = /- \[ \] (.*)/g;
-        const tasks: string[] = [];
-        let match;
-        while ((match = taskRegex.exec(text)) !== null) {
-            tasks.push(match[1]);
+        // 2. 偵測 Action Check 警告
+        if (content.includes('Action Check: ⚠️')) {
+            return { type: 'warning', text: 'Action Check Failed', label: '⚠️ Warning' };
         }
-        return tasks;
-    }
 
-    /**
-     * 提取簡短摘要或洞察
-     */
-    static extractInsight(text: string): { type: 'normal' | 'drift', text: string } {
-        // 簡單邏輯：如果過短，視為 drift (這裡僅為範例)
-        if (text.length < 10) {
-            return { type: 'drift', text: 'Low information density' };
+        // 3. 抓取 Summary
+        const summaryMatch = content.match(/(?:Day Summary|Summary|航行記錄)[:：]\s*(.+)/i);
+        if (summaryMatch && summaryMatch[1]) {
+            return { type: 'summary', text: summaryMatch[1].trim(), label: '📝 Summary' };
         }
-        return { type: 'normal', text: text.substring(0, 50) + (text.length > 50 ? '...' : '') };
-    }
 
-    /**
-     * 獲取 Icon 組件
-     */
-    static getIconComponent(iconStr: string): LucideIcon {
-        // 簡單映射，實際專案可能需要更完整的映射表
-        switch (iconStr) {
-            case '⚡': return Zap;
-            case '💪': return Dumbbell;
-            case '📚': return BookOpen;
-            case '💻': return Code;
-            default: return CheckCircle;
-        }
+        // 4. 預設：抓取第一行有效內容
+        const lines = content.split('\n');
+        const preview = lines.find(l => l.length > 5 && !l.startsWith('#') && !l.startsWith('>')) || '無詳細內容';
+        return { type: 'general', text: preview.slice(0, 60), label: '📄 Log' };
+    },
+
+    parseGraphSeeds: (note: string, graphContent = '') => {
+        if (!note) return { tags: [], links: [] };
+        const combined = note + ' ' + graphContent;
+        const tags = (combined.match(/#([\w\u4e00-\u9fa5]+)/g) || []).map(t => t.slice(1));
+        const links = (combined.match(/\[\[(\d{4}-\d{2}-\d{2})\]\]/g) || []).map(l => l.slice(2, -2));
+        return { tags: [...new Set(tags)], links: [...new Set(links)] };
     }
-}
+};
