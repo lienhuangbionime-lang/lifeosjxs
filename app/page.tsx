@@ -11,6 +11,7 @@ import { CaptureView } from '@/components/CaptureView';
 import { GraphView } from '@/components/GraphView';
 import { HistoryView } from '@/components/HistoryView';
 import { SettingsView } from '@/components/SettingsView'; // [New]
+import { Dashboard } from '@/components/Dashboard'; // [New]
 
 // --- MOCK DATA ---
 const MOCK_LOGS = [
@@ -64,6 +65,7 @@ export default function Home() {
             {activeTab === 'graph' && <GraphView logs={logs} />}
             {activeTab === 'list' && <HistoryView logs={logs} />}
             {activeTab === 'settings' && <SettingsView logs={logs} onImport={handleImportLogs} />}
+            {activeTab === 'dashboard' && <Dashboard />}
         </main>
 
         <nav className="absolute bottom-6 left-6 right-6 h-16 bg-[#1e293b]/90 backdrop-blur-md rounded-2xl border border-slate-700/50 shadow-2xl flex justify-around items-center px-2 z-50">
@@ -71,6 +73,7 @@ export default function Home() {
             <button onClick={() => setActiveTab('graph')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'graph' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><Layers size={20} strokeWidth={activeTab === 'graph' ? 2.5 : 2} /><span className="text-[10px] font-bold">Neural</span></button>
             <button onClick={() => setActiveTab('list')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'list' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><ListIcon size={20} strokeWidth={activeTab === 'list' ? 2.5 : 2} /><span className="text-[10px] font-bold">History</span></button>
             <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'settings' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><Settings size={20} strokeWidth={activeTab === 'settings' ? 2.5 : 2} /><span className="text-[10px] font-bold">Sys</span></button>
+            <button onClick={() => setActiveTab('dashboard')} ... ><Activity ... /></button>
         </nav>
     </div>
   );
