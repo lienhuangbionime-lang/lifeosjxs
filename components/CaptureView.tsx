@@ -24,7 +24,6 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
         setAiThinkingLogs(["連線神經網絡...", "正在讀取脈絡..."]);
         
         try {
-            // 1. 呼叫後端 API (這裡是你設定的 Gemini 1.5 Flash)
             const response = await fetch('/api/ingest', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -34,31 +33,35 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
                 })
             });
 
+            // [Fix] 檢查是否為 JSON 格式
+            const contentType = response.headers.get("content-type");
+            if (!contentType || !contentType.includes("application/json")) {
+                // 如果回傳的是 HTML (通常是錯誤頁面)，讀取文字並拋出錯誤
+                const text = await response.text();
+                console.error("Server Error (HTML):", text); // 在 Console 顯示 HTML 內容以便除錯
+                throw new Error("伺服器發生內部錯誤 (500)，請檢查 Terminal 的報錯訊息。");
+            }
+
             const result = await response.json();
 
             if (!result.success) {
                 throw new Error(result.error || "API 回應錯誤");
             }
 
-            // 2. 成功獲取 AI 思考結果
+            // ... (成功處理邏輯保持不變)
             setAiThinkingLogs(prev => [...prev, "✅ 分析完成", `Model: ${result.model || 'Gemini'}`]);
             
-            // 3. 解析回傳資料 (更新介面)
-            // 後端回傳的 data 結構: { meta: { metrics... }, markdown_body: "...", tasks: [] }
-            const aiData = result.data || {}; // 防呆
+            const aiData = result.data || {};
             const metrics = aiData.meta?.metrics || {};
 
-            // 4. 更新前端狀態
             setEntry((prev: any) => ({
                 ...prev,
-                note: result.data.markdown_body, // 填入整理好的 Markdown (含簽名檔)
+                note: result.data.markdown_body,
                 mood: metrics.mood ?? prev.mood,
                 focus: metrics.focus ?? prev.focus,
                 energy: metrics.energy ?? prev.energy,
-                // 如果後端有回傳 habits，也可以在這裡更新
             }));
 
-            // 5. 更新任務清單
             if (aiData.tasks && Array.isArray(aiData.tasks)) {
                 setDetectedTasks(aiData.tasks.map((t: any) => t.title));
                 setAiThinkingLogs(prev => [...prev, `⚡ 提取了 ${aiData.tasks.length} 個行動`]);
@@ -67,7 +70,7 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
         } catch (e: any) {
             console.error("AI Error:", e);
             setAiThinkingLogs(prev => [...prev, `❌ 錯誤: ${e.message}`]);
-            alert("AI 連線失敗，請檢查 API Key 或 Vercel Logs");
+            alert(`連線失敗: ${e.message}`);
         } finally {
             setIsAiAnalyzing(false);
         }

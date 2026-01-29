@@ -4,7 +4,7 @@ import { AGENTIC_INGEST_SYSTEM_PROMPT } from "@/lib/ai/prompts"; //
 import { NextResponse } from "next/server";
 
 // 確保使用穩定的模型名稱
-const MODEL_NAME = "gemini-2.5-flash"; 
+const MODEL_NAME = "gemini-1.5-flash"; 
 
 export async function POST(req: Request) {
   try {
