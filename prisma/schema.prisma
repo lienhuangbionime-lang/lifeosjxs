@@ -9,7 +9,6 @@ datasource db {
   directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
-// --- 日記核心 ---
 model LogEntry {
   id        String   @id @default(cuid())
   date      DateTime @unique
@@ -26,7 +25,6 @@ model LogEntry {
   tasks     Task[]
 }
 
-// --- 任務系統 ---
 model Task {
   id          String    @id @default(cuid())
   title       String
@@ -52,12 +50,11 @@ model Project {
   updatedAt   DateTime @updatedAt
 }
 
-// --- [Fix] 補回月度回顧表 ---
 model MonthlyReview {
   id        String   @id @default(cuid())
-  month     String   @unique // 格式: "YYYY-MM"
-  content   String   // CCA Report (Markdown)
-  strategy  Json?    // 結構化策略資料
+  month     String   @unique
+  content   String
+  strategy  Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
