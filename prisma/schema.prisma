@@ -1,18 +1,17 @@
-// 這是產生器設定 (保留我們之前的相容性修正)
+// 1. 設定產生器 (解決 Vercel/StackBlitz 環境差異)
 generator client {
   provider = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
 }
 
-// 這是資料庫設定 (只能有一個！請確保只有這一段)
+// 2. 設定資料庫 (只能有一段！請檢查不要重複)
 datasource db {
   provider  = "postgresql"
-  url       = env("POSTGRES_PRISMA_URL") // 用於連線池 (Connection Pool)
-  directUrl = env("POSTGRES_URL_NON_POOLING") // 用於 Migration (直接連線)
+  url       = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
-// 底下接你的 Models (LogEntry, Task, Project 等等...)
-// 確保不要動到下面的資料表定義
+// 3. 資料表定義
 model LogEntry {
   id        String   @id @default(cuid())
   date      DateTime @unique
@@ -20,8 +19,8 @@ model LogEntry {
   mood      Int?
   focus     Int?
   energy    Int?
-  graphSeeds Json?    // 存儲 Graph 的節點資訊
-  habits    Json?    // 存儲習慣打卡
+  graphSeeds Json?
+  habits    Json?
   isAi      Boolean  @default(false)
   aiModel   String?
   createdAt DateTime @default(now())
@@ -32,14 +31,14 @@ model LogEntry {
 model Task {
   id          String    @id @default(cuid())
   title       String
-  status      String    @default("PENDING") // PENDING, DONE, ARCHIVED
+  status      String    @default("PENDING")
   isUrgent    Boolean   @default(false)
   dueDate     DateTime?
-  context     String?   // @home, @office
-  project     Project?  @relation(fields: [projectId], references: [id])
+  context     String?
   projectId   String?
-  logEntry    LogEntry? @relation(fields: [logEntryId], references: [id])
+  project     Project?  @relation(fields: [projectId], references: [id])
   logEntryId  String?
+  logEntry    LogEntry? @relation(fields: [logEntryId], references: [id])
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
@@ -48,7 +47,7 @@ model Project {
   id          String   @id @default(cuid())
   name        String   @unique
   description String?
-  status      String   @default("ACTIVE") // ACTIVE, ON_HOLD, COMPLETED
+  status      String   @default("ACTIVE")
   tasks       Task[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
