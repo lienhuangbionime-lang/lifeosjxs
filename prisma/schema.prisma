@@ -1,4 +1,4 @@
-// prisma/schema.prisma
+// 檔案位置: prisma/schema.prisma
 
 generator client {
   provider = "prisma-client-js"
@@ -17,12 +17,12 @@ model LogEntry {
   mood      Int?
   focus     Int?
   energy    Int?
-  vtrRatio  Float?   
+  vtrRatio  Float?
   habits    Json?
   
   // [New] AI 來源驗證欄位
-  aiModel   String?  @default("manual") // 紀錄模型型號，例如: "gemini-1.5-flash"
-  isAi      Boolean  @default(false)    // 標記是否為 AI 生成
+  aiModel   String?  @default("manual") 
+  isAi      Boolean  @default(false)
   
   tasks     Task[]
   createdAt DateTime @default(now())
@@ -57,10 +57,10 @@ model Task {
 model MonthlyReview {
   id        String   @id @default(cuid())
   month     String   @unique
-  content   String   @db.Text 
+  content   String   @db.Text
   vtr       Float?
   fScore    Int?
-  strategy  Json?    
+  strategy  Json?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
