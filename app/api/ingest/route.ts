@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 // [Critical Fix] 請使用正確的模型名稱
 // 目前 Google API 支援: "gemini-1.5-flash", "gemini-1.5-pro"
-const MODEL_NAME = "gemini-2.5-flash"; 
+const MODEL_NAME = "gemini-1.5-flash"; 
 
 export async function POST(req: Request) {
   try {
