@@ -4,8 +4,7 @@ import { AGENTIC_INGEST_SYSTEM_PROMPT, PROMPT_VERSION } from "@/lib/ai/prompts";
 import { NextResponse } from "next/server";
 
 // [Critical Fix] 請使用正確的模型名稱
-// 目前 Google API 支援: "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"
-// "gemini-2.5-flash" 尚不存在，會導致連線失敗。
+// 目前 Google API 支援: "gemini-1.5-flash", "gemini-1.5-pro"
 const MODEL_NAME = "gemini-2.5-flash"; 
 
 export async function POST(req: Request) {
@@ -28,7 +27,7 @@ export async function POST(req: Request) {
 
     const userPrompt = `CURRENT DATE: ${date}\nINPUT RAW DATA:\n${text}`;
 
-    // 2. Agent 思考 (這是最容易失敗的一步，加入 Log)
+    // 2. Agent 思考
     console.log(`🤖 [Ingest] Calling Gemini (${MODEL_NAME})...`);
     
     const result = await model.generateContent({
@@ -38,8 +37,8 @@ export async function POST(req: Request) {
     const responseText = result.response.text();
     console.log("✅ [Ingest] Gemini response received.");
     
-    // 嘗試解析 JSON，如果 AI 回傳壞掉的 JSON，這裡會報錯
-    let data;
+    // [Fix] 明確宣告型別為 any，解決 TypeScript 編譯錯誤
+    let data: any;
     try {
         data = JSON.parse(responseText);
     } catch (e) {
@@ -114,11 +113,10 @@ export async function POST(req: Request) {
     });
 
     console.log("✨ [Ingest] Success!");
-    return NextResponse.json({ success: true, model: MODEL_NAME, data }); // 回傳 data 讓前端更新
+    return NextResponse.json({ success: true, model: MODEL_NAME, data });
 
   } catch (error: any) {
     console.error("🔥 [Ingest Critical Error]:", error);
-    // 回傳詳細錯誤給前端以便除錯
     return NextResponse.json({ success: false, error: error.message || "Unknown Server Error" }, { status: 500 });
   }
 }
