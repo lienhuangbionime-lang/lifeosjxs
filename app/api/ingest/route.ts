@@ -1,11 +1,10 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "@/lib/db";
-import { AGENTIC_INGEST_SYSTEM_PROMPT, PROMPT_VERSION } from "@/lib/ai/prompts";
+import { AGENTIC_INGEST_SYSTEM_PROMPT, PROMPT_VERSION } from "@/lib/ai/prompts"; // [Cite: 3]
 import { NextResponse } from "next/server";
 
-// 1. 定義模型變數 (方便統一管理)
-// 注意: 目前 Google 最新穩定版是 1.5-flash 或 1.5-pro。
-// 如果你有 2.0 權限可用 "gemini-2.0-flash-exp"
+// 1. 定義模型變數 (方便統一管理與切換)
+// 目前穩定版建議使用 gemini-1.5-flash
 const MODEL_NAME = "gemini-2.5-flash"; 
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
@@ -26,16 +25,20 @@ export async function POST(req: Request) {
     const data = JSON.parse(result.response.text());
 
     // 3. 製作 AI 簽名檔 (讓你在前端直接看得到是誰整理的)
+    // 格式: 🤖 AI Insight | Model: gemini-1.5-flash | Engine: v7.1
     const aiSignature = `\n\n> 🤖 **AI Insight** | Model: ${MODEL_NAME} | Engine: ${PROMPT_VERSION}`;
+    
+    // 將簽名檔追加到 Markdown 內容後
     const finalContent = data.markdown_body + aiSignature;
 
     // 4. 資料庫寫入
     await prisma.$transaction(async (tx) => {
+      // 檢查是否已有當日紀錄
       const existingLog = await tx.logEntry.findUnique({ where: { date: new Date(data.meta.date) } });
 
       let log;
       if (existingLog) {
-        // [Append Mode]
+        // [Append Mode] 若存在則追加，保留舊內容
         log = await tx.logEntry.update({
           where: { date: new Date(data.meta.date) },
           data: {
@@ -43,13 +46,13 @@ export async function POST(req: Request) {
             mood: data.meta.metrics.mood,
             focus: data.meta.metrics.focus,
             energy: data.meta.metrics.energy,
-            // 更新 AI 來源資訊
+            // [Update] 更新 AI 來源資訊
             aiModel: MODEL_NAME,
             isAi: true
           }
         });
       } else {
-        // [Create Mode]
+        // [Create Mode] 若不存在則建立
         log = await tx.logEntry.create({
           data: {
             date: new Date(data.meta.date),
@@ -57,14 +60,16 @@ export async function POST(req: Request) {
             mood: data.meta.metrics.mood,
             focus: data.meta.metrics.focus,
             energy: data.meta.metrics.energy,
-            // 寫入 AI 來源資訊
+            // [Insert] 寫入 AI 來源資訊
             aiModel: MODEL_NAME,
-            isAi: true
+            isAi: true,
+            // 處理 habits (若 prompt 有回傳)
+            habits: data.habits || undefined
           }
         });
       }
 
-      // 任務處理保持不變
+      // 任務處理 (保持原樣)
       if (data.tasks?.length) {
         for (const t of data.tasks) {
           let projectId = null;
@@ -80,7 +85,7 @@ export async function POST(req: Request) {
               isUrgent: t.category === "urgent",
               projectId,
               logEntryId: log.id,
-              status: "PENDING"
+              status: "PENDING" // [Cite: 4]
             }
           });
         }

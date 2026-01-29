@@ -19,11 +19,13 @@ model LogEntry {
   energy    Int?
   vtrRatio  Float?   
   habits    Json?
+  
+  // [New] AI 來源驗證欄位
+  aiModel   String?  @default("manual") // 紀錄模型型號，例如: "gemini-1.5-flash"
+  isAi      Boolean  @default(false)    // 標記是否為 AI 生成
+  
   tasks     Task[]
   createdAt DateTime @default(now())
-  aiModel   String?  // 例如: "gemini-1.5-flash", "gpt-4o"
-  aiVersion String?  // 例如: "v7.1-prompt"
-}
 }
 
 model Project {
