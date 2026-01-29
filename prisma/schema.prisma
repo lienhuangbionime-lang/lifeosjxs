@@ -19,8 +19,6 @@ model LogEntry {
   energy    Int?
   vtrRatio  Float?
   habits    Json?
-  
-  // [New] AI 來源驗證欄位
   aiModel   String?  @default("manual") 
   isAi      Boolean  @default(false)
   
