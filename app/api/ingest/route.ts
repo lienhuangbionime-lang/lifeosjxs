@@ -1,42 +1,64 @@
-// 檔案位置: app/api/ingest/route.ts
-
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "@/lib/db";
 import { AGENTIC_INGEST_SYSTEM_PROMPT, PROMPT_VERSION } from "@/lib/ai/prompts";
 import { NextResponse } from "next/server";
 
-// [設定] 定義 AI 型號 (目前穩定版推薦 1.5-flash)
+// [Critical Fix] 請使用正確的模型名稱
+// 目前 Google API 支援: "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.0-flash-exp"
+// "gemini-2.5-flash" 尚不存在，會導致連線失敗。
 const MODEL_NAME = "gemini-2.5-flash"; 
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
-const model = genAI.getGenerativeModel({ 
-  model: MODEL_NAME, 
-  generationConfig: { responseMimeType: "application/json" } 
-});
 
 export async function POST(req: Request) {
   try {
+    // 0. 檢查 API Key 是否存在
+    if (!process.env.GEMINI_API_KEY) {
+      console.error("❌ GEMINI_API_KEY is missing in environment variables.");
+      return NextResponse.json({ success: false, error: "Server Configuration Error: Missing API Key" }, { status: 500 });
+    }
+
     const { text, date } = await req.json();
+    console.log(`🚀 [Ingest] Starting process for date: ${date}`);
+
+    // 1. 初始化 AI
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ 
+      model: MODEL_NAME, 
+      generationConfig: { responseMimeType: "application/json" } 
+    });
+
     const userPrompt = `CURRENT DATE: ${date}\nINPUT RAW DATA:\n${text}`;
 
-    // 1. Agent 思考
+    // 2. Agent 思考 (這是最容易失敗的一步，加入 Log)
+    console.log(`🤖 [Ingest] Calling Gemini (${MODEL_NAME})...`);
+    
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: AGENTIC_INGEST_SYSTEM_PROMPT + "\n\n" + userPrompt }] }]
     });
-    const data = JSON.parse(result.response.text());
+    
+    const responseText = result.response.text();
+    console.log("✅ [Ingest] Gemini response received.");
+    
+    // 嘗試解析 JSON，如果 AI 回傳壞掉的 JSON，這裡會報錯
+    let data;
+    try {
+        data = JSON.parse(responseText);
+    } catch (e) {
+        console.error("❌ [Ingest] JSON Parse Error:", responseText);
+        throw new Error("AI returned invalid JSON");
+    }
 
-    // 2. [關鍵] 製作 AI 簽名檔
-    // 這行字會直接顯示在你的日記最下方，讓你知道這是 AI 整理的
+    // 3. 製作 AI 簽名檔
     const aiSignature = `\n\n> 🤖 **AI Insight** | Model: ${MODEL_NAME} | Engine: ${PROMPT_VERSION}`;
     const finalContent = data.markdown_body + aiSignature;
 
-    // 3. 資料庫寫入 (包含簽名與模型欄位)
+    // 4. 資料庫寫入
+    console.log("💾 [Ingest] Writing to Database...");
     await prisma.$transaction(async (tx) => {
       const existingLog = await tx.logEntry.findUnique({ where: { date: new Date(data.meta.date) } });
 
       let log;
       if (existingLog) {
-        // [Append Mode] 追加內容
+        // [Append Mode]
         log = await tx.logEntry.update({
           where: { date: new Date(data.meta.date) },
           data: {
@@ -44,13 +66,12 @@ export async function POST(req: Request) {
             mood: data.meta.metrics.mood,
             focus: data.meta.metrics.focus,
             energy: data.meta.metrics.energy,
-            // 記錄 AI 型號
             aiModel: MODEL_NAME,
             isAi: true
           }
         });
       } else {
-        // [Create Mode] 建立新內容
+        // [Create Mode]
         log = await tx.logEntry.create({
           data: {
             date: new Date(data.meta.date),
@@ -58,28 +79,32 @@ export async function POST(req: Request) {
             mood: data.meta.metrics.mood,
             focus: data.meta.metrics.focus,
             energy: data.meta.metrics.energy,
-            // 記錄 AI 型號
             aiModel: MODEL_NAME,
-            isAi: true
+            isAi: true,
+            habits: data.habits || undefined
           }
         });
       }
 
-      // 任務處理 (保持不變)
+      // 任務處理
       if (data.tasks?.length) {
         for (const t of data.tasks) {
-          let projectId = null;
-          if (t.project_tag) {
-            const proj = await tx.project.upsert({ where: { name: t.project_tag }, update: {}, create: { name: t.project_tag } });
-            projectId = proj.id;
-          }
+          // 確保專案名稱存在
+          const projectName = t.project_tag || "Inbox"; 
+          
+          const proj = await tx.project.upsert({ 
+            where: { name: projectName }, 
+            update: {}, 
+            create: { name: projectName } 
+          });
+          
           await tx.task.create({
             data: {
               title: t.title,
               context: t.context,
               dueDate: t.due_date ? new Date(t.due_date) : null,
               isUrgent: t.category === "urgent",
-              projectId,
+              projectId: proj.id,
               logEntryId: log.id,
               status: "PENDING"
             }
@@ -88,9 +113,12 @@ export async function POST(req: Request) {
       }
     });
 
-    return NextResponse.json({ success: true, model: MODEL_NAME });
-  } catch (error) {
-    console.error(error);
-    return NextResponse.json({ success: false, error: "Ingest Failed" }, { status: 500 });
+    console.log("✨ [Ingest] Success!");
+    return NextResponse.json({ success: true, model: MODEL_NAME, data }); // 回傳 data 讓前端更新
+
+  } catch (error: any) {
+    console.error("🔥 [Ingest Critical Error]:", error);
+    // 回傳詳細錯誤給前端以便除錯
+    return NextResponse.json({ success: false, error: error.message || "Unknown Server Error" }, { status: 500 });
   }
 }
