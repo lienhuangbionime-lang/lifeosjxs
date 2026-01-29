@@ -2,41 +2,35 @@
 
 import React, { useState, useEffect } from 'react';
 import { 
-    Layers, PenTool, List as ListIcon, Activity, 
-    Settings
+    Menu, X, PenTool, Layers, List as ListIcon, Activity, 
+    Settings, LayoutTemplate
 } from 'lucide-react';
-import { DEFAULT_HABITS } from '@/lib/ai/core';
 import { CaptureView } from '@/components/CaptureView';
 import { GraphView } from '@/components/GraphView';
 import { HistoryView } from '@/components/HistoryView';
 import { SettingsView } from '@/components/SettingsView';
-import { Dashboard } from '@/components/Dashboard'; // [New] 引入 Dashboard
+import { Dashboard } from '@/components/Dashboard';
+import { ProjectBoard } from '@/components/ProjectBoard'; // [New]
 
-// --- MOCK DATA ---
+// --- MOCK DATA (暫時使用，之後會從 API 抓) ---
 const MOCK_LOGS = [
-  { date: '2024-01-28', note: 'Project LifeOS: Fix Vercel deploy #coding', metrics: { mood: 6, focus: 8, energy: 7, deepWork: 4 }, graphSeeds: { tags: ['coding', 'project'], links: [] }, habits: { h4: true }, isSignal: false },
-  { date: '2024-01-29', note: 'Family dinner at Taichung #life', metrics: { mood: 9, focus: 3, energy: 8, deepWork: 0 }, graphSeeds: { tags: ['life', 'family'], links: [] }, habits: {}, isSignal: false },
-  { date: '2024-01-30', note: 'Deep work session on AI core logic #coding - [ ] Refactor core.ts', metrics: { mood: 7, focus: 9, energy: 6, deepWork: 6 }, graphSeeds: { tags: ['coding', 'ai'], links: [] }, habits: { h1: true, h4: true }, isSignal: true },
+  { date: '2024-01-30', note: 'Deep work on LifeOS UI #coding', metrics: { mood: 7, focus: 9 }, graphSeeds: { tags: ['coding'], links: [] }, habits: {} },
 ];
 
 export default function Home() {
   const [logs, setLogs] = useState<any[]>(MOCK_LOGS);
-  // [New] 加入 'dashboard' 到 activeTab 型別
-  const [activeTab, setActiveTab] = useState<'capture' | 'graph' | 'list' | 'settings' | 'dashboard'>('capture');
-  
+  // 加入 'project' 頁籤
+  const [activeTab, setActiveTab] = useState<'capture' | 'graph' | 'list' | 'settings' | 'dashboard' | 'project'>('capture');
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
   // Hydration Fix
   useEffect(() => {
       const saved = localStorage.getItem('life_os_logs_v8_0');
-      if (saved) {
-          try { setLogs(JSON.parse(saved)); } catch(e) { console.error(e); }
-      }
+      if (saved) try { setLogs(JSON.parse(saved)); } catch(e) { console.error(e); }
   }, []);
 
-  // Auto-Save
   useEffect(() => {
-      if (logs !== MOCK_LOGS) {
-          localStorage.setItem('life_os_logs_v8_0', JSON.stringify(logs));
-      }
+      if (logs !== MOCK_LOGS) localStorage.setItem('life_os_logs_v8_0', JSON.stringify(logs));
   }, [logs]);
 
   const handleSaveLog = (newLog: any) => {
@@ -45,36 +39,61 @@ export default function Home() {
   };
 
   const handleImportLogs = (importedLogs: any[]) => {
-      setLogs(prev => {
-          const existingDates = new Set(prev.map(l => l.date));
-          const filteredNew = importedLogs.filter(l => !existingDates.has(l.date));
-          const merged = [...prev, ...filteredNew].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-          return merged;
-      });
+      setLogs(prev => [...prev, ...importedLogs]); // 簡化版合併
   };
 
+  // 根據 Tab 決定背景色：Graph 用深色，其他用柔和色
+  const bgClass = activeTab === 'graph' ? 'bg-[#0f172a] text-slate-200' : 'bg-[#f8fafc] text-slate-800';
+
+  const menuItems = [
+      { id: 'capture', label: '日誌輸入', icon: PenTool },
+      { id: 'graph', label: '神經網絡', icon: Layers },
+      { id: 'dashboard', label: 'CCA 戰略', icon: Activity },
+      { id: 'project', label: '專案戰情', icon: LayoutTemplate }, // [New]
+      { id: 'list', label: '歷史足跡', icon: ListIcon },
+      { id: 'settings', label: '系統設定', icon: Settings },
+  ];
+
   return (
-    <div className="max-w-md mx-auto h-screen bg-[#0f172a] flex flex-col font-sans text-slate-200 relative shadow-2xl overflow-hidden">
-        <header className="px-6 py-4 bg-[#0f172a]/90 backdrop-blur z-20 flex justify-between items-center border-b border-slate-800 sticky top-0">
-            <h1 className="text-lg font-black tracking-tight text-white">LifeOS <span className="text-indigo-400 text-xs align-top border border-indigo-500/30 px-1 rounded">v2.0 Cloud</span></h1>
-            <div className="w-8 h-8 rounded-full bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center"><span className="text-xs font-bold text-indigo-300">LH</span></div>
+    <div className={`max-w-md mx-auto h-screen flex flex-col font-sans relative shadow-2xl overflow-hidden transition-colors duration-500 ${bgClass}`}>
+        
+        {/* Header (Top Bar) */}
+        <header className={`px-6 py-4 z-50 flex justify-between items-center border-b sticky top-0 backdrop-blur-sm ${activeTab === 'graph' ? 'border-slate-800 bg-[#0f172a]/90' : 'border-slate-200 bg-white/80'}`}>
+            <h1 className={`text-lg font-black tracking-tight ${activeTab === 'graph' ? 'text-white' : 'text-slate-800'}`}>
+                LifeOS <span className="text-indigo-500 text-xs align-top px-1">v2.1</span>
+            </h1>
+            
+            {/* 隱藏式下拉選單按鈕 */}
+            <button onClick={() => setIsMenuOpen(!isMenuOpen)} className={`p-2 rounded-full transition-all ${activeTab === 'graph' ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-600'}`}>
+                {isMenuOpen ? <X size={20}/> : <Menu size={20}/>}
+            </button>
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 relative z-10 custom-scrollbar">
+        {/* Dropdown Menu Overlay */}
+        {isMenuOpen && (
+            <div className="absolute top-16 right-4 z-[100] w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 animate-scale-in origin-top-right">
+                {menuItems.map((item) => (
+                    <button 
+                        key={item.id}
+                        onClick={() => { setActiveTab(item.id as any); setIsMenuOpen(false); }}
+                        className={`w-full text-left px-4 py-3 flex items-center gap-3 text-sm font-bold transition-colors ${activeTab === item.id ? 'text-indigo-600 bg-indigo-50' : 'text-slate-600 hover:bg-slate-50'}`}
+                    >
+                        <item.icon size={16} />
+                        {item.label}
+                    </button>
+                ))}
+            </div>
+        )}
+
+        {/* Main Content Area */}
+        <main className="flex-1 overflow-y-auto p-0 relative z-10 custom-scrollbar">
             {activeTab === 'capture' && <CaptureView onSave={handleSaveLog} />}
             {activeTab === 'graph' && <GraphView logs={logs} />}
+            {activeTab === 'dashboard' && <Dashboard />}
+            {activeTab === 'project' && <ProjectBoard logs={logs} />} 
             {activeTab === 'list' && <HistoryView logs={logs} />}
             {activeTab === 'settings' && <SettingsView logs={logs} onImport={handleImportLogs} />}
-            {activeTab === 'dashboard' && <Dashboard />}
         </main>
-
-        <nav className="absolute bottom-6 left-6 right-6 h-16 bg-[#1e293b]/90 backdrop-blur-md rounded-2xl border border-slate-700/50 shadow-2xl flex justify-around items-center px-2 z-50">
-            <button onClick={() => setActiveTab('capture')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'capture' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><PenTool size={20} strokeWidth={activeTab === 'capture' ? 2.5 : 2} /><span className="text-[10px] font-bold">Log</span></button>
-            <button onClick={() => setActiveTab('graph')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'graph' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><Layers size={20} strokeWidth={activeTab === 'graph' ? 2.5 : 2} /><span className="text-[10px] font-bold">Map</span></button>
-            <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'dashboard' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><Activity size={20} strokeWidth={activeTab === 'dashboard' ? 2.5 : 2} /><span className="text-[10px] font-bold">CCA</span></button>
-            <button onClick={() => setActiveTab('list')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'list' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><ListIcon size={20} strokeWidth={activeTab === 'list' ? 2.5 : 2} /><span className="text-[10px] font-bold">Past</span></button>
-            <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'settings' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><Settings size={20} strokeWidth={activeTab === 'settings' ? 2.5 : 2} /><span className="text-[10px] font-bold">Sys</span></button>
-        </nav>
     </div>
   );
 }
