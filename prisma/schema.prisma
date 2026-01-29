@@ -21,7 +21,6 @@ model LogEntry {
   habits    Json?
   aiModel   String?  @default("manual") 
   isAi      Boolean  @default(false)
-  
   tasks     Task[]
   createdAt DateTime @default(now())
 }
