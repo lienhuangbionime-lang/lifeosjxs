@@ -29,7 +29,6 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
             await wait(500);
             setAiThinkingLogs(prev => [...prev, "Reading context..."]);
             
-            // 模擬 AI 分析過程 (Regex)
             const mood = entry.note.match(/(?:Mood|心情)[\s\S]*?(\d+(?:\.\d+)?)/i);
             const focus = entry.note.match(/(?:Focus|專注)[\s\S]*?(\d+(?:\.\d+)?)/i);
             const energy = entry.note.match(/(?:Energy|能量)[\s\S]*?(\d+(?:\.\d+)?)/i);
@@ -41,7 +40,6 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
             
             if(seeds.tags.length) setAiThinkingLogs(prev => [...prev, `Identified Tags: ${seeds.tags.join(', ')}`]);
 
-            // Tasks
             let tasks: string[] = [];
             const taskRegex = /-\s*\[\s*\]\s*(.*)/g;
             let match;
@@ -71,6 +69,7 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
     const handleSave = () => {
         const seeds = CoreEngine.parseGraphSeeds(entry.note);
         onSave({ ...entry, graphSeeds: seeds });
+        // 重置表單
         setEntry({ date: new Date().toISOString().split('T')[0], note: '', mood: 5, focus: 5, energy: 5, deepWork: 0, habits: {} });
         setDetectedTasks([]);
         setAiThinkingLogs([]);
@@ -82,7 +81,6 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
                <PenTool className="text-indigo-400" /> Capture Flow
             </h2>
             
-            {/* AI Terminal */}
             {(isAiAnalyzing || aiThinkingLogs.length > 0) && (
                 <div className="mb-4 bg-slate-900 rounded-xl p-4 border border-indigo-500/30 shadow-lg animate-fade-in">
                     <div className="flex items-center gap-2 mb-2 border-b border-slate-800 pb-2">
@@ -129,6 +127,21 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
                 </div>
             </div>
             
+            {/* Habits UI */}
+            <div className="grid grid-cols-2 gap-3 mt-4">
+                {DEFAULT_HABITS.map(habit => {
+                    const isActive = entry.habits?.[habit.id] || false;
+                    const Icon = CoreEngine.getIconComponent(habit.icon);
+                    return (
+                        <button key={habit.id} onClick={() => setEntry({ ...entry, habits: { ...entry.habits, [habit.id]: !isActive } })}
+                            className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${isActive ? 'bg-slate-800 border-slate-800 text-white shadow-lg' : 'bg-[#1e293b] border-slate-700 text-slate-400'}`}>
+                            <span className="text-xs font-bold">{habit.label}</span>
+                            <Icon className={`w-5 h-5 ${isActive ? 'opacity-100' : 'opacity-20'}`} />
+                        </button>
+                    );
+                })}
+            </div>
+
             <div className="bg-[#1e293b] p-6 rounded-3xl shadow-lg border border-slate-700 space-y-4 mt-4">
                 {['mood', 'focus', 'energy'].map(k => (
                     <div key={k} className="flex items-center gap-4">

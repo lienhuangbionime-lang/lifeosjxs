@@ -8,6 +8,7 @@ datasource db {
   directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
+
 model LogEntry {
   id        String   @id @default(cuid())
   date      DateTime @unique
@@ -15,7 +16,8 @@ model LogEntry {
   mood      Int?
   focus     Int?
   energy    Int?
-  vtrRatio  Float?
+  vtrRatio  Float?   
+  habits    Json?    
   tasks     Task[]
   createdAt DateTime @default(now())
 }
