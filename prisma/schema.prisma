@@ -1,3 +1,5 @@
+// 檔案位置: prisma/schema.prisma
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,25 +15,25 @@ model LogEntry {
   date      DateTime @unique
   content   String   @db.Text
   
-  // Metrics
+  // 核心指標
   mood      Int?
   focus     Int?
   energy    Int?
-  deepWork  Int?
   vtrRatio  Float?   
   
-  // Habits (JSON)
+  // 習慣追蹤
   habits    Json?    
   
-  // AI Source
-  aiModel   String?  @default("manual")
-  isAi      Boolean  @default(false)
+  // [New] AI 身份驗證欄位 (這就是你要的功能)
+  aiModel   String?  @default("manual") // 紀錄模型，如 "gemini-1.5-flash"
+  isAi      Boolean  @default(false)    // 是否為 AI 生成
   
   tasks     Task[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
 
+// ... (Project, Task, MonthlyReview 維持不變，請保留它們)
 model Project {
   id        String   @id @default(cuid())
   name      String   @unique
@@ -48,13 +50,10 @@ model Task {
   status     String    @default("PENDING")
   dueDate    DateTime?
   isUrgent   Boolean   @default(false)
-  
   logEntryId String
   logEntry   LogEntry  @relation(fields: [logEntryId], references: [id])
-  
   projectId  String?
   project    Project?  @relation(fields: [projectId], references: [id])
-  
   createdAt  DateTime  @default(now())
 }
 
