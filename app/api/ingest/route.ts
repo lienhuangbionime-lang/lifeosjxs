@@ -4,7 +4,7 @@ import { AGENTIC_INGEST_SYSTEM_PROMPT } from "@/lib/ai/prompts"; //
 import { NextResponse } from "next/server";
 
 // 確保使用穩定的模型名稱
-const MODEL_NAME = "gemini-2.5-flash"; 
+const MODEL_NAME = "gemini-3-flash-preview"; 
 
 export async function POST(req: Request) {
   try {
@@ -119,4 +119,5 @@ export async function POST(req: Request) {
     // 回傳具體錯誤訊息給前端
     return NextResponse.json({ success: false, error: error.message || "Internal Server Error" }, { status: 500 });
   }
+
 }
