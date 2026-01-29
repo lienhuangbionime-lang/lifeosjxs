@@ -21,6 +21,9 @@ model LogEntry {
   habits    Json?
   tasks     Task[]
   createdAt DateTime @default(now())
+  aiModel   String?  // 例如: "gemini-1.5-flash", "gpt-4o"
+  aiVersion String?  // 例如: "v7.1-prompt"
+}
 }
 
 model Project {
