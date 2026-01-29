@@ -1,14 +1,13 @@
 'use client';
 import React from 'react';
-import { Network, X } from 'lucide-react';
+import { Network, X, ArrowRight } from 'lucide-react';
 
 export const ContextModal = ({ mainNode, logs, onClose }: { mainNode: any, logs: any[], onClose: () => void }) => {
     if (!mainNode) return null;
 
-    // 找出相關聯的日誌 (Cluster Logic)
+    // 關聯邏輯：找出包含該節點標籤或 ID 的日誌
     const relatedLogs = logs.filter(log => {
         const note = log.note || '';
-        // 簡單關聯：如果是標籤節點，找包含該標籤的；如果是日期節點，找該日期的
         if (mainNode.group === 'tag') {
             return note.includes(`#${mainNode.id}`);
         } else if (mainNode.group === 'date') {
@@ -29,7 +28,7 @@ export const ContextModal = ({ mainNode, logs, onClose }: { mainNode: any, logs:
                         </div>
                         <div>
                             <h3 className="font-bold text-xl text-white">{mainNode.label}</h3>
-                            <span className="text-xs text-slate-400 uppercase font-mono">{mainNode.group || 'Node'} Cluster</span>
+                            <span className="text-xs text-slate-400 uppercase font-mono">{mainNode.group || 'Node'} Cluster ({relatedLogs.length})</span>
                         </div>
                     </div>
                     <button onClick={onClose} className="p-2 hover:bg-slate-700 rounded-full text-slate-400 transition-colors"><X size={20}/></button>
@@ -39,17 +38,17 @@ export const ContextModal = ({ mainNode, logs, onClose }: { mainNode: any, logs:
                 <div className="flex-1 overflow-y-auto p-5 space-y-3 custom-scrollbar">
                     {relatedLogs.length > 0 ? (
                         relatedLogs.map((log, i) => (
-                            <div key={i} className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50 hover:border-indigo-500/50 transition-all">
+                            <div key={i} className="bg-slate-900/50 p-4 rounded-xl border border-slate-700/50 hover:border-indigo-500/50 transition-all group">
                                 <div className="flex justify-between mb-2">
                                     <span className="text-xs font-mono text-indigo-400">{log.date}</span>
-                                    <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400">Metric: {log.metrics?.focus ?? '-'}</span>
+                                    <span className="text-[10px] bg-slate-800 px-2 py-0.5 rounded text-slate-400">Focus: {log.metrics?.focus ?? '-'}</span>
                                 </div>
-                                <p className="text-sm text-slate-300 line-clamp-3">{log.note}</p>
+                                <p className="text-sm text-slate-300 line-clamp-3 leading-relaxed">{log.note}</p>
                             </div>
                         ))
                     ) : (
-                        <div className="text-center py-10 text-slate-500">
-                            <p>此節點尚無直接關聯的紀錄。</p>
+                        <div className="text-center py-10 text-slate-500 italic">
+                            此節點是孤島，尚無直接關聯紀錄。
                         </div>
                     )}
                 </div>
