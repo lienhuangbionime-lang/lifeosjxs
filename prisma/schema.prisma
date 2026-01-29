@@ -1,3 +1,4 @@
+// Generator & Datasource
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,7 +9,7 @@ datasource db {
   directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
-
+// 1. 日誌核心 (LogEntry)
 model LogEntry {
   id        String   @id @default(cuid())
   date      DateTime @unique
@@ -17,11 +18,15 @@ model LogEntry {
   focus     Int?
   energy    Int?
   vtrRatio  Float?   
-  habits    Json?    
+  
+  // [New] 習慣追蹤 (儲存 JSON 格式: { "reading": true, ... })
+  habits    Json?
+  
   tasks     Task[]
   createdAt DateTime @default(now())
 }
 
+// 2. 專案實體 (Project)
 model Project {
   id        String   @id @default(cuid())
   name      String   @unique
@@ -31,6 +36,7 @@ model Project {
   updatedAt DateTime @updatedAt
 }
 
+// 3. 任務實體 (Task)
 model Task {
   id         String    @id @default(cuid())
   title      String
@@ -48,7 +54,7 @@ model Task {
   createdAt  DateTime  @default(now())
 }
 
-// [NEW] 月度復盤與戰略 (CCA Core)
+// 4. [NEW] 月度復盤與戰略 (CCA Core) - 這是之前遺漏的關鍵模型
 model MonthlyReview {
   id        String   @id @default(cuid())
   month     String   @unique // 格式: "2024-01"
@@ -56,11 +62,11 @@ model MonthlyReview {
   // 報告內容 (Markdown)
   content   String   @db.Text 
   
-  // 核心指標 (從報告中萃取)
+  // 核心指標
   vtr       Float?   // Value-Time Ratio
   fScore    Int?     // Family Score
   
-  // 下月戰略 (JSON 儲存 STOP/START/PROTECT)
+  // 下月戰略 (JSON: STOP/START/PROTECT)
   strategy  Json?    
   
   createdAt DateTime @default(now())
