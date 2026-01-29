@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 
 // 1. 定義模型變數 (方便統一管理與切換)
 // 目前穩定版建議使用 gemini-1.5-flash
-const MODEL_NAME = "gemini-2.5-flash"; 
+const MODEL_NAME = "gemini-1.5-flash"; 
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 const model = genAI.getGenerativeModel({ 
