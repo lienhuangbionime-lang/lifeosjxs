@@ -29,34 +29,39 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
             await wait(500);
             setAiThinkingLogs(prev => [...prev, "Reading context..."]);
             
+            // Regex Analysis
             const mood = entry.note.match(/(?:Mood|心情)[\s\S]*?(\d+(?:\.\d+)?)/i);
             const focus = entry.note.match(/(?:Focus|專注)[\s\S]*?(\d+(?:\.\d+)?)/i);
             const energy = entry.note.match(/(?:Energy|能量)[\s\S]*?(\d+(?:\.\d+)?)/i);
             const dateMatch = entry.note.match(/(?:Date|日期|^#\s*\[?)?\s*(\d{4}-\d{2}-\d{2})/m);
             const targetDate = dateMatch ? dateMatch[1] : entry.date;
             
-            const graphMatch = entry.note.match(/(?:Graph|Connections|關聯)(?:[\s:：]*)(?:[\r\n]+)([\s\S]*?)(?:$|^#)/mi);
-            const seeds = CoreEngine.parseGraphSeeds(graphMatch ? graphMatch[1].trim() : entry.note);
-            
-            if(seeds.tags.length) setAiThinkingLogs(prev => [...prev, `Identified Tags: ${seeds.tags.join(', ')}`]);
+            // Habits Detection
+            const detectedHabits = { ...entry.habits };
+            DEFAULT_HABITS.forEach(h => {
+                if (entry.note.toLowerCase().includes(h.id) || entry.note.includes(h.label.slice(0, 2))) {
+                    detectedHabits[h.id] = true;
+                }
+            });
 
+            // Tasks
             let tasks: string[] = [];
             const taskRegex = /-\s*\[\s*\]\s*(.*)/g;
             let match;
             while ((match = taskRegex.exec(entry.note)) !== null) tasks.push(match[1]);
             setDetectedTasks(tasks);
-            if(tasks.length) setAiThinkingLogs(prev => [...prev, `⚡ Extracted ${tasks.length} actionable tasks`]);
 
             await wait(400);
             setAiThinkingLogs(prev => [...prev, "✅ Analysis Complete."]);
             
+            // Update State (Interactive)
             setEntry((prev: any) => ({
                 ...prev,
                 date: targetDate,
                 mood: mood ? parseInt(mood[1]) : prev.mood,
                 focus: focus ? parseInt(focus[1]) : prev.focus,
                 energy: energy ? parseInt(energy[1]) : prev.energy,
-                graphSeeds: seeds
+                habits: detectedHabits // AI 點亮習慣
             }));
 
         } catch (e: any) {
@@ -69,7 +74,6 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
     const handleSave = () => {
         const seeds = CoreEngine.parseGraphSeeds(entry.note);
         onSave({ ...entry, graphSeeds: seeds });
-        // 重置表單
         setEntry({ date: new Date().toISOString().split('T')[0], note: '', mood: 5, focus: 5, energy: 5, deepWork: 0, habits: {} });
         setDetectedTasks([]);
         setAiThinkingLogs([]);
@@ -103,7 +107,7 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
                 </div>
                 <textarea 
                     value={entry.note} onChange={e => setEntry({...entry, note: e.target.value})}
-                    placeholder="# 輸入想法..."
+                    placeholder="# 輸入想法...\n> Agent 會幫你整理成 Project 與 Life 雙軌"
                     className="w-full h-48 p-4 bg-slate-900 border border-slate-700 rounded-xl text-sm font-mono focus:ring-2 focus:ring-indigo-500 outline-none resize-none leading-relaxed text-slate-200 placeholder:text-slate-600"
                 />
                 
@@ -127,7 +131,6 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
                 </div>
             </div>
             
-            {/* Habits UI */}
             <div className="grid grid-cols-2 gap-3 mt-4">
                 {DEFAULT_HABITS.map(habit => {
                     const isActive = entry.habits?.[habit.id] || false;
