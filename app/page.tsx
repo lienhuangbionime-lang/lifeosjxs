@@ -1,17 +1,16 @@
-// 檔案位置: app/page.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import { 
     Layers, PenTool, List as ListIcon, Activity, 
-    Settings, Upload 
+    Settings
 } from 'lucide-react';
-import { CoreEngine, DEFAULT_HABITS } from '@/lib/ai/core';
+import { DEFAULT_HABITS } from '@/lib/ai/core';
 import { CaptureView } from '@/components/CaptureView';
 import { GraphView } from '@/components/GraphView';
 import { HistoryView } from '@/components/HistoryView';
-import { SettingsView } from '@/components/SettingsView'; // [New]
-import { Dashboard } from '@/components/Dashboard'; // [New]
+import { SettingsView } from '@/components/SettingsView';
+import { Dashboard } from '@/components/Dashboard'; // [New] 引入 Dashboard
 
 // --- MOCK DATA ---
 const MOCK_LOGS = [
@@ -22,7 +21,8 @@ const MOCK_LOGS = [
 
 export default function Home() {
   const [logs, setLogs] = useState<any[]>(MOCK_LOGS);
-  const [activeTab, setActiveTab] = useState<'capture' | 'graph' | 'list' | 'settings'>('capture');
+  // [New] 加入 'dashboard' 到 activeTab 型別
+  const [activeTab, setActiveTab] = useState<'capture' | 'graph' | 'list' | 'settings' | 'dashboard'>('capture');
   
   // Hydration Fix
   useEffect(() => {
@@ -69,11 +69,11 @@ export default function Home() {
         </main>
 
         <nav className="absolute bottom-6 left-6 right-6 h-16 bg-[#1e293b]/90 backdrop-blur-md rounded-2xl border border-slate-700/50 shadow-2xl flex justify-around items-center px-2 z-50">
-            <button onClick={() => setActiveTab('capture')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'capture' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><PenTool size={20} strokeWidth={activeTab === 'capture' ? 2.5 : 2} /><span className="text-[10px] font-bold">Capture</span></button>
-            <button onClick={() => setActiveTab('graph')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'graph' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><Layers size={20} strokeWidth={activeTab === 'graph' ? 2.5 : 2} /><span className="text-[10px] font-bold">Neural</span></button>
-            <button onClick={() => setActiveTab('list')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'list' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><ListIcon size={20} strokeWidth={activeTab === 'list' ? 2.5 : 2} /><span className="text-[10px] font-bold">History</span></button>
+            <button onClick={() => setActiveTab('capture')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'capture' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><PenTool size={20} strokeWidth={activeTab === 'capture' ? 2.5 : 2} /><span className="text-[10px] font-bold">Log</span></button>
+            <button onClick={() => setActiveTab('graph')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'graph' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><Layers size={20} strokeWidth={activeTab === 'graph' ? 2.5 : 2} /><span className="text-[10px] font-bold">Map</span></button>
+            <button onClick={() => setActiveTab('dashboard')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'dashboard' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><Activity size={20} strokeWidth={activeTab === 'dashboard' ? 2.5 : 2} /><span className="text-[10px] font-bold">CCA</span></button>
+            <button onClick={() => setActiveTab('list')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'list' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><ListIcon size={20} strokeWidth={activeTab === 'list' ? 2.5 : 2} /><span className="text-[10px] font-bold">Past</span></button>
             <button onClick={() => setActiveTab('settings')} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all ${activeTab === 'settings' ? 'text-indigo-400 bg-indigo-500/10 scale-105' : 'text-slate-500 hover:text-slate-300'}`}><Settings size={20} strokeWidth={activeTab === 'settings' ? 2.5 : 2} /><span className="text-[10px] font-bold">Sys</span></button>
-            <button onClick={() => setActiveTab('dashboard')} ... ><Activity ... /></button>
         </nav>
     </div>
   );
