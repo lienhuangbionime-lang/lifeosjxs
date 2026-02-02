@@ -845,3 +845,176 @@ const NeuralGraphComponent = ({ logs, onNodeClick }: { logs: any[], onNodeClick:
 export const NeuralGraph = memo(NeuralGraphComponent);
 NeuralGraph.displayName = 'NeuralGraph';
 、、、
+components/ContextModal.tsx
+、、、
+// 檔案位置: components/ContextModal.tsx
+'use client';
+import React from 'react';
+import { Network, X, Link as LinkIcon, Calendar, Hash } from 'lucide-react';
+
+export const ContextModal = ({ mainNode, logs, onClose }: { mainNode: any, logs: any[], onClose: () => void }) => {
+    if (!mainNode) return null;
+
+    // [Fix] 增強關聯邏輯：大小寫不敏感，並支援 Graph Link
+    const relatedLogs = logs.map(log => {
+        const note = (log.note || '').toLowerCase();
+        const nodeId = (mainNode.id || '').toLowerCase();
+        let reason = null;
+
+        // 1. Tag 匹配
+        if (mainNode.group === 'tag' && (note.includes(`#${nodeId}`) || (log.graphSeeds?.tags || []).some((t:string) => t.toLowerCase() === nodeId))) {
+            reason = { type: 'tag', label: `#${mainNode.label}` };
+        } 
+        // 2. 日期匹配
+        else if (mainNode.group === 'date' && log.date === mainNode.id) {
+            reason = { type: 'date', label: 'Same Day' };
+        } 
+        // 3. 直接連結 (Link)
+        else if (log.graphSeeds?.links?.includes(mainNode.id)) {
+            reason = { type: 'link', label: 'Linked' };
+        }
+
+        return reason ? { ...log, matchReason: reason } : null;
+    }).filter(Boolean);
+
+    return (
+        <div className="fixed inset-0 z-[150] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+            <div className="w-full max-w-lg max-h-[85vh] bg-white rounded-3xl shadow-2xl flex flex-col border border-slate-200" onClick={e => e.stopPropagation()}>
+                
+                {/* Header */}
+                <div className="p-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50 rounded-t-3xl">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2 bg-indigo-100 rounded-full text-indigo-600"><Network size={20}/></div>
+                        <div>
+                            <h3 className="font-bold text-xl text-slate-800">{mainNode.label}</h3>
+                            <span className="text-xs text-slate-400 uppercase font-mono">Cluster ({relatedLogs.length})</span>
+                        </div>
+                    </div>
+                    <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors"><X size={20}/></button>
+                </div>
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-5 space-y-3 custom-scrollbar">
+                    {relatedLogs.length > 0 ? (
+                        relatedLogs.map((log: any, i) => (
+                            <div key={i} className="bg-white p-4 rounded-xl border border-slate-200 hover:border-indigo-300 hover:shadow-md transition-all group">
+                                <div className="flex justify-between items-start mb-2">
+                                    <span className="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-1 rounded">{log.date}</span>
+                                    
+                                    <span className={`text-[10px] px-2 py-1 rounded-full flex items-center gap-1 font-bold ${
+                                        log.matchReason.type === 'tag' ? 'bg-pink-100 text-pink-600' :
+                                        log.matchReason.type === 'date' ? 'bg-indigo-100 text-indigo-600' :
+                                        'bg-blue-100 text-blue-600'
+                                    }`}>
+                                        {log.matchReason.type === 'tag' && <Hash size={10}/>}
+                                        {log.matchReason.type === 'date' && <Calendar size={10}/>}
+                                        {log.matchReason.type === 'link' && <LinkIcon size={10}/>}
+                                        {log.matchReason.label}
+                                    </span>
+                                </div>
+                                <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">{log.note || log.content}</p>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-center py-10 text-slate-400 italic">
+                            此節點 ({mainNode.label}) 暫無關聯日記。
+                        </div>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// 檔案位置: components/SettingsView.tsx
+'use client';
+import React, { useState } from 'react'; // [Add] useState
+import { Download, Upload, Database, Terminal, Copy } from 'lucide-react'; // [Add] Terminal, Copy
+// [Add] 引入 Prompt 內容 (需確保 lib/ai/prompts.ts 有正確 export 這些字串)
+import { DAILY_INGEST_PROMPT, MONTHLY_REVIEW_PROMPT } from '@/lib/ai/prompts';
+
+export const SettingsView = ({ logs, onImport }: { logs: any[], onImport: (data: any)=>void }) => {
+    // [New] Prompt State
+    const [prompts, setPrompts] = useState({
+        daily: DAILY_INGEST_PROMPT,
+        monthly: MONTHLY_REVIEW_PROMPT
+    });
+    
+    const handleExport = () => {
+        const bundle = { 
+            version: "v2.0 (Cloud)", 
+            logs: logs, 
+            timestamp: new Date().toISOString() 
+        };
+        const blob = new Blob([JSON.stringify(bundle, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a'); 
+        link.href = url; 
+        link.download = `life_os_backup_${new Date().toISOString().split('T')[0]}.json`;
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    };
+
+    const handleFileImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = async (ev) => {
+            try {
+                const json = JSON.parse(ev.target?.result as string);
+                const logsToImport = Array.isArray(json) ? json : (json.logs || []);
+                
+                if (confirm(`準備匯入 ${logsToImport.length} 筆資料到雲端資料庫，這可能需要一點時間。確定嗎？`)) {
+                    // 目前僅更新前端狀態，未來可接批次寫入 API
+                    onImport(logsToImport); 
+                    alert("✅ 匯入成功 (暫存於本地)");
+                }
+            } catch (err) { alert("❌ 格式錯誤"); }
+        };
+        reader.readAsText(file);
+    };
+
+    return (
+        <div className="space-y-6 pb-24 animate-fade-in">
+            {/* [New Section] System Prompts */}
+            <div className="bg-[#1e293b] p-6 rounded-3xl shadow-lg border border-slate-700">
+                 <h3 className="text-base font-bold text-slate-300 mb-4 flex items-center gap-2">
+                    <Terminal className="w-4 h-4 text-emerald-500"/> System Prompts
+                 </h3>
+                 <div className="space-y-4">
+                    {[ {l:'Daily Ingest', k:'daily'}, {l:'Monthly Review', k:'monthly'} ].map(p => (
+                        <div key={p.k}>
+                            <div className="flex justify-between items-center mb-1">
+                                <label className="text-xs font-bold text-slate-500 uppercase">{p.l}</label>
+                                <button onClick={() => navigator.clipboard.writeText((prompts as any)[p.k])} className="text-[10px] bg-slate-800 px-2 py-1 rounded flex gap-1 text-slate-400 hover:text-white"><Copy size={12}/> Copy</button>
+                            </div>
+                            <textarea 
+                                value={(prompts as any)[p.k]} 
+                                readOnly // 暫時設為唯讀，因為實際修改需由後端代碼控制
+                                className="w-full h-24 bg-slate-900 border border-slate-800 rounded-xl p-3 text-[10px] font-mono resize-none outline-none text-slate-400" 
+                            />
+                        </div>
+                    ))}
+                 </div>
+            </div>
+
+            {/* Data Management (原有的部分) */}
+            <div className="bg-[#1e293b] p-6 rounded-3xl shadow-lg border border-slate-700 space-y-4">
+                <h3 className="text-base font-bold text-slate-300 flex items-center gap-2"><Database className="w-4 h-4 text-indigo-500"/> Data Management</h3>
+                <div className="flex gap-2">
+                    <button onClick={handleExport} className="flex-1 py-3 bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 rounded-xl text-xs font-bold flex justify-center items-center gap-2 hover:bg-indigo-500/20 transition-all">
+                        <Download className="w-4 h-4"/> Backup JSON
+                    </button>
+                    <label className="flex-1 py-3 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-xl text-xs font-bold flex justify-center items-center gap-2 cursor-pointer hover:bg-emerald-500/20 transition-all">
+                        <Upload className="w-4 h-4"/> Restore JSON
+                        <input type="file" className="hidden" onChange={handleFileImport} accept=".json"/>
+                    </label>
+                </div>
+
+                <div className="p-3 bg-slate-800 rounded-xl text-xs text-slate-500 leading-relaxed">
+                    ℹ️ <b>v2.0 架構說明：</b><br/>
+                    目前匯入功能僅更新前端顯示。完整的「雲端遷移」功能將在後續實作。
+                </div>
+            </div>
+        </div>
+    );
+};
+、、、
