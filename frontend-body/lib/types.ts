@@ -1,4 +1,20 @@
 // frontend-body/lib/types.ts
+// 對應資料庫中的 LogEntry 表格
+export interface LogEntry {
+  id: string;
+  date: string;     // ISO 8601 Date String
+  content: string;  // 原始筆記
+  mood: number;     // 1-10
+  focus: number;    // 1-10
+  tags: string[];   // 從 content 提取的標籤
+  created_at: string;
+}
+
+// 系統健康狀態 (檢查資料庫有沒有連上)
+export interface SystemHealth {
+  database_status: 'connected' | 'disconnected';
+  latency_ms: number;
+}
 
 // 來自後端 Evolution Agent 的升級提案 [4]
 export interface EvolutionProposal {
