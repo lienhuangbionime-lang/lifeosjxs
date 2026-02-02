@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { PenTool, Cpu, Activity, Terminal, CheckCircle, AlertTriangle } from 'lucide-react';
-import { CoreEngine, DEFAULT_HABITS } from '@/lib/ai/core';
+import { CoreEngine, DEFAULT_HABITS } from '@/frontend-body/lib/ai/core';
 
 export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
     const [entry, setEntry] = useState<any>({ 

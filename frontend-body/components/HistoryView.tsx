@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { List as ListIcon, Filter, Zap, TrendingUp, Clock, Activity, Calendar } from 'lucide-react';
-import { CoreEngine, DEFAULT_HABITS, NEON_PALETTE } from '@/lib/ai/core';
+import { CoreEngine, DEFAULT_HABITS, NEON_PALETTE } from '@/frontend-body/lib/ai/core';
 
 // 輔助：取得 Mood 對應顏色
 const getMoodColor = (mood: number) => {
