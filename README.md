@@ -1018,3 +1018,146 @@ export const SettingsView = ({ logs, onImport }: { logs: any[], onImport: (data:
     );
 };
 、、、
+
+app/core/config_manager.py
+import os
+from sqlalchemy.orm import Session
+from app.db.session import SessionLocal
+from app.models.system import SystemConfig
+import time
+
+class ConfigManager:
+    _instance = None
+    _cache = {}
+    _cache_ttl = 300  # 5分鐘快取
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(ConfigManager, cls).__new__(cls)
+        return cls._instance
+
+    def get_value(self, key: str, default: str) -> str:
+        current_time = time.time()
+        
+        # 1. 檢查快取
+        if key in self._cache:
+            val, timestamp = self._cache[key]
+            if current_time - timestamp < self._cache_ttl:
+                return val
+
+        # 2. 讀取資料庫
+        db: Session = SessionLocal()
+        try:
+            config = db.query(SystemConfig).filter(SystemConfig.key == key).first()
+            if config:
+                self._cache[key] = (config.value, current_time)
+                return config.value
+        except Exception as e:
+            print(f"Config DB Read Error: {e}")
+        finally:
+            db.close()
+
+        # 3. 回退至環境變數或預設值
+        return os.getenv(key, default)
+
+    def set_value(self, key: str, value: str):
+        db: Session = SessionLocal()
+        try:
+            config = db.query(SystemConfig).filter(SystemConfig.key == key).first()
+            if not config:
+                config = SystemConfig(key=key, value=value)
+                db.add(config)
+            else:
+                config.value = value
+            
+            db.commit()
+            # 更新快取
+            self._cache[key] = (value, time.time())
+        except Exception as e:
+            db.rollback()
+            raise e
+        finally:
+            db.close()
+
+config_manager = ConfigManager()
+
+backend-cortex/app/api/v1/ingest.py
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+from app.agents.sorter import SorterAgent
+
+router = APIRouter()
+agent = SorterAgent()
+
+class IngestRequest(BaseModel):
+    content: str
+    source: str = "web"
+
+@router.post("/ingest")
+async def ingest_log(request: IngestRequest):
+    try:
+        # 1. AI 思考與結構化
+        structured_log = agent.process(request.content)
+        
+        # 2. (TODO) 這裡未來會呼叫 Supabase 寫入 DB
+        # database.save(structured_log)
+        
+        return {
+            "status": "success", 
+            "data": structured_log.model_dump()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+  backend-cortex/app/agents/sorter.py
+  import os
+from google import genai
+from dotenv import load_dotenv
+from app.models.gemini import LogEntry
+
+load_dotenv()
+
+class SorterAgent:
+    def __init__(self):
+        # 使用 Flash 模型進行快速分類
+        self.client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+        self.model_name = "gemini-2.0-flash" 
+
+    def process(self, user_input: str) -> LogEntry:
+        prompt = f"""
+        你是一個極速分類器 (The Sorter)。
+        請分析以下使用者輸入，並將其結構化。
+        
+        使用者輸入: {user_input}
+        """
+        
+        response = self.client.models.generate_content(
+            model=self.model_name,
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_schema": LogEntry, # 關鍵：強制結構化輸出
+            },
+        )
+        
+        # 自動轉為 Pydantic Object，無需再做 JSON.parse
+        return response.parsed
+
+  backend-cortex/app/models/gemini.py
+  from pydantic import BaseModel, Field
+from typing import List, Optional
+
+class LogEntry(BaseModel):
+    """將使用者的輸入轉化為結構化日誌"""
+    category: str = Field(..., description="分類標籤 (e.g., Work, Life, Idea)")
+    tags: List[str] = Field(..., description="相關標籤")
+    summary: str = Field(..., description="一句話總結")
+    mood_score: int = Field(..., description="情緒分數 1-10", ge=1, le=10)
+    action_items: List[str] = Field(default=[], description="需要執行的下一步行動")
+
+backend-cortex/requirements.txt
+fastapi
+uvicorn
+google-genai
+pydantic
+python-dotenv
