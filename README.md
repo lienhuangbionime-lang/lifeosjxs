@@ -37,6 +37,7 @@ Check out our [Next.js deployment documentation](https://nextjs.org/docs/deploym
 
 
 prisma/schema.prisma
+、、、
 generator client {
   provider = "prisma-client-js"
   binaryTargets = ["native", "debian-openssl-1.1.x", "debian-openssl-3.0.x"]
@@ -97,8 +98,9 @@ model MonthlyReview {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
+、、、
 lib/ai/core.ts
+、、、
 // 檔案位置: lib/ai/core.ts
 import { BookOpen, Activity, Zap, Brain, Star, TrendingUp, Target, Heart, Rocket, Terminal } from 'lucide-react';
 
@@ -157,8 +159,10 @@ export const CoreEngine = {
         return { tags: [...new Set(tags)], links: [...new Set(links)] };
     }
 };
+、、、
 
 app/api/ingest/route.ts
+、、、
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { prisma } from "@/lib/db";
 import { AGENTIC_INGEST_SYSTEM_PROMPT } from "@/lib/ai/prompts"; //
@@ -282,8 +286,10 @@ export async function POST(req: Request) {
   }
 
 }
+、、、
 
 app/page.tsx
+、、、
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -388,9 +394,10 @@ export default function Home() {
     </div>
   );
 }
-
+、、、
 
 components
+、、、
 CaptureView.tsx
 ContextModal.tsx
 Dashboard.tsx
@@ -399,9 +406,10 @@ HistoryView.tsx
 NeuralGraph.tsx
 ProjectBoard.tsx
 SettingsView.tsx
-
+、、、
 
 components/CaptureView.tsx
+、、、
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -573,8 +581,10 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
         </div>
     );
 };
+、、、
 
 // 檔案位置: components/GraphView.tsx
+、、、
 'use client';
 
 import React, { useState } from 'react';
@@ -599,8 +609,10 @@ export const GraphView = ({ logs }: { logs: any[] }) => {
         </div>
     );
 };
+、、、
 
 // 檔案位置: components/NeuralGraph.tsx
+、、、
 'use client';
 
 import React, { useEffect, useRef, memo, useState } from 'react';
@@ -832,4 +844,4 @@ const NeuralGraphComponent = ({ logs, onNodeClick }: { logs: any[], onNodeClick:
 // [Fix 4] 設定 Display Name 並 Memo 化
 export const NeuralGraph = memo(NeuralGraphComponent);
 NeuralGraph.displayName = 'NeuralGraph';
-
+、、、
