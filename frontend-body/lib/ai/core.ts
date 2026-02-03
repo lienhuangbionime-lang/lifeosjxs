@@ -50,9 +50,15 @@ export const CoreEngine = {
 
     parseGraphSeeds: (note: string, graphContent = '') => {
         if (!note) return { tags: [], links: [] };
+        
         const combined = note + ' ' + graphContent;
         const tags = (combined.match(/#([\w\u4e00-\u9fa5]+)/g) || []).map(t => t.slice(1));
         const links = (combined.match(/\[\[(\d{4}-\d{2}-\d{2})\]\]/g) || []).map(l => l.slice(2, -2));
-        return { tags: [...new Set(tags)], links: [...new Set(links)] };
+        
+        // [Fix] 改用 Array.from 以相容舊版 TS 設定
+        return { 
+            tags: Array.from(new Set(tags)), 
+            links: Array.from(new Set(links)) 
+        };
     }
 };
