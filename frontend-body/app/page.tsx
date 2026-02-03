@@ -11,6 +11,7 @@ import { HistoryView } from '@/components/HistoryView';
 import { SettingsView } from '@/components/SettingsView';
 import { Dashboard } from '@/components/Dashboard';
 import { ProjectBoard } from '@/components/ProjectBoard';
+import { SystemStatus } from '@/components/SystemStatus';
 
 // --- MOCK DATA (預設資料) ---
 const MOCK_LOGS = [
@@ -69,12 +70,16 @@ export default function Home() {
         <h1 className={`text-lg font-black tracking-tight ${activeTab === 'graph' ? 'text-white' : 'text-slate-800'}`}>
           LifeOS <span className="text-indigo-500 text-xs align-top px-1">v3.1</span>
         </h1>
-        <button 
-          onClick={() => setIsMenuOpen(!isMenuOpen)} 
-          className={`p-2 rounded-full transition-all ${activeTab === 'graph' ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-600'}`}
-        >
-          {isMenuOpen ? <X size={20}/> : <Menu size={20}/>}
-        </button>
+        <div className="flex items-center gap-4">
+          <h1 className="...">LifeOS Cortex</h1>
+          <SystemStatus />
+            <button 
+            onClick={() => setIsMenuOpen(!isMenuOpen)} 
+            className={`p-2 rounded-full transition-all ${activeTab === 'graph' ? 'hover:bg-slate-800 text-white' : 'hover:bg-slate-100 text-slate-600'}`}
+          >
+            {isMenuOpen ? <X size={20}/> : <Menu size={20}/>}
+          </button>
+        </div>
       </header>
 
       {/* Dropdown Menu */}
