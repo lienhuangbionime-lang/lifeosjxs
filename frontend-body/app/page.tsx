@@ -31,7 +31,7 @@ export default function Home() {
     try {
       console.log("🧠 Connecting to Hippocampus...");
       // 呼叫後端 API (透過 next.config.js rewrite 轉發到 Python)
-      const res = await fetch('/api/py/api/v1/memories/daily'); 
+      const res = await fetch('/api/py/memories/daily'); 
       if (!res.ok) throw new Error("Memory recall failed");
       
       const dbLogs = await res.json();
