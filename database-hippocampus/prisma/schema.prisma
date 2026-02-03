@@ -1,0 +1,22 @@
+// database-hippocampus/prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model LogEntry {
+  id        String   @id @default(cuid())
+  date      DateTime @unique
+  content   String   // Markdown body
+  mood      Int?
+  focus     Int?
+  energy    Int?
+  // V3.1 新增：思考軌跡
+  aiModel   String?  @default("gemini-flash") 
+  isAi      Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
