@@ -81,7 +81,15 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
     onSave({ ...entry, graphSeeds: seeds });
     
     // Reset
-    setEntry({ date: new Date().toISOString().split('T'), note: '', mood: 5, focus: 5, energy: 5, deepWork: 0, habits: {} });
+    setEntry({ 
+      date: new Date().toISOString().split('T'), // 👈 關鍵修正：加上 
+      note: '', 
+      mood: 5, 
+      focus: 5, 
+      energy: 5, 
+      deepWork: 0, 
+      habits: {} 
+    });
     setDetectedTasks([]);
     setAiThinkingLogs([]);
   };
