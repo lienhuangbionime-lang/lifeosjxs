@@ -1,15 +1,13 @@
 # backend-cortex/main.py
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
-from app.core.config import get_settings
+from app.core.config import settings
 from app.core.gemini import get_model # 這是我們之前建立的
 import uvicorn
 
-settings = get_settings()
-
 app = FastAPI(
-    title=settings.PROJECT_NAME,
-    openapi_url=f"{settings.API_V1_STR}/openapi.json"
+    title="LifeOS Cortex",
+    openapi_url="/api/v1/openapi.json"
 )
 
 # --- 定義資料模型 (與前端對接) ---
@@ -40,7 +38,7 @@ async def ingest_log(request: LogRequest):
         # 3. 回傳給前端 (格式必須符合 CaptureView 的預期)
         return {
             "success": True,
-            "model": settings.MODEL_FAST,
+            "model": settings.MODEL_SMART,
             "data": {
                 "markdown_body": response.text, # AI 的回應文字
                 "meta": {

@@ -1,12 +1,10 @@
 # backend-cortex/app/core/gemini.py (Bypass Version)
 import requests
 import json
-from app.core.config import get_settings
-
-settings = get_settings()
+from app.core.config import settings
 
 class GeminiClient:
-    def __init__(self, model_name="gemini-2.0-flash"):
+    def __init__(self, model_name="gemini-2.5-flash"):
         self.api_key = settings.GEMINI_API_KEY
         self.model_name = model_name
         self.base_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
@@ -56,5 +54,5 @@ class MockResponse:
 
 # 工廠函數 (保持與原本介面一致)
 def get_model(model_type: str = "fast"):
-    model_name = settings.MODEL_FAST if model_type == "fast" else settings.MODEL_SMART
+    model_name = settings.MODEL_SMART
     return GeminiClient(model_name=model_name)

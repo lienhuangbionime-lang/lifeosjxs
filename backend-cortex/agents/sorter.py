@@ -9,7 +9,7 @@ class SorterAgent:
     def __init__(self):
         # 使用 Flash 模型進行快速分類
         self.client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
-        self.model_name = "gemini-2.0-flash" 
+        self.model_name = "gemini-2.5-flash" 
 
     def process(self, user_input: str) -> LogEntry:
         prompt = f"""
