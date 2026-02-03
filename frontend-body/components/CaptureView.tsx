@@ -82,7 +82,7 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
     
     // Reset
     setEntry({ 
-      date: new Date().toISOString().split('T'), // 👈 關鍵修正：加上 
+      date: new Date().toISOString().split('T')[0], // 👈 關鍵修正：加上 
       note: '', 
       mood: 5, 
       focus: 5, 
