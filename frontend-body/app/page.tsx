@@ -27,14 +27,53 @@ export default function Home() {
   const [isMounted, setIsMounted] = useState(false);
 
   useEffect(() => {
-    setIsMounted(true); // 標記元件已掛載
+    setIsMounted(true);
     const saved = localStorage.getItem('life_os_logs_v8_0');
-    if (saved) try { setLogs(JSON.parse(saved)); } catch(e) { console.error(e); }
-  }, []);
+    if (saved) {
+      try { 
+        setLogs(JSON.parse(saved)); 
+      } catch(e) { console.error("Cache Error", e); }
+    }, []);
 
-  useEffect(() => {
-    if (logs !== MOCK_LOGS) localStorage.setItem('life_os_logs_v8_0', JSON.stringify(logs));
-  }, [logs]);
+    const syncMemories = async () => {
+      try {
+        console.log("🧠 Connecting to Hippocampus...");
+        // 呼叫後端 API (注意：這裡使用 Next.js Rewrite 路徑 /api/py/...)
+        const res = await fetch('/api/py/api/v1/memories/daily'); 
+        if (!res.ok) throw new Error("Memory recall failed");
+        
+        const dbLogs = await res.json();
+        
+        // 資料格式轉換：將 DB 格式轉為前端 UI 格式
+        const formattedLogs = dbLogs.map((row: any) => ({
+          ...row.structured_data, // 解包 AI 分析結果
+          date: row.date,         // 確保日期正確
+        }));
+  
+        if (formattedLogs.length > 0) {
+          setLogs(formattedLogs);
+          console.log("✨ Memories synchronized from Cortex");
+        }
+      } catch (e) {
+        console.warn("⚠️ Offline Mode: Using LocalStorage only", e);
+      }
+    };
+  
+    // 1. 初始化 Effect
+    useEffect(() => {
+      setIsMounted(true);
+      
+      // 步驟 A: 先讀取本地快取 (V2 機制 - 速度快)
+      const saved = localStorage.getItem('life_os_logs_v8_0');
+      if (saved) {
+        try { 
+          setLogs(JSON.parse(saved)); 
+        } catch(e) { console.error("Cache Error", e); }
+      }
+      
+      // 步驟 B: 接著啟動雲端同步 (V3 機制 - 資料真)
+      syncMemories();
+    }, []);
 
   const handleSaveLog = (newLog: any) => {
     setLogs(prev => [newLog, ...prev]);

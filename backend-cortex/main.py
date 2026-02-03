@@ -6,6 +6,8 @@ from app.core.gemini import get_model
 from app.subconscious.scheduler import start_scheduler
 from app.api.v1.system import router as system_router
 import uvicorn
+from app.api.v1 import ingest, memories, system # 引入 memories
+
 
 app = FastAPI(
     title="LifeOS Cortex",
@@ -13,8 +15,9 @@ app = FastAPI(
 )
 
 # 掛載 System API
-app.include_router(system_router, prefix="/api/v1")
-
+app.include_router(ingest.router, prefix="/api/v1", tags=["Ingest"])
+app.include_router(memories.router, prefix="/api/v1", tags=["Memories"])
+app.include_router(system.router, prefix="/api/v1", tags=["System"]) # 這是剛剛導致崩潰的元兇
 
 @app.on_event("startup")
 def on_startup() -> None:

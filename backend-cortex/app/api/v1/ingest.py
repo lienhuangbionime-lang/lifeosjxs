@@ -1,17 +1,17 @@
-# 檔案: backend-cortex/app/api/v1/ingest.py
-from fastapi import APIRouter, HTTPException, Depends
+# 檔案位置: backend-cortex/app/api/v1/ingest.py
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import google.generativeai as genai
 import json
 import logging
-import os
+from datetime import datetime
 
-# 引入核心設定與模型
+# 引入核心設定與資料庫
 from app.core.config import settings
-from app.models.gemini import LogAnalysisResult # 確保這個檔案存在並與之前定義的一致
+from app.core.database import supabase
+from app.models.gemini import LogAnalysisResult 
 
 router = APIRouter()
-# 設定 Logger 以便除錯
 logger = logging.getLogger("uvicorn")
 
 # 定義前端傳來的請求格式
@@ -22,29 +22,21 @@ class LogRequest(BaseModel):
 @router.post("/ingest", response_model=LogAnalysisResult)
 async def ingest_log(request: LogRequest):
     """
-    接收前端日誌 -> 透過 Gemini 進行結構化分析 (Structure) -> 回傳 Pydantic 物件
+    接收前端日誌 -> 透過 Gemini 進行思考 -> 存入 Supabase 海馬迴 -> 回傳結果
     """
     try:
-        logger.info(f"📥 Cortex received: {request.text[:50]}...")
-
-        # 1. 設定 Gemini (確保 API Key 已載入)
+        logger.info(f"📥 Cortex received log for {request.date}")
+        
+        # 1. 檢查並啟動 Gemini
         if not settings.GEMINI_API_KEY:
-             raise HTTPException(status_code=500, detail="GEMINI_API_KEY not found in env")
-             
+            raise HTTPException(status_code=500, detail="Missing GEMINI_API_KEY")
+            
         genai.configure(api_key=settings.GEMINI_API_KEY)
         model = genai.GenerativeModel(settings.MODEL_SMART)
-
-        # 2. 準備 Prompt
-        prompt = f"""
-        Analyze the following user log for date: {request.date}.
-        Convert it into the structured format defined by the JSON schema.
         
-        USER INPUT:
-        {request.text}
-        """
-
-        # 3. 呼叫 AI (啟用結構化輸出)
-        # [CTO Note] 這邊使用 response_json_schema 強制輸出的格式
+        prompt = f"Analyze this log for {request.date}: {request.text}"
+        
+        # 2. 執行思考 (Thinking)
         response = model.generate_content(
             contents=prompt,
             config={
@@ -52,26 +44,31 @@ async def ingest_log(request: LogRequest):
                 "response_json_schema": LogAnalysisResult.model_json_schema(),
             },
         )
-
-        # 4. [關鍵修復] 安全地解析回應
-        # 不去手動存取 candidates['content'] (這會導致 list indices error)
-        # 直接使用 SDK 提供的 .text 屬性，它會自動提取生成的文字
-        raw_json = response.text 
         
-        # 確保 AI 回傳的是有效 JSON
-        try:
-            parsed_data = json.loads(raw_json)
-        except json.JSONDecodeError:
-            logger.error(f"❌ JSON Decode Error. Raw: {raw_json}")
-            raise HTTPException(status_code=500, detail="AI response was not valid JSON.")
-
+        # 3. 解析結果 (Parsing)
+        raw_json = response.text
+        structured_data = json.loads(raw_json)
         logger.info("✅ Gemini analysis complete.")
-        
-        # 5. 回傳字典 (FastAPI 會自動將其驗證為 LogAnalysisResult)
-        return parsed_data
+
+        # 4. 寫入海馬迴 (Memory Consolidation)
+        # 準備要寫入 Supabase 的 payload
+        db_payload = {
+            "date": request.date,
+            "content": structured_data["markdown_body"],
+            "mood": structured_data["meta"]["metrics"]["mood"],
+            "focus": structured_data["meta"]["metrics"]["focus"],
+            "energy": structured_data["meta"]["metrics"]["energy"],
+            "structured_data": structured_data, # 存入完整的 JSON 分析結果
+            "created_at": datetime.now().isoformat()
+        }
+
+        # 執行 Upsert (有則更新，無則新增)
+        data, count = supabase.table("logs").upsert(db_payload).execute()
+        logger.info(f"💾 Memory stored in Hippocampus.")
+
+        # 5. 回傳給前端 (Feedback)
+        return structured_data
 
     except Exception as e:
         logger.error(f"🔥 Cortex Error: {str(e)}")
-        # 回傳包含錯誤訊息的 JSON，而不是讓伺服器崩潰
-        # 注意：這裡我們拋出 HTTPException，前端會捕捉到並顯示 Alert
-        raise HTTPException(status_code=500, detail=f"Cortex Error: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

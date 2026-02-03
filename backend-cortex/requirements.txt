@@ -1,6 +1,8 @@
 fastapi
 uvicorn
 google-genai
+google-generativeai
+supabase
 pydantic
 python-dotenv
 apscheduler

@@ -1,46 +1,76 @@
-'use client';
-import React from 'react';
-import { Server, Activity, Database, Cpu } from 'lucide-react';
+// 檔案: components/SettingsView.tsx
+import React, { useState } from 'react';
+import { UploadCloud, CheckCircle, AlertTriangle } from 'lucide-react';
 
-// [關鍵修正] 使用 export const (Named Export) 以配合 page.tsx 的引用
-export const SettingsView = ({ logs = [], onImport }: { logs?: any[], onImport?: (data: any) => void }) => {
+export const SettingsView = () => {
+  const [status, setStatus] = useState("idle"); // idle, uploading, done
+
+  const migrateToCloud = async () => {
+    // 1. 從舊家拿資料
+    const localData = localStorage.getItem('life_os_logs_v8_0');
+    if (!localData) return alert("瀏覽器中沒有舊資料可遷移");
+    
+    const logs = JSON.parse(localData);
+    if (!confirm(`準備將 ${logs.length} 筆本地日記上傳至雲端大腦？`)) return;
+
+    setStatus("uploading");
+
+    try {
+      let successCount = 0;
+      // 2. 開始一筆筆搬運
+      for (const log of logs) {
+        // 為了避免太快把後端打掛，稍微等一下 (選擇性)
+        // await new Promise(r => setTimeout(r, 100)); 
+
+        const res = await fetch('/api/py/api/v1/ingest', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: log.note || log.markdown_body || "Old Entry", // 確保有內容
+            date: log.date
+          }),
+        });
+
+        if (res.ok) successCount++;
+        console.log(`Uploading ${log.date}: ${res.status}`);
+      }
+      
+      alert(`遷移成功！共上傳 ${successCount} / ${logs.length} 筆回憶。`);
+      setStatus("done");
+
+    } catch (e) {
+      console.error(e);
+      alert("遷移過程中發生錯誤，請檢查 Console");
+      setStatus("idle");
+    }
+  };
+
   return (
-    <div className="h-full overflow-y-auto p-6 custom-scrollbar text-slate-300">
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-slate-100 flex items-center gap-2">
-          <Server className="text-indigo-500" />
-          System Configuration
-        </h2>
-        <p className="text-slate-500 text-sm mt-1">LifeOS v3.1 Autopoiesis 核心參數控制</p>
-      </div>
-
-      {/* 系統狀態面板 */}
-      <div className="grid gap-4 mb-8">
-        <div className="bg-slate-900/50 border border-slate-800 p-4 rounded-xl">
-          <h3 className="text-xs font-bold text-slate-500 uppercase mb-4 tracking-wider">Neural Connection</h3>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center text-sm">
-              <div className="flex items-center gap-2">
-                <Cpu size={14} className="text-emerald-500"/>
-                <span>Cortex (FastAPI/Python)</span>
-              </div>
-              <span className="text-emerald-400 font-mono text-xs px-2 py-1 bg-emerald-500/10 rounded">● ACTIVE</span>
-            </div>
-            <div className="flex justify-between items-center text-sm">
-              <div className="flex items-center gap-2">
-                <Database size={14} className="text-blue-500"/>
-                <span>Hippocampus (Supabase)</span>
-              </div>
-              <span className="text-blue-400 font-mono text-xs px-2 py-1 bg-blue-500/10 rounded">● CONNECTED</span>
-            </div>
-          </div>
-        </div>
-
-        {/* 簡單的資料顯示，證明組件運作中 */}
-        <div className="p-4 rounded-xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-200 text-sm flex items-center gap-3">
-          <Activity size={16} />
-          <span>目前系統記憶庫中共有 {logs?.length || 0} 條神經節點。</span>
-        </div>
+    <div className="p-6 text-slate-300">
+      <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
+        <UploadCloud className="text-indigo-400"/> 
+        記憶遷移中心
+      </h2>
+      
+      <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
+        <p className="mb-4 text-sm text-slate-400">
+          偵測到您使用 V2 版本的 LocalStorage 儲存機制。
+          點擊下方按鈕將資料永久寫入海馬迴 (Supabase)。
+        </p>
+        
+        <button 
+          onClick={migrateToCloud}
+          disabled={status === 'uploading'}
+          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold flex items-center gap-2 disabled:opacity-50"
+        >
+          {status === 'uploading' ? (
+            <>⏳ 正在上傳中...</>
+          ) : status === 'done' ? (
+            <><CheckCircle size={18}/> 遷移完成</>
+          ) : (
+            <><UploadCloud size={18}/> 開始上傳至雲端</>
+          )}
+        </button>
       </div>
     </div>
   );
