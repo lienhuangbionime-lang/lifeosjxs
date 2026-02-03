@@ -2,13 +2,24 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from app.core.config import settings
-from app.core.gemini import get_model # 這是我們之前建立的
+from app.core.gemini import get_model
+from app.subconscious.scheduler import start_scheduler
+from app.api.v1.system import router as system_router
 import uvicorn
 
 app = FastAPI(
     title="LifeOS Cortex",
     openapi_url="/api/v1/openapi.json"
 )
+
+# 掛載 System API
+app.include_router(system_router, prefix="/api/v1")
+
+
+@app.on_event("startup")
+def on_startup() -> None:
+    """應用啟動時啟動背景排程器。"""
+    start_scheduler()
 
 # --- 定義資料模型 (與前端對接) ---
 class LogRequest(BaseModel):
