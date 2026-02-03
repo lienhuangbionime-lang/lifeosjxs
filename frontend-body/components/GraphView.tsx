@@ -3,8 +3,8 @@
 
 import React, { useState } from 'react';
 import { Activity } from 'lucide-react';
-import { NeuralGraph } from '@/frontend-body/components/NeuralGraph';
-import { ContextModal } from '@/frontend-body/components/ContextModal'; // [New]
+import { NeuralGraph } from '@/components/NeuralGraph';
+import { ContextModal } from '@/components/ContextModal';
 
 export const GraphView = ({ logs }: { logs: any[] }) => {
     const [contextNode, setContextNode] = useState(null);

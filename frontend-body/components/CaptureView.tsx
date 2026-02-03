@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { PenTool, Cpu, Activity, Terminal, CheckCircle, AlertTriangle } from 'lucide-react';
-import { CoreEngine, DEFAULT_HABITS } from '@/frontend-body/lib/ai/core';
+import { CoreEngine, DEFAULT_HABITS } from '@/lib/ai/core';
 
 export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
     const [entry, setEntry] = useState<any>({ 
@@ -24,13 +24,10 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
         setAiThinkingLogs(["連線神經網絡...", "正在讀取脈絡..."]);
         
         try {
-            const response = await fetch('/api/ingest', {
+            const response = await fetch('/api/py/ingest/', { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    text: entry.note, 
-                    date: entry.date 
-                })
+                body: JSON.stringify({ text: entry.note, date: entry.date })
             });
 
             // [Fix] 檢查是否為 JSON 格式
