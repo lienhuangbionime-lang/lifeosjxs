@@ -1,18 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  reactStrictMode: false, // 建議關閉，避免開發模式下 useEffect 執行兩次
-  
-  // [CTO 關鍵設定] 建立通往 Python 大腦的神經通道
   async rewrites() {
     return [
       {
-        // 當前端呼叫 /api/py/xxx 時...
+        // 前端呼叫路徑
         source: '/api/py/:path*',
-        // 自動轉發到 Python 後端 (Port 8001) 的 /api/v1/xxx
-        destination: 'http://127.0.0.1:8001/api/v1/:path*',
+        // [關鍵修改] 填入您剛獲得的 Render 網址
+        // 注意：Render 網址後要加上 /api/v1/ 因為我們後端 main.py 有設定 prefix
+        destination: 'https://lifeosjxs.onrender.com/api/v1/:path*', 
       },
-    ];
+    ]
   },
-};
+}
 
-module.exports = nextConfig;
+module.exports = nextConfig

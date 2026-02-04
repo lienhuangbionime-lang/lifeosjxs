@@ -4,6 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { PenTool, Cpu, Activity, Terminal, CheckCircle, AlertTriangle } from 'lucide-react';
 import { CoreEngine, DEFAULT_HABITS } from '@/lib/ai/core';
+import { cortex } from '@/lib/api/client'; // [Fix 1] 引入神經束 (連線到 Python 後端)
 
 export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
   const [entry, setEntry] = useState({ date: '', note: '', mood: 5, focus: 5, energy: 5, deepWork: 0, habits: {} });
