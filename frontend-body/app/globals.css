@@ -1,3 +1,5 @@
+/* 檔案位置: frontend-body/app/globals.css */
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -16,14 +18,49 @@
   }
 }
 
-/* 自訂捲軸樣式 (LifeOS 風格) */
+body {
+  /* 確保背景色與 layout.tsx 一致 */
+  background-color: rgb(2, 6, 23); /* slate-950 */
+  color: rgb(241, 245, 249); /* slate-100 */
+}
+
+/* --- 自定義滾動條 (配合 CaptureView) --- */
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
+  height: 6px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(15, 23, 42, 0.5);
+  border-radius: 8px;
 }
+
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: #475569;
-  border-radius: 20px;
+  background: rgba(71, 85, 105, 0.5); /* slate-600/50 */
+  border-radius: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(99, 102, 241, 0.6); /* indigo-500/60 */
+}
+
+/* --- 動畫 (配合 Menu 彈出) --- */
+@keyframes scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.15s ease-out forwards;
+}
+
+/* --- D3 Graph Glow Effect --- */
+.glow-effect {
+  filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.5));
 }
