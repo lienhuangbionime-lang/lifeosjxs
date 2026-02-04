@@ -1,69 +1,81 @@
-# 檔案位置: backend-cortex/app/api/v1/system.py
+# 檔案: backend-cortex/app/api/v1/system.py
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-import os
+from pathlib import Path
+import re
 import logging
-from dotenv import load_dotenv
-
-# 引入潛意識進化邏輯 (如果還沒建立 evolution.py，這行可能會報錯，我們先做簡單版)
-# from app.subconscious.evolution import check_for_upgrades 
+import os
 
 router = APIRouter()
-logger = logging.getLogger("uvicorn")
+logger = logging.getLogger("evolution")
 
-class UpgradeRequest(BaseModel):
+# 定義請求體 (Payload)
+class UpgradePayload(BaseModel):
     target_model: str
+
+def _get_env_path() -> Path:
+    # 根據目前的目錄結構：backend-cortex/app/api/v1/system.py
+    # 往上 4 層回到 backend-cortex 根目錄
+    return Path(__file__).resolve().parent.parent.parent.parent / ".env"
 
 @router.get("/evolve")
 async def check_evolution():
     """
-    [模擬] 檢查是否有新模型可用的端點
+    [模擬端點] 檢查是否有可用的進化版本
+    實際運作時，這裡會由 Window 3 (Evolution Agent) 的資料庫讀取最新提案。
+    目前先回傳一個模擬資料供前端測試。
     """
-    try:
-        # 暫時回傳模擬數據，確保 API 不會崩潰
-        return {
-            "current_model": os.getenv("MODEL_SMART", "gemini-2.0-flash"),
-            "recommended_upgrade": None, # 暫時不建議升級
-            "message": "Evolution Agent is strictly monitoring."
-        }
-    except Exception as e:
-        logger.error(f"Evolution Check Failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+    # 模擬：發現新模型 Gemini 3.0
+    return {
+        "status": "stable", # 或 'available'
+        "current_model": os.getenv("MODEL_SMART", "gemini-2.0-flash"),
+        # 若要測試按鈕亮起，請將下行改為具体的模型名稱，如 "gemini-3.0-pro-exp"
+        "recommended_upgrade": None 
+    }
 
 @router.post("/upgrade")
-async def execute_upgrade(request: UpgradeRequest):
+async def mutate_system(payload: UpgradePayload):
     """
-    [危險] 修改 .env 檔案並觸發重啟
+    [核心突變] 修改 .env 檔案並觸發熱重載
     """
+    env_path = _get_env_path()
+    
+    if not env_path.exists():
+        logger.error(f"❌ .env file not found at {env_path}")
+        raise HTTPException(status_code=500, detail=".env file not found")
+
     try:
-        env_path = ".env"
-        if not os.path.exists(env_path):
-            raise FileNotFoundError(".env file not found")
-
-        # 讀取現有內容
-        with open(env_path, "r", encoding="utf-8") as f:
-            lines = f.readlines()
-
-        # 替換模型變數
-        new_lines = []
-        found = False
-        for line in lines:
-            if line.startswith("MODEL_SMART="):
-                new_lines.append(f"MODEL_SMART={request.target_model}\n")
-                found = True
-            else:
-                new_lines.append(line)
+        # 1. 讀取基因
+        content = env_path.read_text(encoding="utf-8")
         
-        if not found:
-            new_lines.append(f"\nMODEL_SMART={request.target_model}\n")
-
-        # 寫回檔案
-        with open(env_path, "w", encoding="utf-8") as f:
-            f.writelines(new_lines)
-
-        logger.warning(f"🧬 System Mutated: Switched to {request.target_model}")
-        return {"status": "success", "message": "System mutation complete. Restarting..."}
+        # 2. 準備新的基因片段
+        new_line = f"MODEL_SMART={payload.target_model}"
+        
+        # 3. 執行基因編輯 (Regex Replace)
+        # 尋找以 MODEL_SMART= 開頭的行，替換為新內容
+        if re.search(r"^MODEL_SMART=.*$", content, flags=re.MULTILINE):
+            new_content = re.sub(
+                r"^MODEL_SMART=.*$", 
+                new_line, 
+                content, 
+                flags=re.MULTILINE
+            )
+        else:
+            # 如果原本沒有定義，則附加在最後
+            new_content = content + f"\n{new_line}"
+            
+        # 4. 寫入基因 (這會觸發 FastAPI 的 reload)
+        env_path.write_text(new_content, encoding="utf-8")
+        
+        logger.warning(f"♻️ System mutating to {payload.target_model}... Restarting Cortex.")
+        print(f"♻️ [MUTATION] System upgraded to {payload.target_model}. Rebooting...")
+        
+        return {
+            "status": "success", 
+            "message": "Mutation complete. Cortex is rebooting...",
+            "new_model": payload.target_model
+        }
 
     except Exception as e:
-        logger.error(f"Mutation Failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"Mutation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Mutation failed: {str(e)}")
