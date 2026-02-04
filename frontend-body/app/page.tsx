@@ -10,61 +10,31 @@ import { SettingsView } from '@/components/SettingsView';
 import { Dashboard } from '@/components/Dashboard';
 import { ProjectBoard } from '@/components/ProjectBoard';
 
-// --- MOCK DATA ---
+// --- MOCK DATA (預設資料) ---
 const MOCK_LOGS = [
-  { date: '2024-01-30', note: 'Deep work on LifeOS UI #coding', metrics: { mood: 7, focus: 9 }, graphSeeds: { tags: ['coding'], links: [] }, habits: {} },
+  { date: '2026-02-03', note: 'System initialized. Waiting for cortex connection...', metrics: { mood: 5, focus: 5 }, graphSeeds: { tags: ['system'], links: [] }, habits: {} },
 ];
 
 export default function Home() {
-  // --- 1. 狀態定義區 (State) ---
   const [logs, setLogs] = useState<any[]>(MOCK_LOGS);
   const [activeTab, setActiveTab] = useState<'capture' | 'graph' | 'list' | 'settings' | 'dashboard' | 'project'>('capture');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   
-  // [Fix] 防止 Hydration Error (水合錯誤)
+  // [Fix 1] 防止 Hydration Error (水合錯誤) 的關鍵狀態
   const [isMounted, setIsMounted] = useState(false);
 
-  // --- 2. 定義功能函式 (Functions) ---
-  
-  // [V3 新增] 同步函式：從大腦 (Cortex) 提取記憶
+  // [Fix 2] 定義同步函式 (暫時只做簡單宣告，防止報錯)
   const syncMemories = async () => {
     try {
-      console.log("🧠 Connecting to Hippocampus...");
-      // 呼叫後端 API (透過 next.config.js rewrite 轉發到 Python)
-      const res = await fetch('/api/py/memories/daily'); 
-      if (!res.ok) throw new Error("Memory recall failed");
-      
-      const dbLogs = await res.json();
-      
-      // 資料格式轉換：將 DB 格式轉為前端 UI 格式
-      const formattedLogs = dbLogs.map((row: any) => ({
-        ...row.structured_data, // 解包 AI 分析結果
-        date: row.date,         // 確保日期正確
-      }));
-
-      if (formattedLogs.length > 0) {
-        setLogs(formattedLogs);
-        console.log("✨ Memories synchronized from Cortex");
-      }
+      // 這裡未來會呼叫 '/api/py/memories' 從 Railway 獲取資料
+      console.log("📡 Connecting to Cortex...");
     } catch (e) {
-      console.warn("⚠️ Offline Mode: Using LocalStorage only", e);
+      console.error("Sync failed:", e);
     }
   };
 
-  const handleSaveLog = (newLog: any) => {
-    setLogs(prev => [newLog, ...prev]);
-    setActiveTab('graph');
-  };
-
-  const handleImportLogs = (importedLogs: any[]) => {
-    setLogs(prev => [...prev, ...importedLogs]);
-  };
-
-  // --- 3. 副作用區 (Effects) ---
-  
-  // 初始化：掛載 -> 讀快取 -> 讀雲端
   useEffect(() => {
-    setIsMounted(true);
+    setIsMounted(true); // 標記元件已掛載
 
     // A. 讀取瀏覽器快取 (V2 機制 - 速度快)
     const saved = localStorage.getItem('life_os_logs_v8_0');
@@ -85,11 +55,27 @@ export default function Home() {
     }
   }, [logs]);
 
+  const handleSaveLog = (newLog: any) => {
+    setLogs(prev => [newLog, ...prev]);
+    setActiveTab('graph');
+  };
+
+  const handleImportLogs = (importedLogs: any[]) => {
+    setLogs(prev => [...prev, ...importedLogs]);
+  };
+
   // --- 4. 渲染 (Render) ---
   
-  // 如果還沒掛載，只回傳一個空殼，避免 Server/Client 不一致
+  // [Fix 3] 如果還沒掛載，顯示 Loading 動畫，而不是 return null (白屏)
   if (!isMounted) {
-    return null;
+    return (
+      <div className="h-screen w-full bg-[#f8fafc] flex flex-col items-center justify-center gap-4">
+        <div className="w-10 h-10 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+        <div className="text-slate-400 font-mono text-xs tracking-widest animate-pulse">
+          INITIALIZING LIFEOS v3.1...
+        </div>
+      </div>
+    );
   }
 
   const bgClass = activeTab === 'graph' ? 'bg-[#0f172a] text-slate-200' : 'bg-[#f8fafc] text-slate-800';
@@ -105,7 +91,6 @@ export default function Home() {
 
   return (
     <div className={`max-w-md mx-auto h-screen flex flex-col font-sans relative shadow-2xl overflow-hidden transition-colors duration-500 ${bgClass}`}>
-      
       {/* Header */}
       <header className={`px-6 py-4 z-50 flex justify-between items-center border-b sticky top-0 backdrop-blur-sm ${activeTab === 'graph' ? 'border-slate-800 bg-[#0f172a]/90' : 'border-slate-200 bg-white/80'}`}>
         <h1 className={`text-lg font-black tracking-tight ${activeTab === 'graph' ? 'text-white' : 'text-slate-800'}`}>
@@ -121,7 +106,7 @@ export default function Home() {
 
       {/* Dropdown Menu */}
       {isMenuOpen && (
-        <div className="absolute top-16 right-4 z- w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 animate-scale-in origin-top-right">
+        <div className="absolute top-16 right-4 z-[1] w-48 bg-white rounded-2xl shadow-xl border border-slate-100 py-2 animate-scale-in origin-top-right">
           {menuItems.map((item) => (
             <button 
               key={item.id} 
