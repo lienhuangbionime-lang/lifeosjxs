@@ -3,7 +3,8 @@ uvicorn
 google-genai
 google-generativeai
 supabase
-pydantic
+pydantic>=2.0.0
+pydantic-settings  <-- 關鍵缺失！一定要加這行
 python-dotenv
 apscheduler
 requests
