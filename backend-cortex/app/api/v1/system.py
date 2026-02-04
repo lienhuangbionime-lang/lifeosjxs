@@ -1,81 +1,57 @@
-# 檔案: backend-cortex/app/api/v1/system.py
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from pathlib import Path
-import re
-import logging
-import os
+// 檔案: frontend-body/lib/api/client.ts
 
-router = APIRouter()
-logger = logging.getLogger("evolution")
+// [Config] 優先使用環境變數，開發時預設為後端 Port 8001 (注意：之前設定是 8001 或 8000，請確認 FastAPI 的 Port)
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 
-# 定義請求體 (Payload)
-class UpgradePayload(BaseModel):
-    target_model: str
+export interface EvolutionStatus {
+  status: 'stable' | 'available';
+  current_model: string;
+  recommended_upgrade: string | null;
+}
 
-def _get_env_path() -> Path:
-    # 根據目前的目錄結構：backend-cortex/app/api/v1/system.py
-    # 往上 4 層回到 backend-cortex 根目錄
-    return Path(__file__).resolve().parent.parent.parent.parent / ".env"
-
-@router.get("/evolve")
-async def check_evolution():
-    """
-    [模擬端點] 檢查是否有可用的進化版本
-    實際運作時，這裡會由 Window 3 (Evolution Agent) 的資料庫讀取最新提案。
-    目前先回傳一個模擬資料供前端測試。
-    """
-    # 模擬：發現新模型 Gemini 3.0
-    return {
-        "status": "stable", # 或 'available'
-        "current_model": os.getenv("MODEL_SMART", "gemini-2.0-flash"),
-        # 若要測試按鈕亮起，請將下行改為具体的模型名稱，如 "gemini-3.0-pro-exp"
-        "recommended_upgrade": None 
+export const cortex = {
+  // 1. 基本健康檢查
+  health: async () => {
+    try {
+      const res = await fetch(`${API_URL}/`);
+      return await res.json();
+    } catch (e) {
+      return { status: 'offline', message: 'Cortex disconnected' };
     }
+  },
 
-@router.post("/upgrade")
-async def mutate_system(payload: UpgradePayload):
-    """
-    [核心突變] 修改 .env 檔案並觸發熱重載
-    """
-    env_path = _get_env_path()
-    
-    if not env_path.exists():
-        logger.error(f"❌ .env file not found at {env_path}")
-        raise HTTPException(status_code=500, detail=".env file not found")
+  // 2. [修正] 檢查進化狀態
+  checkEvolution: async (): Promise<EvolutionStatus> => {
+    try {
+      // ⚠️ Fix: 後端定義為 /api/v1/system/evolve，非 /status
+      const res = await fetch(`${API_URL}/api/v1/system/evolve`);
+      if (!res.ok) throw new Error('Status check failed');
+      return await res.json();
+    } catch (e) {
+      console.error("Cortex Link Error:", e);
+      // Fallback: 回傳安全預設值，防止 UI 白屏
+      return { status: 'stable', current_model: 'Connection Lost', recommended_upgrade: null };
+    }
+  },
 
-    try:
-        # 1. 讀取基因
-        content = env_path.read_text(encoding="utf-8")
-        
-        # 2. 準備新的基因片段
-        new_line = f"MODEL_SMART={payload.target_model}"
-        
-        # 3. 執行基因編輯 (Regex Replace)
-        # 尋找以 MODEL_SMART= 開頭的行，替換為新內容
-        if re.search(r"^MODEL_SMART=.*$", content, flags=re.MULTILINE):
-            new_content = re.sub(
-                r"^MODEL_SMART=.*$", 
-                new_line, 
-                content, 
-                flags=re.MULTILINE
-            )
-        else:
-            # 如果原本沒有定義，則附加在最後
-            new_content = content + f"\n{new_line}"
-            
-        # 4. 寫入基因 (這會觸發 FastAPI 的 reload)
-        env_path.write_text(new_content, encoding="utf-8")
-        
-        logger.warning(f"♻️ System mutating to {payload.target_model}... Restarting Cortex.")
-        print(f"♻️ [MUTATION] System upgraded to {payload.target_model}. Rebooting...")
-        
-        return {
-            "status": "success", 
-            "message": "Mutation complete. Cortex is rebooting...",
-            "new_model": payload.target_model
-        }
+  // 3. 執行進化
+  evolve: async (targetModel: string) => {
+    const res = await fetch(`${API_URL}/api/v1/system/upgrade`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target_model: targetModel }),
+    });
+    if (!res.ok) throw new Error('Evolution failed');
+    return await res.json();
+  },
 
-    except Exception as e:
-        logger.error(f"Mutation failed: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Mutation failed: {str(e)}")
+  // 4. 輸入日記 (Ingest)
+  ingest: async (content: string) => {
+    const res = await fetch(`${API_URL}/api/v1/ingest`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ content }),
+    });
+    return await res.json();
+  }
+};
