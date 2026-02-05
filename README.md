@@ -123,3 +123,6 @@ Life-os-v3/
 └── 📂 database-hippocampus/ # 🟩 Window 4: The Hippocampus
     └── 📂 prisma/           # 📐 [核心記憶模板]
         └── schema.prisma    # 📝 唯一記憶真理來源 (Schema Definition Only)
+
+        
+        
