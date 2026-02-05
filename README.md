@@ -75,41 +75,51 @@ LifeOS v3 系統架構地圖
 1. 完善 `app/core/gemini.py` (Client 封裝)。
 2. 實作 `Architect Agent` 的 Prompt 與邏輯。
 3. 讓前端的 `CaptureView` 真正打通到 FastAPI 的 `ingest` 端點。
-life-os-v3/
-├── .env.shared # 🌍 [共用變數] DATABASE_URL, GOOGLE_API_KEY
-├── README.md # 📜 [系統宣言] Evolution Protocol 說明
+
+Life-os-v3/
+├── README.md                # 📜 [系統宣言] Evolution Protocol 說明
 │
-├── 📂 frontend-body/ # 🟦 Window 1: The Body (Next.js 15)
-│ ├── next.config.js # ⚙️ 前端運行配置
-│ ├── package.json # 📦 前端依賴管理
-│ ├── 📂 app/ # 🚀 [路由中樞]
-│ │ ├── globals.css # 🎨 全域樣式
-│ │ ├── layout.tsx # 🏗️ UI 佈局骨架
-│ │ └── page.tsx # 🏠 系統首頁入口
-│ ├── 📂 components/ # 🎨 [視覺模組] 系統交互器官
-│ │ ├── CaptureView.tsx # 📝 AI Terminal (快取輸入)
-│ │ ├── ContextModal.tsx # 🗔 上下文彈窗
-│ │ ├── Dashboard.tsx # 📊 主控面板
-│ │ ├── GraphView.tsx # 🕸️ 圖譜視圖
-│ │ ├── HistoryView.tsx # 📜 歷史回溯
-│ │ ├── NeuralGraph.tsx # 🧠 神經關聯圖
-│ │ ├── ProjectBoard.tsx # 🏗️ 專案管理面板
-│ │ └── SettingsView.tsx # ⚙️ 系統調節
-│ └── 📂 lib/ai/ # 🧬 [神經傳導]
-│ ├── core.ts # 🧠 前端 AI 核心函數
-│ └── prompts.ts # 🗣️ Prompt 集中管理
+├── 📂 frontend-body/        # 🟦 Window 1: The Body (Next.js 15)
+│   ├── next.config.js       # ⚙️ 前端運行配置
+│   ├── tailwind.config.ts   # 🎨 樣式配置
+│   ├── package.json         # 📦 前端依賴管理
+│   ├── 📂 app/              # 🚀 [路由中樞]
+│   │   ├── globals.css      # 🎨 全域樣式
+│   │   ├── layout.tsx       # 🏗️ UI 佈局骨架
+│   │   └── page.tsx         # 🏠 系統首頁入口
+│   ├── 📂 components/       # 🎨 [視覺模組] 系統交互器官
+│   │   ├── CaptureView.tsx  # 📝 AI Terminal (快取輸入)
+│   │   ├── ContextModal.tsx # 🗔 上下文彈窗
+│   │   ├── Dashboard.tsx    # 📊 主控面板
+│   │   ├── GraphView.tsx    # 🕸️ 圖譜視圖
+│   │   ├── HistoryView.tsx  # 📜 歷史回溯 (接軌 Memories API)
+│   │   ├── NeuralGraph.tsx  # 🧠 神經關聯圖
+│   │   ├── ProjectBoard.tsx # 🏗️ 專案管理面板
+│   │   ├── SettingsView.tsx # ⚙️ 系統調節
+│   │   └── SystemStatus.tsx # 🧬 系統進化 (接軌 System API)
+│   └── 📂 lib/              # 🔌 [神經傳導]
+│       ├── 📂 ai/           # 🧠 前端 AI 核心函數 (core.ts)
+│       └── 📂 api/          # 🌐 API Client (client.ts)
 │
-├── 📂 backend-cortex/ # 🟧 & 🟪 Window 2 & 3: The Cortex (FastAPI)
-│ ├── main.py # 🚪 應用程式入口 (FastAPI)
-│ ├── requirements.txt # 📦 Python 核心依賴
-│ └── 📂 app/ # 🧠 [大腦邏輯層]
-│ ├── 📂 agents/ # 🤖 [Agent 聚落] (architect.py, sorter.py)
-│ ├── 📂 api/v1/ # 🌐 [皮質接口] (ingest.py)
-│ ├── 📂 models/ # 📐 [資料定義] (domain.py / Pydantic)
-│ └── 📂 subconscious/ # 🌑 [潛意識循環]
-│ ├── evolution.py # 🧬 Evolution Agent 自我測試
-│ └── scheduler.py # ⏰ 系統排程器
+├── 📂 backend-cortex/       # 🟧 & 🟪 Window 2 & 3: The Cortex (FastAPI)
+│   ├── main.py              # 🚪 應用程式入口 (掛載 Routers & Scheduler)
+│   ├── requirements.txt     # 📦 Python 核心依賴 (fastapi, uvicorn, supabase, google-genai)
+│   ├── .env                 # 🔑 [私鑰] GEMINI_API_KEY, SUPABASE_URL/KEY
+│   └── 📂 app/              # 🧠 [大腦邏輯層]
+│       ├── 📂 core/         # ⚙️ [核心基礎設施]
+│       │   ├── config.py    # 🔧 環境變數管理
+│       │   ├── database.py  # 💾 Database Client (supabase-py 單例)
+│       │   └── gemini.py    # 🤖 Model Factory (Client 初始化 & get_model)
+│       ├── 📂 models/       # 📐 [資料結構]
+│       │   └── schemas.py   # 📝 Pydantic Models (LogEntry, API Response)
+│       ├── 📂 api/          # 🌐 [皮質接口] (Routers)
+│       │   └── 📂 v1/
+│       │       ├── ingest.py    # 📥 感知輸入 (處理 CaptureView)
+│       │       ├── memories.py  # 💾 記憶檢索 (處理 HistoryView)
+│       │       └── system.py    # 🧬 系統狀態 (處理 SystemStatus)
+│       └── 📂 subconscious/ # 🌑 [潛意識循環]
+│           └── scheduler.py # ⏰ 生物時鐘 (APScheduler 心跳與排程)
 │
 └── 📂 database-hippocampus/ # 🟩 Window 4: The Hippocampus
-└── 📂 prisma/ # 📐 [核心記憶模板]
-└── schema.prisma # 📝 唯一記憶真理來源 (Single Source of Truth)
+    └── 📂 prisma/           # 📐 [核心記憶模板]
+        └── schema.prisma    # 📝 唯一記憶真理來源 (Schema Definition Only)
