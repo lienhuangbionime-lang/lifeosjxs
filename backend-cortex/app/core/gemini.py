@@ -1,58 +1,51 @@
-# backend-cortex/app/core/gemini.py (Bypass Version)
-import requests
-import json
-from app.core.config import settings
+# app/core/gemini.py
+from typing import Literal, Dict
+import os
+import logging
 
-class GeminiClient:
-    def __init__(self, model_name="gemini-2.5-flash"):
-        self.api_key = settings.GEMINI_API_KEY
-        self.model_name = model_name
-        self.base_url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent"
+# genai is the google-genai wrapper used in the project; defensive import
+try:
+    import genai
+except Exception:
+    genai = None
 
-    def generate_content(self, prompt: str):
-        if not self.api_key:
-            return MockResponse("⚠️ Error: GEMINI_API_KEY not found.")
-            
-        headers = {
-            "Content-Type": "application/json",
-            "x-goog-api-key": self.api_key
-        }
-        
-        # 構建 Payload
-        payload = {
-            "contents": [{
-                "parts": [{"text": prompt}]
-            }],
-            "generationConfig": {
-                "temperature": 0.7,
-                "response_mime_type": "application/json"
-            }
-        }
-        
-        try:
-            response = requests.post(self.base_url, headers=headers, json=payload)
-            response.raise_for_status() # 檢查 HTTP 錯誤
-            data = response.json()
-            
-            # 解析回應文字
-            text_content = data['candidates']['content']['parts']['text']
-            return MockResponse(text_content)
-            
-        except Exception as e:
-            print(f"❌ Gemini API Error: {str(e)}")
-            # 回傳一個假的回應物件，避免 ingest.py 崩潰
-            return MockResponse(json.dumps({
-                "markdown_body": f"⚠️ 連線失敗: {str(e)}",
-                "meta": {"metrics": {"mood": 5, "focus": 5, "energy": 5}},
-                "tasks": []
-            }))
+logger = logging.getLogger("app.core.gemini")
 
-# 模擬 SDK 的回應物件
-class MockResponse:
-    def __init__(self, text):
-        self.text = text
+# read defaults from env (these are model ids)
+DEFAULT_FAST = os.getenv("GEMINI_FAST_MODEL", "gemini-2.5-flash")
+DEFAULT_SMART = os.getenv("GEMINI_SMART_MODEL", "gemini-3-pro-preview")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# 工廠函數 (保持與原本介面一致)
-def get_model(model_type: str = "fast"):
-    model_name = settings.MODEL_SMART
-    return GeminiClient(model_name=model_name)
+# perform genai.configure if possible
+if genai and GEMINI_API_KEY:
+    try:
+        genai.configure(api_key=GEMINI_API_KEY)
+        logger.info("genai configured.")
+    except Exception as e:
+        logger.exception("Failed to configure genai: %s", e)
+else:
+    if not genai:
+        logger.warning("genai library not available; gemini client factory will be limited.")
+    if not GEMINI_API_KEY:
+        logger.warning("GEMINI_API_KEY not set; genai won't be configured (offline/degraded mode).")
+
+
+def get_model(mode: Literal["fast", "smart"] = "fast") -> Dict[str, str]:
+    """
+    Client factory that returns model configuration for the requested mode.
+    Returns a simple dict with model id and an info string.
+    This function intentionally avoids importing other app.core modules to prevent circular imports.
+    """
+    try:
+        if mode == "fast":
+            model = os.getenv("GEMINI_FAST_MODEL", DEFAULT_FAST)
+        elif mode == "smart":
+            model = os.getenv("GEMINI_SMART_MODEL", DEFAULT_SMART)
+        else:
+            logger.warning("Unknown mode '%s' requested, defaulting to fast", mode)
+            model = DEFAULT_FAST
+
+        return {"model": model, "configured": bool(GEMINI_API_KEY)}
+    except Exception as e:
+        logger.exception("Error in get_model: %s", e)
+        return {"model": DEFAULT_FAST, "configured": False}

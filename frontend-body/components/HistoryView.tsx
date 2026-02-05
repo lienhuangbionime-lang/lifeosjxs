@@ -1,103 +1,76 @@
-'use client';
+// frontend-body/components/HistoryView.tsx
+"use client";
 
-import React, { useState } from 'react';
-import { List as ListIcon, Filter, Zap, TrendingUp, Clock, Activity, Calendar } from 'lucide-react';
-import { CoreEngine, DEFAULT_HABITS, NEON_PALETTE } from '@/lib/ai/core';
+import React, { useEffect, useState } from "react";
+import { cortex, LogEntry } from "@/lib/api/client";
 
-// 輔助：取得 Mood 對應顏色
-const getMoodColor = (mood: number) => {
-    if (mood >= 8) return 'bg-emerald-500';
-    if (mood <= 3) return 'bg-rose-500';
-    return 'bg-indigo-500';
-};
+function shortContent(content?: string | null, max = 120) {
+  if (!content) return "";
+  return content.length > max ? content.slice(0, max) + "…" : content;
+}
 
-export const HistoryView = ({ logs }: { logs: any[] }) => {
-    const [searchTerm, setSearchTerm] = useState('');
-    
-    // 過濾與排序
-    const filteredLogs = logs.filter(log => (log.content + log.date).toLowerCase().includes(searchTerm.toLowerCase()));
-    const sortedLogs = [...filteredLogs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+export default function HistoryView(): JSX.Element {
+  const [memories, setMemories] = useState<LogEntry[] | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
-    return (
-        <div className="h-full flex flex-col pb-20">
-            {/* Header */}
-            <div className="flex justify-between items-center mb-6 px-2">
-                <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                    <ListIcon className="text-indigo-400" /> Time Capsule
-                </h2>
-                <input 
-                    type="text" 
-                    placeholder="Search..." 
-                    value={searchTerm} 
-                    onChange={(e) => setSearchTerm(e.target.value)} 
-                    className="bg-slate-800 rounded-full text-xs text-white border border-slate-700 px-4 py-2 w-32 focus:w-48 transition-all outline-none"
-                />
-            </div>
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setError(null);
 
-            {/* List */}
-            <div className="flex-1 overflow-y-auto space-y-4 px-2 custom-scrollbar">
-                {sortedLogs.map((log) => {
-                    const insight = CoreEngine.extractInsight(log.content || log.note); // 支援新舊欄位
-                    const moodColor = getMoodColor(log.mood || log.metrics?.mood || 5);
-                    const activeHabits = log.habits ? Object.keys(log.habits).filter(k => log.habits[k]) : [];
+    cortex
+      .getMemories(50)
+      .then((data) => {
+        if (!mounted) return;
+        setMemories(data ?? []);
+      })
+      .catch((err: Error) => {
+        if (!mounted) return;
+        setError(err.message || "無法讀取記憶");
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setLoading(false);
+      });
 
-                    return (
-                        <div key={log.id || log.date} className="bg-[#1e293b] rounded-2xl border border-slate-700 overflow-hidden relative group hover:border-indigo-500/50 transition-all">
-                            {/* Mood Bar */}
-                            <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${moodColor}`} />
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
-                            <div className="p-5 pl-6">
-                                {/* Top Row: Date & Metrics */}
-                                <div className="flex justify-between items-start mb-3">
-                                    <div>
-                                        <h3 className="text-lg font-black text-white font-mono tracking-tight">{log.date}</h3>
-                                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                                            {new Date(log.date).toLocaleDateString('en-US', {weekday:'short'})}
-                                        </span>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Badge icon={Activity} val={log.mood || log.metrics?.mood} color="indigo" />
-                                        <Badge icon={Zap} val={log.focus || log.metrics?.focus} color="amber" />
-                                    </div>
-                                </div>
+  return (
+    <div className="p-4 rounded-md bg-white dark:bg-slate-800 shadow-sm">
+      <h3 className="text-lg font-semibold mb-3">歷史回溯</h3>
 
-                                {/* Content Preview */}
-                                <p className="text-sm text-slate-300 leading-relaxed mb-4 line-clamp-3 font-sans">
-                                    {insight.text}
-                                </p>
-
-                                {/* Habits & Footer */}
-                                <div className="flex justify-between items-center pt-3 border-t border-slate-700/50">
-                                    <div className="flex gap-2">
-                                        {activeHabits.map(hId => {
-                                            const habitConfig = DEFAULT_HABITS.find(h => h.id === hId);
-                                            if(!habitConfig) return null;
-                                            const Icon = CoreEngine.getIconComponent(habitConfig.icon);
-                                            return (
-                                                <div key={hId} className="p-1.5 bg-slate-800 rounded-lg text-slate-400" title={habitConfig.label}>
-                                                    <Icon size={12} />
-                                                </div>
-                                            )
-                                        })}
-                                    </div>
-                                    {/* Tag Visuals */}
-                                    <div className="flex gap-1">
-                                        {/* 這裡未來可顯示 graphSeeds tags */}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                })}
-            </div>
-        </div>
-    );
-};
-
-// 小元件：指標 Badge
-const Badge = ({ icon: Icon, val, color }: any) => (
-    <div className={`flex items-center gap-1 px-2 py-1 rounded-lg bg-${color}-500/10 text-${color}-400 border border-${color}-500/20`}>
-        <Icon size={10} />
-        <span className="text-[10px] font-bold">{val ?? '-'}</span>
+      {loading ? (
+        <p className="text-sm text-gray-500">讀取中…</p>
+      ) : error ? (
+        <p className="text-sm text-red-500">錯誤: {error}</p>
+      ) : !memories || memories.length === 0 ? (
+        <div className="py-8 text-center text-gray-500">尚無記憶</div>
+      ) : (
+        <ul className="space-y-3">
+          {memories.map((m) => (
+            <li key={m.id ?? m.date} className="p-3 border rounded hover:bg-gray-50 dark:hover:bg-slate-700">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="text-sm text-gray-500">
+                    {new Date(m.date).toLocaleString()}
+                  </div>
+                  <div className="mt-1 text-sm text-slate-700 dark:text-slate-200">
+                    {shortContent(m.content ?? "(無內容)", 180)}
+                  </div>
+                </div>
+                <div className="ml-4 text-right">
+                  <div className="text-xs text-gray-500">Mood</div>
+                  <div className="text-sm font-medium">{typeof m.mood === "number" ? m.mood : "—"}</div>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
-);
+  );
+}

@@ -1,49 +1,47 @@
-# 檔案: backend-cortex/main.py
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
-from app.subconscious.scheduler import start_scheduler
-from app.api.v1 import system, ingest, memories  # 確保這三個檔案都存在
-import uvicorn
+# main.py
+import os
 import logging
 
-# 設定日誌
+from fastapi import FastAPI
+import uvicorn
+
+# routers
+from app.api.v1 import ingest as ingest_router_mod
+from app.api.v1 import memories as memories_router_mod
+from app.api.v1 import system as system_router_mod
+
+from app.subconscious import scheduler as subconscious_scheduler
+
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("cortex")
+logger = logging.getLogger("backend-cortex")
 
-app = FastAPI(
-    title="LifeOS Cortex",
-    version="3.1.0",
-    description="Biological Operating System Backend",
-    openapi_url="/api/v1/openapi.json"
-)
+app = FastAPI(title="backend-cortex (LifeOS)")
 
-# 允許跨域 (讓 Vercel 前端能連線)
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"], # 生產環境建議改為前端域名
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# include routers with prefixes as requested
+app.include_router(ingest_router_mod.router, prefix="/api/v1/ingest", tags=["ingest"])
+app.include_router(memories_router_mod.router, prefix="/api/v1/memories", tags=["memories"])
+app.include_router(system_router_mod.router, prefix="/api/v1/system", tags=["system"])
 
-# --- 掛載神經分區 (Routers) ---
-# 1. 系統進化 (Evolution)
-app.include_router(system.router, prefix="/api/v1/system", tags=["System"])
-# 2. 感知輸入 (Ingest) - 將原本寫死在 main 的邏輯移到這裡
-app.include_router(ingest.router, prefix="/api/v1", tags=["Ingest"])
-# 3. 記憶檢索 (Memories)
-app.include_router(memories.router, prefix="/api/v1/memories", tags=["Memories"])
 
 @app.on_event("startup")
-def on_startup() -> None:
-    """應用啟動時喚醒潛意識 (Scheduler)"""
-    logger.info("🧠 Cortex is waking up...")
-    start_scheduler()
+async def on_startup():
+    logger.info("Application startup: starting scheduler")
+    try:
+        subconscious_scheduler.start_scheduler()
+    except Exception:
+        logger.exception("Failed to start subconscious scheduler on startup")
 
-@app.get("/")
-def root():
-    return {"status": "online", "message": "LifeOS v3.1 Cortex is active."}
+
+@app.on_event("shutdown")
+async def on_shutdown():
+    logger.info("Application shutdown: stopping scheduler")
+    try:
+        subconscious_scheduler.stop_scheduler()
+    except Exception:
+        logger.exception("Failed to stop subconscious scheduler on shutdown")
+
 
 if __name__ == "__main__":
-    # 使用 Port 8001 避免與其它服務衝突
-    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
+    port = int(os.getenv("PORT", 8000))
+    host = os.getenv("HOST", "0.0.0.0")
+    uvicorn.run("main:app", host=host, port=port, log_level="info")

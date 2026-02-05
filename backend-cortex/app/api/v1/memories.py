@@ -1,30 +1,51 @@
-# 檔案位置: backend-cortex/app/api/v1/memories.py
-
+# app/api/v1/memories.py
 from fastapi import APIRouter, HTTPException
-from app.core.database import supabase  # 這是我們之前建立的資料庫連線
+from typing import List
+import logging
+import asyncio
+
+from app.models.schemas import LogEntrySchema
+from app.core.database import supabase
 
 router = APIRouter()
+logger = logging.getLogger("app.api.v1.memories")
 
-# 這行代表：當有人訪問 "網址/memories/daily" 時，執行下面的動作
-@router.get("/memories/daily")
-async def get_daily_memories(limit: int = 30):
+
+@router.get("/", response_model=List[LogEntrySchema])
+async def get_recent_memories(limit: int = 20):
     """
-    這段函式是去 Supabase (海馬迴) 把日記拿出來
+    Retrieve recent LogEntry rows from supabase 'LogEntry' table, ordered by date desc.
+    If supabase client is not configured, returns HTTP 503.
     """
+    if supabase is None:
+        logger.warning("Supabase client unavailable; cannot fetch memories.")
+        raise HTTPException(status_code=503, detail="Database unavailable (supabase not configured).")
+
     try:
-        # 1. table("logs"): 打開叫做 logs 的資料表
-        # 2. select("*"): 拿出所有欄位 (mood, content, date...)
-        # 3. order("date", desc=True): 按照日期「降序」排 (最新的在最上面)
-        # 4. limit(limit): 只拿前 30 筆 (避免一次拿太多跑不動)
-        response = supabase.table("logs")\
-            .select("*")\
-            .order("date", desc=True)\
-            .limit(limit)\
-            .execute()
-            
-        # 把拿到的資料 (response.data) 直接回傳給前端
-        return response.data
+        # supabase client is sync; run in thread to avoid blocking event loop
+        def query():
+            try:
+                result = supabase.table("LogEntry").select("*").order("date", desc=True).limit(limit).execute()
+                return result
+            except Exception as e:
+                # bubble up
+                raise
 
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, query)
+
+        # supabase-py returns a dict-like object with 'data' and 'error'
+        data = getattr(result, "data", None) or result.get("data") if isinstance(result, dict) else None
+        error = getattr(result, "error", None) or result.get("error") if isinstance(result, dict) else None
+
+        if error:
+            logger.error("Supabase error while fetching memories: %s", error)
+            raise HTTPException(status_code=500, detail="Database query error")
+
+        # map list of dicts to pydantic models will be handled by FastAPI response model
+        return data or []
+    except HTTPException:
+        raise
     except Exception as e:
-        # 如果出錯 (例如資料庫連不上)，告訴前端發生什麼事
-        raise HTTPException(status_code=500, detail=f"Recall Error: {str(e)}")
+        logger.exception("Unexpected error fetching memories: %s", e)
+        raise HTTPException(status_code=500, detail="Unexpected error fetching memories")

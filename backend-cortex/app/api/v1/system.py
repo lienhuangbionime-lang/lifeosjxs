@@ -1,57 +1,52 @@
-// 檔案: frontend-body/lib/api/client.ts
+# app/api/v1/system.py
+from fastapi import APIRouter, HTTPException
+import logging
+from typing import Dict
 
-// [Config] 優先使用環境變數，開發時預設為後端 Port 8001 (注意：之前設定是 8001 或 8000，請確認 FastAPI 的 Port)
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
+from app.core.gemini import get_model
+from app.models.schemas import SystemStatusResponse, UpgradeResponse
 
-export interface EvolutionStatus {
-  status: 'stable' | 'available';
-  current_model: string;
-  recommended_upgrade: string | null;
-}
+router = APIRouter()
+logger = logging.getLogger("app.api.v1.system")
 
-export const cortex = {
-  // 1. 基本健康檢查
-  health: async () => {
-    try {
-      const res = await fetch(`${API_URL}/`);
-      return await res.json();
-    } catch (e) {
-      return { status: 'offline', message: 'Cortex disconnected' };
-    }
-  },
 
-  // 2. [修正] 檢查進化狀態
-  checkEvolution: async (): Promise<EvolutionStatus> => {
-    try {
-      // ⚠️ Fix: 後端定義為 /api/v1/system/evolve，非 /status
-      const res = await fetch(`${API_URL}/api/v1/system/evolve`);
-      if (!res.ok) throw new Error('Status check failed');
-      return await res.json();
-    } catch (e) {
-      console.error("Cortex Link Error:", e);
-      // Fallback: 回傳安全預設值，防止 UI 白屏
-      return { status: 'stable', current_model: 'Connection Lost', recommended_upgrade: null };
-    }
-  },
+@router.get("/status", response_model=SystemStatusResponse)
+async def get_system_status():
+    """
+    Return system status including current model and available versions.
+    """
+    try:
+        fast = get_model("fast")
+        smart = get_model("smart")
+        # choose current model based on env preference or default to fast
+        current_choice = "smart" if smart.get("configured") else "fast"
+        current_model = smart["model"] if current_choice == "smart" else fast["model"]
 
-  // 3. 執行進化
-  evolve: async (targetModel: string) => {
-    const res = await fetch(`${API_URL}/api/v1/system/upgrade`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ target_model: targetModel }),
-    });
-    if (!res.ok) throw new Error('Evolution failed');
-    return await res.json();
-  },
+        status = "ok" if (fast.get("configured") or smart.get("configured")) else "degraded"
 
-  // 4. 輸入日記 (Ingest)
-  ingest: async (content: string) => {
-    const res = await fetch(`${API_URL}/api/v1/ingest`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ content }),
-    });
-    return await res.json();
-  }
-};
+        return SystemStatusResponse(
+            status=status,
+            current_model=current_model,
+            model_versions=[fast["model"], smart["model"]],
+            note="Models obtained from app/core/gemini factory."
+        )
+    except Exception as e:
+        logger.exception("Failed to get system status: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to retrieve system status")
+
+
+@router.post("/upgrade", response_model=UpgradeResponse)
+async def trigger_upgrade():
+    """
+    Simulate an upgrade/evolution trigger.
+    Note: we MUST NOT write to .env in cloud environments. This endpoint logs the action and returns success.
+    TODO: In the future, record an upgrade request to the supabase `system_config` table and let a deployment job act on it.
+    """
+    try:
+        # Simulated action
+        logger.info("Evolution triggered via /api/v1/system/upgrade")
+        # TODO: optionally write to supabase system_config table (deferred)
+        return UpgradeResponse(success=True, message="Evolution triggered (simulated).")
+    except Exception as e:
+        logger.exception("Upgrade trigger failed: %s", e)
+        raise HTTPException(status_code=500, detail="Failed to trigger upgrade")

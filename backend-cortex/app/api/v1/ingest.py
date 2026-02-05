@@ -1,72 +1,53 @@
-# 檔案: backend-cortex/app/api/v1/ingest.py
+# app/api/v1/ingest.py
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from app.core.config import settings
-# 注意：這裡假設您已經有 get_model 實作，若無請暫時用 mock
-try:
-    from app.core.gemini import get_model
-except ImportError:
-    # Fallback for dev without Gemini setup
-    def get_model(mode): return None
+from typing import Any
+import logging
+import asyncio
+from datetime import datetime
+
+from app.models.schemas import LogEntrySchema
+from app.core.database import supabase
+from app.core.gemini import get_model  # ensure import path uses app.core
 
 router = APIRouter()
+logger = logging.getLogger("app.api.v1.ingest")
 
-# 定義資料模型
-class LogRequest(BaseModel):
-    text: str
-    date: str
 
-class IngestResponse(BaseModel):
-    success: bool
-    model: str
-    data: dict
-    error: str | None = None
-
-@router.post("/ingest", response_model=IngestResponse)
-async def ingest_log(request: LogRequest):
+@router.post("/", response_model=LogEntrySchema)
+async def ingest_log(entry: LogEntrySchema):
     """
-    接收前端日誌 -> Sorter Agent (Flash Model) -> 結構化輸出
+    Ingest a new LogEntry into the 'LogEntry' table in supabase.
+    - Uses app.core.gemini only if needed (import path corrected).
+    - Defensive behavior if supabase is not configured.
     """
-    print(f"📥 Cortex received ingest: {request.text[:30]}...")
-    
+    if supabase is None:
+        logger.warning("Supabase client unavailable; cannot ingest log.")
+        raise HTTPException(status_code=503, detail="Database unavailable (supabase not configured).")
+
     try:
-        # 1. 嘗試獲取 AI 模型 (Flash Layer)
-        client = get_model("fast") 
-        
-        response_text = ""
-        model_name = settings.MODEL_SMART if hasattr(settings, 'MODEL_SMART') else "gemini-2.0-flash"
+        payload = entry.dict(exclude_unset=True)
+        # Ensure date is an ISO string for DB if necessary
+        if isinstance(payload.get("date"), datetime):
+            payload["date"] = payload["date"].isoformat()
 
-        if client:
-            # 這裡未來要接上 Sorter Agent 的邏輯
-            # 目前先做簡單的回應測試連線
-            try:
-                ai_resp = client.generate_content(f"請將此日誌轉換為 Markdown 格式並簡短摘要: {request.text}")
-                response_text = ai_resp.text
-            except Exception as e:
-                print(f"⚠️ AI Generation failed: {e}")
-                response_text = f"AI Processing Error, saved raw: {request.text}"
-        else:
-            response_text = f"AI Offline (Mock Mode): {request.text}"
+        def insert():
+            return supabase.table("LogEntry").insert(payload).execute()
 
-        # 2. 建構符合前端 CaptureView 預期的回應
-        return {
-            "success": True,
-            "model": model_name,
-            "data": {
-                "markdown_body": response_text,
-                "meta": {
-                    "metrics": {"mood": 5, "focus": 5, "energy": 5},
-                    "date": request.date
-                },
-                "tasks": [] # 未來由 Agent 提取
-            }
-        }
+        loop = asyncio.get_running_loop()
+        result = await loop.run_in_executor(None, insert)
 
+        data = getattr(result, "data", None) or result.get("data") if isinstance(result, dict) else None
+        error = getattr(result, "error", None) or result.get("error") if isinstance(result, dict) else None
+
+        if error:
+            logger.error("Supabase error while inserting log: %s", error)
+            raise HTTPException(status_code=500, detail="Database insert error")
+
+        # return the first inserted row if available
+        created = (data[0] if isinstance(data, list) and len(data) > 0 else payload)
+        return created
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"🔥 Ingest Error: {str(e)}")
-        return {
-            "success": False,
-            "model": "error",
-            "data": {},
-            "error": str(e)
-        }
+        logger.exception("Failed to ingest log entry: %s", e)
+        raise HTTPException(status_code=500, detail="Unexpected error ingesting log")

@@ -1,31 +1,33 @@
-# backend-cortex/app/subconscious/scheduler.py
-"""
-Subconscious Scheduler: 背景排程維護任務，不阻塞 API。
-"""
-from typing import Optional
+# app/subconscious/scheduler.py
+import logging
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
+import asyncio
 
-from apscheduler.schedulers.background import BackgroundScheduler
+logger = logging.getLogger("app.subconscious.scheduler")
+
+scheduler: AsyncIOScheduler = AsyncIOScheduler()
 
 
-_scheduler: Optional[BackgroundScheduler] = None
+def heartbeat():
+    logger.info("heartbeat: system is alive")
 
 
-def start_scheduler() -> None:
-    """建立並啟動 BackgroundScheduler，加入 evolution 掃描作業。"""
-    global _scheduler
-    if _scheduler is not None:
-        return
+def start_scheduler():
+    try:
+        # add job if not added
+        # run every 10 minutes
+        scheduler.add_job(heartbeat, trigger=IntervalTrigger(minutes=10), id="heartbeat", replace_existing=True)
+        scheduler.start()
+        logger.info("Scheduler started with heartbeat every 10 minutes")
+    except Exception as e:
+        logger.exception("Failed to start scheduler: %s", e)
 
-    _scheduler = BackgroundScheduler()
 
-    # 每天執行一次進化檢查
-    _scheduler.add_job(
-        "app.subconscious.evolution:check_for_upgrades",
-        trigger="interval",
-        hours=24,
-        id="evolution_scan",
-        replace_existing=True,
-    )
-
-    _scheduler.start()
-    print("[Scheduler] Background scheduler started (evolution_scan every 24h).")
+def stop_scheduler():
+    try:
+        if scheduler.running:
+            scheduler.shutdown(wait=False)
+            logger.info("Scheduler shut down")
+    except Exception as e:
+        logger.exception("Failed to stop scheduler: %s", e)
