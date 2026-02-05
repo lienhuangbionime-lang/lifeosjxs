@@ -29,7 +29,17 @@ async def ingest_log(request: IngestRequest):
     try:
         # 1. 呼叫 Gemini (The Architect)
         # 確保您的 get_model 支援 "smart" 參數，或改為 "gemini-2.0-flash"
-        model = get_model("smart") 
+        # [Critical Fix] 從 get_model 取得設定，並正確初始化 Google GenAI 模型
+        import google.generativeai as genai
+        
+        model_config = get_model("smart") 
+        if not model_config.get("configured"):
+             logger.warning("Gemini API Key not set, using mock response")
+             # 在這裡可以選擇拋出錯誤或使用 Mock
+        
+        # 初始化模型物件
+        model_name = model_config.get("model", "gemini-2.5-flash")
+        model = genai.GenerativeModel(model_name)
         
         system_prompt = """
         You are the LifeOS Cortex. Analyze the user's daily log.
