@@ -5,6 +5,8 @@ import React, { useEffect, useRef, memo, useState } from 'react';
 import * as d3 from 'd3';
 import { Activity, Layers, LayoutGrid } from 'lucide-react';
 import { NEON_PALETTE, CoreEngine } from '@/lib/ai/core';
+import { cortex, SystemStatus } from "@/lib/api/client";
+
 interface LogNode extends d3.SimulationNodeDatum {
   id: string;
   val: number;

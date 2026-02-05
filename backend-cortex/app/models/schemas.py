@@ -10,7 +10,7 @@ class LogEntrySchema(BaseModel):
     content: Optional[str] = Field(None, description="Free-text content of the memory / diary")
     mood: Optional[int] = Field(None, ge=0, le=10, description="Mood 0-10")
     focus: Optional[int] = Field(None, ge=0, le=10, description="Focus 0-10")
-description="Energy 0-10")    energy: Optional[int] = Field(None, ge=0, le=10, 
+    energy: Optional[int] = Field(None, ge=0, le=10, description="Energy 0-10")    
 
     class Config:
         orm_mode = True

@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import dynamic from 'next/dynamic'; // [Fix] 動態載入
 import { Activity } from 'lucide-react';
 import { ContextModal } from '@/components/ContextModal';
+import { cortex, SystemStatus } from "@/lib/api/client";
 
 // [Fix] 強制關閉 SSR，解決 "window is not defined" 或 Hydration 錯誤
 const NeuralGraph = dynamic(
