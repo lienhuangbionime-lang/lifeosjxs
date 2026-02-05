@@ -1,121 +1,147 @@
-// frontend-body/components/SystemStatus.tsx
-"use client";
+// 檔案: frontend-body/components/SystemStatus.tsx
+'use client';
 
-import React, { useEffect, useState } from "react";
-import { cortex, SystemStatus } from "@/lib/api/client";
+import React, { useEffect, useState } from 'react';
+import { cortex, EvolutionStatus } from '@/lib/api/client';
+import { Activity, RefreshCw, Zap, CheckCircle2, X } from 'lucide-react';
 
-export default function SystemStatusCard(): JSX.Element {
-  const [status, setStatus] = useState<SystemStatus | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
-  const [upgrading, setUpgrading] = useState<boolean>(false);
+// [Fix 1] 使用具名匯出 (Named Export) 以匹配 page.tsx 的 import { SystemStatus }
+export const SystemStatus = () => {
+  const [status, setStatus] = useState<EvolutionStatus | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
   const [upgradeMessage, setUpgradeMessage] = useState<string | null>(null);
 
+  // 1. 初始化檢查
+  const checkHealth = async () => {
+    try {
+      const res = await cortex.checkEvolution();
+      setStatus(res);
+    } catch (e) {
+      console.error("Cortex disconnect", e);
+    }
+  };
+
   useEffect(() => {
-    let mounted = true;
-    setLoading(true);
-    setError(null);
-
-    cortex
-      .checkEvolution()
-      .then((res) => {
-        if (!mounted) return;
-        setStatus(res);
-      })
-      .catch((err: Error) => {
-        if (!mounted) return;
-        setError(err.message || "無法取得系統狀態");
-      })
-      .finally(() => {
-        if (!mounted) return;
-        setLoading(false);
-      });
-
-    return () => {
-      mounted = false;
-    };
+    checkHealth();
+    // 建立每 60 秒的心跳檢查
+    const timer = setInterval(checkHealth, 60000);
+    return () => clearInterval(timer);
   }, []);
 
+  // 2. 觸發進化
   const handleUpgrade = async () => {
+    if (!status?.recommended_upgrade) return;
+    
     setUpgrading(true);
     setUpgradeMessage(null);
     try {
-      // you can pass a target model string if desired
-      const res = await cortex.evolve();
+      // 呼叫後端進化接口
+      const res = await cortex.evolve(status.recommended_upgrade);
       setUpgradeMessage(res.message ?? "Evolution triggered.");
-      // refresh status after upgrade trigger
-      try {
-        const refreshed = await cortex.checkEvolution();
-        setStatus(refreshed);
-      } catch {
-        // ignore refresh error
-      }
+      
+      // 成功後重新整理頁面以載入新配置
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
     } catch (e: any) {
       setUpgradeMessage(e?.message ?? "Upgrade failed");
-    } finally {
       setUpgrading(false);
     }
   };
 
+  // 如果連線失敗或還沒載入，暫時不顯示
+  if (!status) return null;
+
+  // 判斷是否可升級
+  const isUpgradeAvailable = status.status === 'available' || !!status.recommended_upgrade;
+
   return (
-    <div className="p-4 rounded-md shadow-md bg-white dark:bg-slate-800">
-      <h3 className="text-lg font-semibold mb-2">系統進化狀態</h3>
+    <>
+      {/* --- [UI Part 1] Header 上的膠囊按鈕 (Pill) --- */}
+      <button
+        onClick={() => setIsModalOpen(true)}
+        className={`
+          flex items-center gap-2 px-3 py-1.5 rounded-full border text-[10px] font-mono transition-all duration-300
+          ${isUpgradeAvailable
+            ? 'bg-amber-950/30 border-amber-500/50 text-amber-400 hover:bg-amber-900/50 animate-pulse cursor-pointer' 
+            : 'bg-slate-900/50 border-emerald-500/30 text-emerald-500 hover:bg-slate-800 cursor-pointer'}
+        `}
+      >
+        <div className={`w-1.5 h-1.5 rounded-full ${isUpgradeAvailable ? 'bg-amber-500' : 'bg-emerald-500'}`} />
+        {isUpgradeAvailable ? 'EVOLUTION AVAILABLE' : 'SYSTEM STABLE'}
+      </button>
 
-      {loading ? (
-        <p className="text-sm text-gray-500">讀取中…</p>
-      ) : error ? (
-        <p className="text-sm text-red-500">錯誤: {error}</p>
-      ) : status ? (
-        <>
-          <div className="mb-3">
-            <p className="text-sm text-gray-600">
-              狀態: <span className="font-medium">{status.status}</span>
-            </p>
-            <p className="text-sm text-gray-600">
-              目前模型: <span className="font-medium">{status.current_model}</span>
-            </p>
-            <p className="text-sm text-gray-600">
-              可用版本:
-              <span className="ml-2 text-sm text-slate-700 dark:text-slate-300">
-                {status.model_versions.join(" , ")}
-              </span>
-            </p>
-            {status.note && <p className="text-xs text-gray-500 mt-1">說明: {status.note}</p>}
+      {/* --- [UI Part 2] 點擊後彈出的詳細資訊 (Modal) --- */}
+      {isModalOpen && (
+        <div className="fixed inset-0 z-[1] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in zoom-in duration-200">
+          <div className="w-full max-w-sm bg-[#0f172a] border border-slate-700 rounded-2xl shadow-2xl overflow-hidden relative">
+            
+            {/* Modal Header */}
+            <div className="bg-slate-900 p-4 border-b border-slate-800 flex justify-between items-center">
+                <div className="flex items-center gap-2 text-slate-200 font-bold text-sm">
+                    <Activity size={16} className="text-indigo-400"/>
+                    System Status
+                </div>
+                <button onClick={() => setIsModalOpen(false)} className="text-slate-500 hover:text-white">
+                    <X size={18} />
+                </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="p-6 space-y-4">
+                {/* 當前模型 */}
+                <div className="flex justify-between items-center bg-slate-800/50 p-3 rounded-lg border border-slate-700">
+                    <span className="text-slate-400 text-xs">Current Core</span>
+                    <span className="font-mono text-xs text-emerald-400">{status.current_model}</span>
+                </div>
+
+                {/* 升級路徑 */}
+                {isUpgradeAvailable ? (
+                    <div className="flex justify-between items-center bg-amber-900/20 p-3 rounded-lg border border-amber-500/30">
+                        <span className="text-amber-500/80 text-xs font-bold">New Version</span>
+                        <div className="flex items-center gap-2">
+                             <Zap size={12} className="text-amber-400" />
+                             <span className="font-mono text-xs text-amber-400 font-bold">{status.recommended_upgrade}</span>
+                        </div>
+                    </div>
+                ) : (
+                   <div className="text-center py-2">
+                      <p className="text-slate-600 text-xs">All systems operational. No updates found.</p>
+                   </div>
+                )}
+                
+                {/* 訊息顯示 */}
+                {upgradeMessage && (
+                    <div className="text-xs text-center text-emerald-400 font-mono bg-emerald-900/20 p-2 rounded">
+                        {upgradeMessage}
+                    </div>
+                )}
+            </div>
+
+            {/* Modal Actions */}
+            <div className="p-4 bg-slate-900 flex gap-3">
+                <button 
+                    onClick={checkHealth}
+                    className="flex-1 py-2 rounded-xl border border-slate-700 text-slate-400 text-xs font-bold hover:bg-slate-800 flex justify-center items-center gap-2"
+                >
+                    <RefreshCw size={12}/> Refresh
+                </button>
+                
+                {isUpgradeAvailable && (
+                    <button 
+                        onClick={handleUpgrade}
+                        disabled={upgrading}
+                        className="flex-1 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-500 flex items-center justify-center gap-2 shadow-lg shadow-indigo-900/20 disabled:opacity-50"
+                    >
+                        {upgrading ? <RefreshCw className="animate-spin" size={14}/> : <Zap size={14}/>}
+                        {upgrading ? 'Mutating...' : 'Evolve Now'}
+                    </button>
+                )}
+            </div>
           </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleUpgrade}
-              disabled={upgrading}
-              className="px-3 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50"
-            >
-              {upgrading ? "觸發中…" : "觸發進化"}
-            </button>
-
-            <button
-              onClick={async () => {
-                setLoading(true);
-                setError(null);
-                try {
-                  const refreshed = await cortex.checkEvolution();
-                  setStatus(refreshed);
-                } catch (err: any) {
-                  setError(err?.message ?? "刷新失敗");
-                } finally {
-                  setLoading(false);
-                }
-              }}
-              className="px-3 py-1 rounded border text-sm"
-            >
-              刷新
-            </button>
-          </div>
-
-          {upgradeMessage && <p className="text-sm text-green-600 mt-2">{upgradeMessage}</p>}
-        </>
-      ) : (
-        <p className="text-sm text-gray-500">沒有可用狀態資料</p>
+        </div>
       )}
-    </div>
+    </>
   );
-}
+};

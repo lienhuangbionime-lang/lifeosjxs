@@ -25,7 +25,7 @@ interface LogLink extends d3.SimulationLinkDatum<LogNode> {
 }
 
 // [Fix 1] 命名元件函式，而不是使用匿名函式
-const NeuralGraphComponent = ({ logs, onNodeClick }: { logs: any[], onNodeClick: (n:any)=>void }) => {
+export const NeuralGraphComponent = ({ logs, onNodeClick }: { logs: any[], onNodeClick: (n:any)=>void }) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [mode, setMode] = useState('gravity');
