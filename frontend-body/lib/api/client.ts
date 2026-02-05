@@ -27,8 +27,7 @@ async function fetchJSON<T>(input: string, init?: RequestInit): Promise<T> {
 
 /* --- TypeScript Interfaces (定義資料結構) --- */
 
-// [Fix] 這裡改名為 EvolutionStatus 以匹配 SystemStatus.tsx 的需求
-// 同時補上 recommended_upgrade 欄位，讓 UI 的進化按鈕能正常運作
+// [Fix] 配合 SystemStatus.tsx 與 backend-cortex/app/api/v1/system.py
 export interface EvolutionStatus {
   status: 'stable' | 'available' | 'offline';
   current_model: string;
@@ -36,72 +35,107 @@ export interface EvolutionStatus {
   note?: string;
 }
 
+// 配合 backend-cortex/app/models/domain.py
 export interface LogEntry {
-  id?: string; // Supabase ID 是 UUID (string)
-  date: string; // ISO string
-  content?: string | null;
+  id?: string;        // Supabase ID (UUID)
+  date: string;       // YYYY-MM-DD
+  content?: string | null; // Markdown content
   mood?: number | null;
   focus?: number | null;
   energy?: number | null;
-  isAi?: boolean;
-  aiModel?: string;
+  isAi?: boolean;     // 是否由 AI 生成
+  aiModel?: string;   // 生成模型 (e.g., "gemini-2.0-flash")
+  tags?: string[];    // [New] 支援標籤
+}
+
+// AI 分析的回傳結果 (配合 ingest.py 的回傳格式)
+export interface IngestResponse {
+  success: boolean;
+  model: string;
+  data: {
+    markdown_body: string;
+    meta: {
+      metrics: { mood: number; focus: number; energy: number };
+    };
+    tasks: Array<{ title: string; status: string }>;
+  };
+}
+
+/* --- Private Helper (神經傳導物質) --- */
+// 自動處理 Rewrite 路徑與錯誤拋出
+async function fetchProxy<T>(endpoint: string, options?: RequestInit): Promise<T> {
+  // [Critical] 強制將 /api/v1 轉為 /api/py 以觸發 next.config.js 的 Rewrite 規則
+  // 這樣才能從 Vercel (Frontend) 穿透到 Render (Backend)
+  const finalUrl = endpoint.replace(/^\/api\/v1/, "/api/py");
+
+  try {
+    const res = await fetch(finalUrl, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    });
+
+    if (!res.ok) {
+      // 嘗試讀取後端回傳的錯誤訊息
+      const errorText = await res.text();
+      throw new Error(`Cortex Error (${res.status}): ${errorText}`);
+    }
+
+    return await res.json();
+  } catch (error: any) {
+    console.error(`🔌 Neural Link Broken [${endpoint}]:`, error);
+    throw error; // 讓 UI 層決定如何顯示錯誤
+  }
 }
 
 /* --- Cortex API Client (大腦連線核心) --- */
 export const cortex = {
-  // 1. 檢查進化狀態
+  
+  // 1. 檢查進化狀態 (System Status)
+  // 對應後端: GET /api/v1/system/status
   async checkEvolution(): Promise<EvolutionStatus> {
     try {
-      return await fetchJSON<EvolutionStatus>("/api/v1/system/status", {
-        method: "GET",
-      });
+      // 使用 fetchProxy 自動處理路徑轉換
+      return await fetchProxy<EvolutionStatus>("/api/v1/system/status");
     } catch (e) {
-      // 離線保護機制：如果後端沒開，回傳離線狀態，避免前端白屏
+      // 如果連不上大腦，回傳預設的離線狀態 (防禦性編程)
       return {
-        status: 'offline',
-        current_model: 'Disconnect',
-        recommended_upgrade: null
+        status: "offline",
+        current_model: "Unknown",
+        recommended_upgrade: null,
+        note: "Cortex disconnected",
       };
     }
   },
 
-  // 2. 執行進化 (升級模型)
-  async evolve(targetModel: string): Promise<{ success: boolean; message?: string }> {
-    return fetchJSON<{ success: boolean; message?: string }>("/api/v1/system/upgrade", {
+  // 2. 發送確認升級指令 (Evolution Protocol)
+  // 對應後端: POST /api/v1/system/upgrade
+  async confirmUpgrade(targetModel: string): Promise<{ success: boolean }> {
+    return await fetchProxy("/api/v1/system/upgrade", {
       method: "POST",
-      body: JSON.stringify({ target_model: targetModel }),
+      body: JSON.stringify({ model: targetModel }),
     });
   },
 
-  // 3. 讀取記憶 (HistoryView 用)
-  async getMemories(limit = 50): Promise<LogEntry[]> {
+  // 3. 記憶提取 (Memory Recall)
+  // 對應後端: GET /api/v1/memories?limit=20
+  async getRecentMemories(limit: number = 20): Promise<LogEntry[]> {
     try {
-      const res = await fetchJSON<{ data: LogEntry[] }>(`/api/v1/memories?limit=${encodeURIComponent(String(limit))}`, {
-        method: "GET",
-      });
-      return res.data || [];
+      return await fetchProxy<LogEntry[]>(`/api/v1/memories?limit=${limit}`);
     } catch (e) {
-      console.error("Failed to fetch memories:", e);
+      console.warn("Memory access failed, returning empty list.");
       return [];
     }
   },
 
-  // 4. 感知輸入 (CaptureView 用)
-  async ingest(text: string, meta?: Partial<Pick<LogEntry, "mood" | "focus" | "energy">>): Promise<LogEntry> {
-    // 取得當地的 YYYY-MM-DD
-    const today = new Date().toISOString().split('T')[0];
-    
-    const payload = {
-      text: text,
-      date: today, // 確保符合後端 IngestRequest 格式
-      ...meta,
-    };
-
-    const res = await fetchJSON<{ success: boolean; data: any }>("/api/v1/ingest", {
+  // 4. 感知輸入 (Sensory Ingest)
+  // 對應後端: POST /api/v1/ingest
+  async ingestLog(date: string, text: string): Promise<IngestResponse> {
+    return await fetchProxy<IngestResponse>("/api/v1/ingest", {
       method: "POST",
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ date, text }),
     });
-    
-    return res.data; 
-  },
+  }
 };
