@@ -12,18 +12,18 @@ export const Dashboard = () => {
     const handleAnalyze = async () => {
         setLoading(true);
         try {
-            const res = await fetch('/api/analyze/monthly', { method: 'POST', body: JSON.stringify({ month }) });
+            const res = await fetch('/api/py/analyze/monthly', { method: 'POST', body: JSON.stringify({ month }) });
             const data = await res.json();
-            if(data.success) {
+            if (data.success) {
                 setAnalysis(data.data);
             } else {
                 alert("分析失敗: " + (data.error || "未知錯誤"));
             }
-        } catch(e) { 
-            console.error(e); 
-            alert("系統錯誤，請檢查 Console"); 
-        } finally { 
-            setLoading(false); 
+        } catch (e) {
+            console.error(e);
+            alert("系統錯誤，請檢查 Console");
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -32,14 +32,14 @@ export const Dashboard = () => {
             {/* Control Panel */}
             <div className="bg-white p-5 rounded-3xl border border-slate-200 flex justify-between items-center shadow-sm mb-6">
                 <div className="flex items-center gap-3">
-                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Target size={20}/></div>
+                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Target size={20} /></div>
                     <div>
                         <h2 className="text-slate-800 font-bold">CCA 戰略室</h2>
-                        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="bg-transparent text-slate-500 text-xs font-mono outline-none"/>
+                        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="bg-transparent text-slate-500 text-xs font-mono outline-none" />
                     </div>
                 </div>
                 <button onClick={handleAnalyze} disabled={loading} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50">
-                    {loading ? <RefreshCw className="animate-spin w-4 h-4"/> : <Play className="w-4 h-4"/>}
+                    {loading ? <RefreshCw className="animate-spin w-4 h-4" /> : <Play className="w-4 h-4" />}
                     {loading ? "Thinking..." : "Run Agent"}
                 </button>
             </div>
@@ -59,7 +59,7 @@ export const Dashboard = () => {
                                 <div className="p-4 bg-white rounded-2xl border border-emerald-100">
                                     <span className="text-xs text-emerald-500 block mb-1">New Habits</span>
                                     <div className="flex flex-wrap gap-2 mt-1">
-                                        {(analysis.strategy.new_habits || []).map((h:string, i:number) => (
+                                        {(analysis.strategy.new_habits || []).map((h: string, i: number) => (
                                             <span key={i} className="text-xs bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full border border-emerald-100">{h}</span>
                                         ))}
                                         {(!analysis.strategy.new_habits || analysis.strategy.new_habits.length === 0) && <span className="text-slate-400 text-xs">無新習慣建議</span>}
@@ -67,7 +67,7 @@ export const Dashboard = () => {
                                 </div>
                             </div>
                         ) : (
-                            <div className="p-4 bg-amber-50 text-amber-600 rounded-xl text-xs flex items-center gap-2"><AlertTriangle size={14}/> 策略資料解析不完整，請查看下方報告。</div>
+                            <div className="p-4 bg-amber-50 text-amber-600 rounded-xl text-xs flex items-center gap-2"><AlertTriangle size={14} /> 策略資料解析不完整，請查看下方報告。</div>
                         )}
                     </div>
 

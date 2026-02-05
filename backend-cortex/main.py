@@ -8,6 +8,7 @@ import uvicorn
 from app.api.v1 import ingest as ingest_router_mod
 from app.api.v1 import memories as memories_router_mod
 from app.api.v1 import system as system_router_mod
+from app.api.v1 import analyze as analyze_router_mod
 
 from app.subconscious import scheduler as subconscious_scheduler
 
@@ -50,6 +51,7 @@ app.include_router(memories_router_mod.router, prefix="/api/v1/memories", tags=[
 # 這裡 prefix 設為 "/api/v1/system"
 # 組合結果: /api/v1/system/status (正確!)
 app.include_router(system_router_mod.router, prefix="/api/v1/system", tags=["System"])
+app.include_router(analyze_router_mod.router, prefix="/api/v1/analyze", tags=["Analyze"])
 
 
 # 根路徑檢查
