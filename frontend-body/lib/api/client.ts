@@ -1,7 +1,7 @@
 // frontend-body/lib/api/client.ts
 
 // 1. 讀取環境變數 (Vercel 上設定的那個)
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8001';
 
 export const cortex = {
   // 健康檢查 (System Status 用)
