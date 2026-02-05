@@ -25,7 +25,7 @@ export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
     try {
       // [V3.1 Fix] 這裡原本是 '/api/ingest'，現在改為指向 Python 大腦的 Rewrite 路徑
       // 路徑對應： /api/py/ingest -> http://localhost:8001/api/v1/ingest
-      const response = await fetch('/app/api/v1/ingest', { 
+      const response = await fetch('/api/v1/ingest', { 
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
