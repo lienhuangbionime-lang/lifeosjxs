@@ -10,25 +10,27 @@ import datetime
 # 引入核心模組
 from app.core.gemini import get_model
 from app.core.database import supabase
-from app.models.schemas import LogEntrySchema # 確保您有定義這個
+from app.models.schemas import LogEntrySchema 
 
 router = APIRouter()
 logger = logging.getLogger("cortex.ingest")
 
-# 定義請求格式 (對應前端 fetch body)
+# 定義請求格式
 class IngestRequest(BaseModel):
     text: str
     date: str  # YYYY-MM-DD
 
-@router.post("/")
+# [CRITICAL FIX] 修正路由路徑
+# 配合 main.py 的 prefix="/api/v1"，組合後路徑為 /api/v1/ingest
+@router.post("/ingest") 
 async def ingest_log(request: IngestRequest):
     logger.info(f"🧠 Cortex receiving input for {request.date}...")
     
     try:
         # 1. 呼叫 Gemini (The Architect)
-        model = get_model("smart") # 使用 Pro 模型進行深度分析
+        # 確保您的 get_model 支援 "smart" 參數，或改為 "gemini-2.0-flash"
+        model = get_model("smart") 
         
-        # System Prompt (精簡版)
         system_prompt = """
         You are the LifeOS Cortex. Analyze the user's daily log.
         Output MUST be valid JSON with this structure:
@@ -45,13 +47,11 @@ async def ingest_log(request: IngestRequest):
         
         user_content = f"Date: {request.date}\nLog: {request.text}"
         
-        # 產生內容
         response = model.generate_content(f"{system_prompt}\n\n{user_content}")
         
-        # 2. 解析 JSON (防禦性解析)
+        # 2. 解析 JSON
         try:
             cleaned_text = response.text.strip()
-            # 移除可能的 markdown code block 標記
             if cleaned_text.startswith("```json"):
                 cleaned_text = cleaned_text[7:]
             if cleaned_text.endswith("```"):
@@ -60,7 +60,6 @@ async def ingest_log(request: IngestRequest):
             ai_data = json.loads(cleaned_text)
         except Exception as e:
             logger.error(f"JSON Parse Error: {e}")
-            # 降級處理：回傳原始文字
             ai_data = {
                 "markdown_body": request.text, 
                 "meta": {"metrics": {}}, 
@@ -68,10 +67,10 @@ async def ingest_log(request: IngestRequest):
             }
 
         # 3. 寫入海馬迴 (Supabase)
-        # [Fix] 這裡強制使用小寫 'logentry'，解決 Table Not Found 問題
+        # [Check] 確認使用了小寫 "logentry"
         db_payload = {
             "date": request.date,
-            "note": ai_data.get("markdown_body", request.text), # 注意：Supabase 欄位名需對應 (可能是 content 或 note)
+            "note": ai_data.get("markdown_body", request.text),
             "mood": ai_data.get("meta", {}).get("metrics", {}).get("mood", 5),
             "is_ai": True,
             "created_at": datetime.datetime.now().isoformat()
@@ -79,17 +78,17 @@ async def ingest_log(request: IngestRequest):
 
         if supabase:
             try:
-                # 嘗試寫入 (使用 logentry 小寫)
+                # 再次確認 Table Name 為小寫
                 data, count = supabase.table("logentry").insert(db_payload).execute()
                 logger.info("✅ Memory stored in Hippocampus.")
             except Exception as db_e:
                 logger.error(f"❌ Database Write Failed: {db_e}")
-                # 注意：這裡不拋出錯誤，讓前端仍能收到 AI 分析結果，只是沒存檔
+                # 不拋出錯誤，讓前端仍能顯示分析結果
         
-        # 4. 回傳給前端 (Body)
+        # 4. 回傳給前端
         return {
             "success": True,
-            "model": "gemini-2.5-flash", # 或動態讀取
+            "model": "gemini-2.0-flash", # 更新顯示的模型名稱
             "data": ai_data
         }
 

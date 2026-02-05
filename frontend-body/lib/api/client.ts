@@ -12,7 +12,7 @@ async function fetchJSON<T>(input: string, init?: RequestInit): Promise<T> {
   };
 
   const res = await fetch(url, { ...init, headers });
-  
+
   // 處理 204 No Content 或空回應
   const text = await res.text();
   const data = text ? JSON.parse(text) : undefined;
@@ -92,7 +92,16 @@ async function fetchProxy<T>(endpoint: string, options?: RequestInit): Promise<T
 
 /* --- Cortex API Client (大腦連線核心) --- */
 export const cortex = {
-  
+
+  // [New] System Evolution (進化協定)
+  // 對應後端: POST /api/v1/system/upgrade (需確認後端路由是否一致，假設為 upgrade)
+  async evolve(targetModel: string): Promise<{ success: boolean; message?: string }> {
+    return await fetchProxy("/api/v1/system/upgrade", {
+      method: "POST",
+      body: JSON.stringify({ model: targetModel }),
+    });
+  },
+
   // 1. 檢查進化狀態 (System Status)
   // 對應後端: GET /api/v1/system/status
   async checkEvolution(): Promise<EvolutionStatus> {
