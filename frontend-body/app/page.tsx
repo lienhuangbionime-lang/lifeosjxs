@@ -126,14 +126,21 @@ export default function Home() {
         </button>
       </header>
 
-      {/* --- Dropdown Menu --- */}
+      {/* Dropdown Menu (V3.1 Dark Mode Style) */}
       {isMenuOpen && (
-        <div className="absolute top-16 right-4 z-50 w-48 bg-slate-900 rounded-2xl shadow-xl border border-slate-700 py-2 animate-scale-in origin-top-right">
+        <div className="absolute top-16 right-4 z-[1] w-48 bg-[#1e293b] rounded-2xl shadow-xl border border-slate-700 py-2 animate-scale-in origin-top-right">
           {menuItems.map((item) => (
-            <button 
-              key={item.id} 
-              onClick={() => { setActiveTab(item.id as any); setIsMenuOpen(false); }}
-              className={`w-full text-left px-4 py-3 flex items-center gap-3 text-sm font-bold transition-colors ${activeTab === item.id ? 'text-indigo-400 bg-indigo-900/20' : 'text-slate-400 hover:bg-slate-800'}`}
+            <button
+              key={item.id}
+              onClick={() => {
+                setActiveTab(item.id as any);
+                setIsMenuOpen(false);
+              }}
+              className={`w-full text-left px-4 py-3 flex items-center gap-3 text-sm font-bold transition-colors ${
+                activeTab === item.id 
+                  ? 'text-indigo-400 bg-indigo-500/10' 
+                  : 'text-slate-400 hover:bg-slate-800'
+              }`}
             >
               <item.icon size={16} />
               {item.label}
@@ -142,14 +149,27 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- Main Content --- */}
+      {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto p-0 relative z-10 custom-scrollbar">
+        
+        {/* 1. Capture: 傳遞 save handler */}
         {activeTab === 'capture' && <CaptureView onSave={handleSaveLog} />}
+        
+        {/* 2. Graph: 暫時保留 props，直到 GraphView 也完成 V3 重構 */}
         {activeTab === 'graph' && <GraphView logs={logs} />}
+        
+        {/* 3. Dashboard: 靜態面板，無 props */}
         {activeTab === 'dashboard' && <Dashboard />}
+        
+        {/* 4. Project: 暫時保留 props */}
         {activeTab === 'project' && <ProjectBoard logs={logs} />}
-        {activeTab === 'list' && <HistoryView logs={logs} />}
+
+        {/* 5. [CRITICAL FIX] History: V3.1 版本自主讀取 API，移除 props */}
+        {activeTab === 'list' && <HistoryView />}
+
+        {/* 6. Settings: 保留 props 用於本地匯入 */}
         {activeTab === 'settings' && <SettingsView logs={logs} onImport={handleImportLogs} />}
+        
       </main>
     </div>
   );
