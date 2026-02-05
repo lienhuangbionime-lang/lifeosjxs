@@ -89,7 +89,7 @@ async def ingest_log(request: IngestRequest):
         # 4. 回傳給前端 (Body)
         return {
             "success": True,
-            "model": "gemini-2.0-flash", # 或動態讀取
+            "model": "gemini-2.5-flash", # 或動態讀取
             "data": ai_data
         }
 
