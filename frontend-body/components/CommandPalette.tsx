@@ -8,9 +8,10 @@ interface CommandPaletteProps {
     isOpen: boolean;
     onClose: () => void;
     onNavigate: (tab: string) => void;
+    onCreateProject?: () => void; // [NEW]
 }
 
-export const CommandPalette = ({ isOpen, onClose, onNavigate }: CommandPaletteProps) => {
+export const CommandPalette = ({ isOpen, onClose, onNavigate, onCreateProject }: CommandPaletteProps) => {
     const [query, setQuery] = useState('');
     const { toggleTheme, theme } = useSettings();
     const [selectedIndex, setSelectedIndex] = useState(0);
@@ -19,6 +20,7 @@ export const CommandPalette = ({ isOpen, onClose, onNavigate }: CommandPalettePr
         { id: 'nav-home', label: 'Go to Home', icon: Home, action: () => onNavigate('dashboard') },
         { id: 'nav-projects', label: 'Go to Projects', icon: Layers, action: () => onNavigate('project') },
         { id: 'create-note', label: 'Create New Note', icon: Plus, action: () => onNavigate('capture') },
+        { id: 'create-project', label: 'Create New Project', icon: Plus, action: () => { if (onCreateProject) onCreateProject(); else onNavigate('project'); } }, // [NEW]
         { id: 'toggle-theme', label: `Switch to ${theme === 'dark' ? 'Light' : 'Dark'} Mode`, icon: theme === 'dark' ? Sun : Moon, action: () => toggleTheme() },
     ];
 

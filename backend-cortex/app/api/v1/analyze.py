@@ -2,8 +2,8 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 import logging
 import datetime
-import google.generativeai as genai
-from app.core.gemini import get_model
+import google.generativeai as genai # Keep direct import for types if needed, or rely on core
+from app.core.gemini import get_model, genai
 
 router = APIRouter()
 logger = logging.getLogger("cortex.analyze")
@@ -15,7 +15,7 @@ class AnalyzeRequest(BaseModel):
 async def analyze_monthly(request: AnalyzeRequest):
     # 1. 初始化模型
     model_config = get_model("smart")
-    model_name = model_config.get("model", "gemini-2.0-flash")
+    model_name = model_config.get("model", "gemini-3.0-pro-preview")
     model = genai.GenerativeModel(model_name)
 
     # 2. 模擬或是從 Supabase 讀取資料 (這裡先簡化，直接生成策略)

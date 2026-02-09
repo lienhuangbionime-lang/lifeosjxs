@@ -1,6 +1,8 @@
-# app/services/rag_service.py
 import os
 import logging
+import tempfile
+import shutil
+from pathlib import Path
 from typing import List, Dict, Any, Optional
 from fastapi import UploadFile
 
@@ -10,7 +12,7 @@ from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 from langchain_community.vectorstores import SupabaseVectorStore
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough, RunnableParallel
 from supabase.client import Client, create_client
 
 # Init Logger
@@ -22,7 +24,10 @@ SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Optional[Client] = None
 
 if SUPABASE_URL and SUPABASE_KEY:
-    supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    try:
+        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception as e:
+        logger.error(f"Failed to init Supabase: {e}")
 
 # Init OpenAI
 embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
@@ -30,6 +35,9 @@ llm = ChatOpenAI(model="gpt-4o", temperature=0)
 
 class RAGService:
     def __init__(self):
+        if not supabase:
+            logger.warning("Supabase client not initialized. RAG service will fail.")
+            
         self.vector_store = SupabaseVectorStore(
             client=supabase,
             embedding=embeddings,
@@ -46,9 +54,11 @@ class RAGService:
         docs = text_splitter.create_documents([text], metadatas=[meta])
         
         # Store in Supabase
-        self.vector_store.add_documents(docs)
-        logger.info(f"Ingested {len(docs)} chunks.")
-        return len(docs)
+        if self.vector_store:
+            self.vector_store.add_documents(docs)
+            logger.info(f"Ingested {len(docs)} chunks.")
+            return len(docs)
+        return 0
 
     async def ingest_file(self, file: UploadFile):
         """
@@ -56,14 +66,15 @@ class RAGService:
         """
         logger.info(f"Processing file: {file.filename}")
         
-        # Save temp file
-        temp_path = f"/tmp/{file.filename}"
-        with open(temp_path, "wb") as f:
-            f.write(await file.read())
+        # Save temp file using tempfile for cross-platform compatibility
+        suffix = Path(file.filename).suffix
+        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+            shutil.copyfileobj(file.file, tmp)
+            temp_path = tmp.name
             
         try:
             # Load
-            if file.filename.endswith(".pdf"):
+            if file.filename.lower().endswith(".pdf"):
                 loader = PyPDFLoader(temp_path)
             else:
                 loader = TextLoader(temp_path)
@@ -79,9 +90,11 @@ class RAGService:
                 doc.metadata["source"] = file.filename
                 
             # Store
-            self.vector_store.add_documents(docs)
-            logger.info(f"Ingested {len(docs)} chunks from {file.filename}")
-            return len(docs)
+            if self.vector_store:
+                self.vector_store.add_documents(docs)
+                logger.info(f"Ingested {len(docs)} chunks from {file.filename}")
+                return len(docs)
+            return 0
             
         except Exception as e:
             logger.error(f"Error ingesting file: {e}")
@@ -109,7 +122,7 @@ class RAGService:
             return "\n\n".join(doc.page_content for doc in docs)
 
         rag_chain = (
-            {"context": retriever | format_docs, "question": RunnablePassthrough()}
+            RunnableParallel({"context": retriever | format_docs, "question": RunnablePassthrough()})
             | prompt
             | llm
             | StrOutputParser()

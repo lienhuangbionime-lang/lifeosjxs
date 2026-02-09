@@ -6,7 +6,11 @@ import { Project } from '@/lib/types/api-schema';
 import { ProjectCard } from './ProjectCard'; // Make sure this path is correct
 import { cortex } from '@/lib/api/client';
 
-export const ProjectBoard = () => {
+interface ProjectBoardProps {
+    onCreateProject?: () => void;
+}
+
+export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
     const supabase = createClientComponentClient();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
@@ -155,6 +159,13 @@ export const ProjectBoard = () => {
                 <div>
                     <h2 className="text-3xl font-black text-slate-800 flex items-center gap-3 tracking-tight">
                         <span className="text-4xl">🚀</span> Projects
+                        <button
+                            onClick={onCreateProject}
+                            className="ml-2 p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full transition-all shadow-lg hover:shadow-indigo-500/30 active:scale-95"
+                            title="New Project"
+                        >
+                            <Plus size={20} />
+                        </button>
                     </h2>
                     <p className="text-slate-500 text-sm mt-1 font-medium">Ship your life & work.</p>
                 </div>
