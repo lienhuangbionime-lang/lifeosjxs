@@ -54,9 +54,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+from app.api.v1 import brain as brain_router_mod
 app.include_router(ingest_router_mod.router, prefix="/api/v1/ingest", tags=["Ingest"])
 app.include_router(memories_router_mod.router, prefix="/api/v1/memories", tags=["Memories"])
 app.include_router(system_router_mod.router, prefix="/api/v1/system", tags=["System"])
+app.include_router(brain_router_mod.router, prefix="/api/v1/brain", tags=["Brain"])
 
 app.include_router(analyze_router_mod.router, prefix="/api/v1/analyze", tags=["Analyze"])
 app.include_router(chat_router_mod.router, prefix="/api/v1/chat", tags=["Chat"])

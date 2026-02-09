@@ -27,7 +27,7 @@ export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: any) => {
         if (!mainNode) return [];
 
         const mainId = mainNode.id;
-        const mainSeeds = CoreEngine.parseGraphSeeds(mainNode.note || '', mainNode.graphSeeds?.content || '');
+        const mainSeeds = CoreEngine.parseNoteSeeds((mainNode.note || '') + (mainNode.graphSeeds?.content || ''));
         // If mainNode is a tag, the tag itself is the key constraint
         const mainTags = mainSeeds.tags.length > 0 ? mainSeeds.tags : (mainNode.group === 'tag' ? [mainId] : []);
         const mainLinks = mainSeeds.links || [];
@@ -43,7 +43,7 @@ export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: any) => {
 
         const related = logs.filter((l: any) => {
             if (l.date === mainId) return false;
-            const logSeeds = CoreEngine.parseGraphSeeds(l.note || '', l.graphSeeds?.content || '');
+            const logSeeds = CoreEngine.parseNoteSeeds((l.note || '') + (l.graphSeeds?.content || ''));
             const logTags = logSeeds.tags || [];
             const logLinks = logSeeds.links || [];
 

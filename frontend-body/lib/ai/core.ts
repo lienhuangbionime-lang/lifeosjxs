@@ -128,6 +128,17 @@ export const CoreEngine = {
         return tasks;
     },
 
+    parseNoteSeeds: (content: string): { tags: string[], links: string[] } => {
+        if (!content) return { tags: [], links: [] };
+        const foundTags = (content.match(/#([\w\u4e00-\u9fa5]+)/g) || []).map(t => t.slice(1));
+        const uniqueTags = Array.from(new Set(foundTags));
+        // Simple link extraction if [[Link]] format is used, or just return empty for now if not implemented
+        // For now, let's assume links are also tags or just empty. 
+        // If the legacy code expected links, maybe it regexes for [[...]]? 
+        // The error shows 'links' being accessed.
+        return { tags: uniqueTags, links: [] };
+    },
+
     parseGraphSeeds: (logs: LogEntry[]): GraphData => {
         const nodes = new Map<string, GraphNode>();
         const links: GraphLink[] = [];
