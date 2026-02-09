@@ -1,111 +1,59 @@
 'use client';
-import React, { useState, useMemo } from 'react';
-import { LayoutTemplate, ChevronRight, Hash, FolderKanban, MoreHorizontal, Edit2, Trash2, ArrowRightLeft, CheckCircle2 } from 'lucide-react';
-import { CoreEngine } from '@/lib/ai/core';
+import React, { useEffect, useState } from 'react';
+import { LayoutTemplate, FolderKanban, MoreHorizontal, Edit2, Trash2, CheckCircle2, Search, Filter } from 'lucide-react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Project } from '@/lib/types/api-schema';
 
-interface Project {
-    name: string;
-    count: number;
-    lastUpdate: string;
-    type: 'life' | 'work'; // Inferred or Manual
-}
+export const ProjectBoard = () => {
+    const supabase = createClientComponentClient();
+    const [projects, setProjects] = useState<Project[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [filter, setFilter] = useState<'all' | 'active' | 'archived' | 'idea'>('active');
 
-interface ProjectBoardProps {
-    logs: any[];
-    onUpdateLogs: (newLogs: any[]) => void;
-}
+    // Fetch Projects
+    useEffect(() => {
+        const fetchProjects = async () => {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('projects')
+                .select('*')
+                .order('progress', { ascending: false });
 
-export const ProjectBoard = ({ logs, onUpdateLogs }: ProjectBoardProps) => {
-    const [filter, setFilter] = useState<'all' | 'life' | 'work'>('all');
-    const [editingProject, setEditingProject] = useState<string | null>(null);
-    const [newName, setNewName] = useState('');
-    const [menuOpen, setMenuOpen] = useState<string | null>(null);
+            if (data) setProjects(data as Project[]);
+            setLoading(false);
+        };
+        fetchProjects();
+    }, [supabase]);
 
-    // 1. Aggregate Projects from Logs
-    const projects = useMemo(() => {
-        const map = new Map<string, Project>();
-        (logs || []).forEach(log => {
-            const seeds = CoreEngine.parseGraphSeeds(log.note, log.graphSeeds?.content);
-            const tags = seeds.tags; // Use standardized extraction
+    const filteredProjects = projects.filter(p => filter === 'all' || p.status === filter);
 
-            tags.forEach(tag => {
-                if (!map.has(tag)) {
-                    // Simple heuristic for Life vs Work (can be improved with AI or manual setting later)
-                    const isLife = ['health', 'reading', 'family', 'life', 'gym', 'sleep'].some(k => tag.toLowerCase().includes(k));
-                    map.set(tag, {
-                        name: tag,
-                        count: 0,
-                        lastUpdate: log.date,
-                        type: isLife ? 'life' : 'work'
-                    });
-                }
-                const p = map.get(tag)!;
-                p.count++;
-                if (new Date(log.date) > new Date(p.lastUpdate)) p.lastUpdate = log.date;
-            });
-        });
-        return Array.from(map.values()).sort((a, b) => b.count - a.count);
-    }, [logs]);
-
-    const filteredProjects = projects.filter(p => filter === 'all' || p.type === filter);
-
-    // 2. Actions
-    const handleRename = (oldName: string) => {
-        if (!newName.trim() || newName === oldName) return;
-
-        const updatedLogs = logs.map(log => {
-            if (!log.note.includes(`#${oldName}`)) return log;
-            // Regex replace to ensure we only replace exact tag match
-            const noteUpdates = log.note.replace(new RegExp(`#${oldName}\\b`, 'g'), `#${newName}`);
-            // Also update graphSeeds tag list if present
-            const seeds = log.graphSeeds || {};
-            let tagString = seeds.tags || '';
-            if (tagString.includes(oldName)) {
-                tagString = tagString.replace(new RegExp(`${oldName}\\b`, 'g'), newName);
-            }
-
-            return {
-                ...log,
-                note: noteUpdates,
-                graphSeeds: { ...seeds, tags: tagString }
-            };
-        });
-
-        onUpdateLogs(updatedLogs);
-        setEditingProject(null);
-        setMenuOpen(null);
-    };
-
-    const handleDelete = (targetName: string) => {
-        if (!confirm(`確定要刪除專案 #${targetName} 嗎？\n這將會從所有日誌中移除此標籤。`)) return;
-
-        const updatedLogs = logs.map(log => {
-            if (!log.note.includes(`#${targetName}`)) return log;
-            const noteUpdates = log.note.replace(new RegExp(`#${targetName}\\b`, 'g'), '');
-            return { ...log, note: noteUpdates };
-        });
-
-        onUpdateLogs(updatedLogs);
-        setMenuOpen(null);
+    const getStatusColor = (status: string) => {
+        switch (status) {
+            case 'active': return 'bg-emerald-100 text-emerald-700 border-emerald-200';
+            case 'completed': return 'bg-blue-100 text-blue-700 border-blue-200';
+            case 'idea': return 'bg-amber-100 text-amber-700 border-amber-200';
+            default: return 'bg-slate-100 text-slate-700 border-slate-200';
+        }
     };
 
     return (
-        <div className="h-full overflow-y-auto pb-32 px-4 pt-6 custom-scrollbar animate-fade-in">
-            <div className="mb-6 flex justify-between items-end">
+        <div className="h-full overflow-y-auto pb-32 px-4 pt-6 custom-scrollbar animate-fade-in bg-slate-50/50">
+            {/* Header */}
+            <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h2 className="text-2xl font-bold text-slate-700 flex items-center gap-2">
-                        <LayoutTemplate className="text-indigo-500" /> Project Board
+                    <h2 className="text-3xl font-black text-slate-800 flex items-center gap-3 tracking-tight">
+                        <span className="text-4xl">🚀</span> Projects
                     </h2>
-                    <p className="text-slate-400 text-xs mt-1">Manage your Life & Work projects</p>
+                    <p className="text-slate-500 text-sm mt-1 font-medium">Ship your life & work.</p>
                 </div>
 
-                {/* Filter Tabs */}
-                <div className="flex bg-slate-100 p-1 rounded-xl">
-                    {['all', 'work', 'life'].map(t => (
+                {/* Filters */}
+                <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200">
+                    {['active', 'idea', 'archived', 'all'].map(t => (
                         <button
                             key={t}
                             onClick={() => setFilter(t as any)}
-                            className={`px-3 py-1 rounded-lg text-xs font-bold capitalize transition-all ${filter === t ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                            className={`px-4 py-1.5 rounded-xl text-xs font-bold capitalize transition-all ${filter === t ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
                         >
                             {t}
                         </button>
@@ -113,69 +61,73 @@ export const ProjectBoard = ({ logs, onUpdateLogs }: ProjectBoardProps) => {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {/* Nomad List Style Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {filteredProjects.map((proj) => (
-                    <div key={proj.name} className="relative bg-white p-4 rounded-2xl border border-slate-200 shadow-sm hover:shadow-md transition-all group">
+                    <div key={proj.id} className="group relative bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 overflow-hidden flex flex-col h-64">
 
-                        <div className="flex justify-between items-start mb-2">
-                            <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-sm ${proj.type === 'life' ? 'bg-emerald-400' : 'bg-indigo-400'}`}>
-                                    {proj.name[0].toUpperCase()}
-                                </div>
-                                <div>
-                                    {editingProject === proj.name ? (
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                autoFocus
-                                                value={newName}
-                                                onChange={e => setNewName(e.target.value)}
-                                                className="bg-slate-50 border border-indigo-300 rounded px-2 py-0.5 text-sm font-bold text-slate-700 outline-none"
-                                            />
-                                            <button onClick={() => handleRename(proj.name)} className="text-emerald-500 hover:bg-emerald-50 p-1 rounded"><CheckCircle2 size={16} /></button>
-                                        </div>
-                                    ) : (
-                                        <h3 className="font-bold text-slate-700 text-base flex items-center gap-2">
-                                            #{proj.name}
-                                        </h3>
-                                    )}
-                                    <span className="text-[10px] text-slate-400 font-mono">Updated: {proj.lastUpdate}</span>
+                        {/* Cover Image Area */}
+                        <div className="h-24 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 relative">
+                            {proj.meta?.cover_image && (
+                                <img src={proj.meta.cover_image} className="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" />
+                            )}
+                            <div className="absolute -bottom-6 left-4 bg-white p-2 rounded-2xl shadow-sm border border-slate-100 text-2xl">
+                                {proj.meta?.emoji || '📦'}
+                            </div>
+                            <div className={`absolute top-3 right-3 px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${getStatusColor(proj.status)}`}>
+                                {proj.status}
+                            </div>
+                        </div>
+
+                        {/* Content */}
+                        <div className="pt-8 px-5 pb-5 flex-1 flex flex-col justify-between">
+                            <div>
+                                <h3 className="font-bold text-slate-800 text-lg leading-tight mb-1 group-hover:text-indigo-600 transition-colors">
+                                    {proj.name}
+                                </h3>
+                                <div className="flex flex-wrap gap-1 mt-2">
+                                    {proj.tags?.map(tag => (
+                                        <span key={tag} className="text-[10px] bg-slate-100 text-slate-500 px-2 py-0.5 rounded-md font-mono">
+                                            #{tag}
+                                        </span>
+                                    ))}
                                 </div>
                             </div>
 
-                            <div className="relative">
-                                <button onClick={() => setMenuOpen(menuOpen === proj.name ? null : proj.name)} className="p-1 rounded-full hover:bg-slate-100 text-slate-400">
-                                    <MoreHorizontal size={16} />
-                                </button>
-
-                                {menuOpen === proj.name && (
-                                    <div className="absolute right-0 top-8 bg-white border border-slate-200 rounded-xl shadow-xl z-20 w-32 overflow-hidden animate-scale-in">
-                                        <button onClick={() => { setEditingProject(proj.name); setNewName(proj.name); setMenuOpen(null); }} className="w-full text-left px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 flex items-center gap-2">
-                                            <Edit2 size={12} /> Rename
-                                        </button>
-                                        <button onClick={() => handleDelete(proj.name)} className="w-full text-left px-4 py-2 text-xs font-bold text-red-500 hover:bg-red-50 flex items-center gap-2">
-                                            <Trash2 size={12} /> Delete
-                                        </button>
-                                    </div>
+                            {/* Progress & Meta */}
+                            <div className="mt-4">
+                                <div className="flex justify-between items-end mb-1">
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase">Progress</span>
+                                    <span className="text-xs font-black text-slate-800">{proj.progress}%</span>
+                                </div>
+                                <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                                    <div
+                                        className="h-full bg-gradient-to-r from-emerald-400 to-cyan-400 transition-all duration-1000 ease-out"
+                                        style={{ width: `${proj.progress}%` }}
+                                    />
+                                </div>
+                                {proj.meta?.vibe && (
+                                    <p className="mt-3 text-[10px] text-slate-400 italic truncate">
+                                        "{proj.meta.vibe}"
+                                    </p>
                                 )}
                             </div>
                         </div>
 
-                        <div className="flex items-center justify-between mt-3">
-                            <span className="text-xs font-bold bg-slate-50 text-slate-500 px-2 py-1 rounded-md border border-slate-100">
-                                {proj.count} logs
-                            </span>
-                            <span className={`text-[10px] uppercase font-black px-2 py-0.5 rounded-full ${proj.type === 'life' ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
-                                {proj.type}
-                            </span>
+                        {/* Hover Actions */}
+                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button className="p-1.5 bg-white/90 backdrop-blur rounded-full text-slate-500 hover:text-indigo-600 shadow-sm border border-slate-200">
+                                <MoreHorizontal size={14} />
+                            </button>
                         </div>
                     </div>
                 ))}
 
-                {filteredProjects.length === 0 && (
-                    <div className="col-span-full flex flex-col items-center justify-center py-20 text-slate-400 border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50">
-                        <FolderKanban size={48} className="mb-4 opacity-20" />
-                        <p className="text-sm">No projects found.</p>
-                        <p className="text-xs mt-2 opacity-50">Use #Tags in your logs to create projects.</p>
+                {/* Empty State */}
+                {filteredProjects.length === 0 && !loading && (
+                    <div className="col-span-full py-20 text-center border-2 border-dashed border-slate-200 rounded-3xl bg-slate-50/50">
+                        <div className="text-4xl mb-2 opacity-50">🧭</div>
+                        <p className="text-slate-400 font-medium">No projects found in {filter}.</p>
                     </div>
                 )}
             </div>

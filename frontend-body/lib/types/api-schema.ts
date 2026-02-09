@@ -1,6 +1,23 @@
 // 檔案: frontend-body/lib/types/api-schema.ts
 
+
+export interface Project {
+  id: number;
+  created_at?: string;
+  name: string;
+  status: 'active' | 'archived' | 'completed' | 'idea';
+  progress: number;
+  meta: {
+    vibe?: string;
+    emoji?: string;
+    cover_image?: string;
+    [key: string]: any;
+  };
+  tags: string[];
+}
+
 export interface paths {
+
     "/api/v1/ingest": {
       post: {
         requestBody: {
