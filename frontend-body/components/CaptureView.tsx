@@ -1,195 +1,230 @@
-// 檔案: frontend-body/components/CaptureView.tsx
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { PenTool, Cpu, Activity, Terminal, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Edit3, ListIcon as ListTodo, Copy, ExternalLink, GitMerge, Hash, Link as LinkIcon, Cpu, Save, BookOpen, Terminal, Zap, Activity, Brain, Star } from 'lucide-react';
 import { CoreEngine, DEFAULT_HABITS } from '@/lib/ai/core';
-import { cortex } from '@/lib/api/client'; // [Fix 1] 引入神經束 (連線到 Python 後端)
 
-export const CaptureView = ({ onSave }: { onSave: (log: any) => void }) => {
-  const [entry, setEntry] = useState({ date: '', note: '', mood: 5, focus: 5, energy: 5, deepWork: 0, habits: {} });
-  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
-  const [aiThinkingLogs, setAiThinkingLogs] = useState<string[]>([]);
-  const [detectedTasks, setDetectedTasks] = useState<string[]>([]);
+// Helper for clipboard
+const copyToClipboard = async (text: string) => {
+  if (!text) return false;
+  try { await navigator.clipboard.writeText(text); return true; } catch (err) { return false; }
+};
 
+interface CaptureViewProps {
+  onSave: (log: any) => void;
+}
+
+export const CaptureView = ({ onSave }: CaptureViewProps) => {
+  // Local state for form
+  const [entry, setEntry] = useState({
+    date: new Date().toISOString().split('T')[0],
+    mood: 5, focus: 5, energy: 5, readingTime: 0,
+    habits: {} as Record<string, boolean>,
+    note: '',
+    graphSeeds: { tags: '', links: '', content: '' }
+  });
+
+  const [notification, setNotification] = useState<{ msg: string, type: string } | null>(null);
+  const [detectedTasks, setDetectedTasks] = useState<string[]>([]); // [Task Bridge] State
+
+  // Init Logic to ensure date is set
   useEffect(() => {
-    setEntry((prev: any) => ({ ...prev, date: new Date().toISOString().split('T')[0] }));
+    if (!entry.date) setEntry(prev => ({ ...prev, date: new Date().toISOString().split('T')[0] }));
   }, []);
 
-  const handleAIParse = async () => {
-    if (!entry.note) return alert("❌ 請輸入內容");
+  const showToast = (msg: string, type = 'success') => { setNotification({ msg, type }); setTimeout(() => setNotification(null), 3000); };
 
-    setIsAiAnalyzing(true);
-    setAiThinkingLogs(["連線神經網絡...", "正在讀取脈絡..."]);
+  // [AI Agent] Enhanced Regex Logic & Task Extraction
+  const handleAIParse = () => {
+    const text = entry.note;
+    if (!text) return;
 
+    const mood = text.match(/(?:Mood|心情)[\s\S]*?(\d+(?:\.\d+)?)/i);
+    const focus = text.match(/(?:Focus|專注)[\s\S]*?(\d+(?:\.\d+)?)/i);
+    const energy = text.match(/(?:Energy|能量)[\s\S]*?(\d+(?:\.\d+)?)/i);
+    const deep = text.match(/(?:Deep|Reading|深度)[\s\S]*?(\d+(?:\.\d+)?)/i);
+
+    const dateMatch = text.match(/(?:Date|日期|^#\s*\[?)?\s*(\d{4}-\d{2}-\d{2})/m);
+    const targetDate = dateMatch ? dateMatch[1] : entry.date;
+
+    const graphMatch = text.match(/(?:Graph|Connections|關聯)(?:[\s:：]*)(?:[\r\n]+)([\s\S]*?)(?:$|^#)/mi);
+    const graphContent = graphMatch ? graphMatch[1].trim() : '';
+
+    const searchScope = graphContent || text;
+    const tags = (searchScope.match(/#([\w\u4e00-\u9fa5]+)/g) || []).join(' ');
+    const links = (searchScope.match(/\[\[(.*?)\]\]/g) || []).join(' ');
+
+    let detectedFocus = focus ? parseInt(focus[1]) : entry.focus;
+    if (text.includes('URGENT') || text.includes('TODO')) {
+      detectedFocus = Math.max(detectedFocus || 5, 8);
+    }
+
+    let detectedHabits = { ...entry.habits };
+    DEFAULT_HABITS.forEach(h => {
+      if (text.toLowerCase().includes(h.id) || text.includes(h.label.split(' ')[0])) {
+        detectedHabits[h.id] = true;
+      }
+    });
+
+    // [Task Bridge] Extract tasks
+    const tasks = CoreEngine.extractTasks(text);
+    setDetectedTasks(tasks);
+
+    setEntry(prev => ({
+      ...prev,
+      date: targetDate,
+      mood: mood ? parseInt(mood[1]) : prev.mood,
+      focus: detectedFocus,
+      energy: energy ? parseInt(energy[1]) : prev.energy,
+      readingTime: deep ? parseInt(deep[1]) : prev.readingTime,
+      habits: detectedHabits,
+      graphSeeds: { tags: tags, links: links, content: graphContent }
+    }));
+    showToast(`🪄 AI 分析完成 (提取 ${tasks.length} 個待辦)`);
+  };
+
+  const handleSaveEntry = async () => {
+    const finalSeeds = {
+      tags: entry.graphSeeds?.tags || '',
+      links: entry.graphSeeds?.links || '',
+      content: entry.graphSeeds?.content || ''
+    };
+
+    let finalNote = entry.note;
+    if (!finalNote) {
+      finalNote = `# [${entry.date}] Log\n> Mood: ${entry.mood} | Focus: ${entry.focus}\n\n## Summary\n${entry.graphSeeds?.tags ? `Tags: ${entry.graphSeeds.tags}` : ''}`;
+    }
+
+    // Core Weakness Warning
+    if ((entry.habits['creation'] || entry.habits['native_coding']) && entry.readingTime < 15 && !finalNote.includes('Core Weakness')) {
+      finalNote += "\n\n⚠️ [Warning: Core Weakness]";
+      showToast("⚠️ 偵測到核心能力虛弱", "warning");
+    }
+
+    // Construct Logic Object
+    const newEntry = {
+      ...entry,
+      metrics: { mood: entry.mood, focus: entry.focus, energy: entry.energy, deepWork: entry.readingTime },
+      graphSeeds: finalSeeds,
+      note: finalNote,
+      timestamp: Date.now()
+    };
+
+    // 1. Pass to parent (App level state) - Optimistic update
+    onSave(newEntry);
+
+    // 2. [Backend Sync] 
     try {
-      // [V3.1 Fix] 這裡原本是 '/api/ingest'，現在改為指向 Python 大腦的 Rewrite 路徑
-      // 路徑對應： /api/py/ingest -> http://localhost:8001/api/v1/ingest
-      const response = await fetch('/api/py/ingest', {
+      // Background sync - do not await blocking UI
+      fetch('/api/v1/ingest', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          text: entry.note,
-          date: entry.date
+          text: finalNote,
+          date: entry.date,
+          metrics: newEntry.metrics,
+          habits: newEntry.habits
         })
+      }).then(res => {
+        if (!res.ok) console.error("Backend Sync Failed");
+        else console.log("Backend Synced");
       });
+    } catch (e) { console.error("Sync Error", e); }
 
-      // 檢查回應狀態
-      const contentType = response.headers.get("content-type");
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Brain Error:", errorText);
-        throw new Error(`Cortex 回應錯誤 (${response.status})`);
-      }
-
-      if (!contentType || !contentType.includes("application/json")) {
-        throw new Error("Cortex 回傳了非 JSON 格式 (可能是 500 錯誤頁面)");
-      }
-
-      const result = await response.json();
-
-      // 兼容 Python 回傳格式 (Python 通常直接回傳 data，或包含在 success 欄位)
-      // 假設 backend 回傳: { success: true, data: { ... }, model: ... }
-      const aiData = result.data || result;
-
-      setAiThinkingLogs(prev => [...prev, "✅ 分析完成", `Model: ${result.model || 'Gemini-2.0'}`]);
-
-      // 更新 UI 狀態
-      const metrics = aiData.meta?.metrics || {};
-      setEntry((prev: any) => ({
-        ...prev,
-        note: aiData.markdown_body || prev.note, // 更新為 AI 整理後的 Markdown
-        mood: metrics.mood ?? prev.mood,
-        focus: metrics.focus ?? prev.focus,
-        energy: metrics.energy ?? prev.energy,
-      }));
-
-      if (aiData.tasks && Array.isArray(aiData.tasks)) {
-        setDetectedTasks(aiData.tasks.map((t: any) => t.title || t.task)); // 兼容 title 或 task 欄位
-        setAiThinkingLogs(prev => [...prev, `⚡ 提取了 ${aiData.tasks.length} 個行動`]);
-      }
-
-    } catch (e: any) {
-      console.error("AI Error:", e);
-      setAiThinkingLogs(prev => [...prev, `❌ 錯誤: ${e.message}`]);
-    } finally {
-      setIsAiAnalyzing(false);
-    }
-  };
-
-  const handleSave = () => {
-    const seeds = CoreEngine ? CoreEngine.parseGraphSeeds(entry.note) : { tags: [], links: [] };
-    onSave({ ...entry, graphSeeds: seeds });
-
-    // Reset
-    setEntry({
-      date: new Date().toISOString().split('T')[0], // 👈 關鍵修正：加上 
-      note: '',
-      mood: 5,
-      focus: 5,
-      energy: 5,
-      deepWork: 0,
-      habits: {}
-    });
-    setDetectedTasks([]);
-    setAiThinkingLogs([]);
+    showToast("✅ 紀錄已寫入 (Neural Sync)");
+    setDetectedTasks([]); // Clear tasks after save
+    // Reset entry (except date stays same or advances?) 
+    // Keeping date allows rapid multiple entry for same day
   };
 
   return (
-    <div className="h-full overflow-y-auto pb-32 px-4 pt-6 custom-scrollbar">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-          <PenTool className="text-indigo-500" /> Capture Flow
-        </h2>
-        <p className="text-slate-400 text-xs mt-1">紀錄當下，讓 AI 幫你整理結構</p>
-      </div>
-
-      {/* AI Terminal */}
-      {(isAiAnalyzing || aiThinkingLogs.length > 0) && (
-        <div className="mb-6 bg-slate-900 rounded-2xl p-4 shadow-xl border border-slate-800">
-          <div className="flex items-center gap-2 mb-2 border-b border-slate-800 pb-2">
-            <Terminal size={14} className="text-emerald-400 animate-pulse" />
-            <span className="text-xs font-mono text-emerald-400 font-bold">AI_CORE_PROCESSOR</span>
-          </div>
-          <div className="font-mono text-xs space-y-1 h-32 overflow-y-auto custom-scrollbar flex flex-col-reverse">
-            {isAiAnalyzing && <div className="text-emerald-500 animate-pulse">_</div>}
-            {[...aiThinkingLogs].reverse().map((log, i) => (
-              <div key={i} className="text-slate-300"><span className="text-indigo-500 mr-2">➜</span>{log}</div>
-            ))}
-          </div>
+    <div className="space-y-6 pb-24 animate-fade-in relative">
+      {notification && (
+        <div className={`fixed top-6 left-1/2 transform -translate-x-1/2 px-4 py-2 rounded-full text-xs font-bold shadow-xl z-[100] flex items-center gap-2 animate-fade-in-up ${notification.type === 'error' ? 'bg-red-500 text-white' : 'bg-slate-800 text-white'}`}>
+          {notification.msg}
         </div>
       )}
 
-      {/* Input Card */}
-      <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200">
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
         <div className="flex justify-between items-center mb-4">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Daily Log</span>
-          <input type="date" value={entry.date} onChange={e => setEntry({ ...entry, date: e.target.value })} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1 text-sm font-mono text-slate-600 outline-none" />
+          <span className="text-sm font-bold text-slate-600 flex items-center gap-2"><Edit3 className="w-4 h-4" /> DAILY LOG</span>
+          <input type="date" value={entry.date} onChange={e => setEntry({ ...entry, date: e.target.value })} className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1 text-sm font-mono outline-none" />
         </div>
-
         <textarea
-          value={entry.note}
-          onChange={e => setEntry({ ...entry, note: e.target.value })}
-          placeholder="# 輸入想法...\n> Agent 會幫你整理成 Project 與 Life 雙軌"
-          className="w-full h-48 p-4 bg-slate-50 border border-slate-100 rounded-xl text-sm font-mono focus:ring-2 focus:ring-indigo-100 outline-none resize-none leading-relaxed text-slate-700 placeholder:text-slate-400"
+          value={entry.note} onChange={e => setEntry({ ...entry, note: e.target.value })}
+          placeholder="# [YYYY-MM-DD] Title\n> Mood: 8 | Focus: 7\n[T:30] (S) Task...\n\n## Graph\n#ProjectA [[2024-01-01]]"
+          className="w-full h-40 p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-mono focus:ring-2 focus:ring-indigo-100 outline-none resize-none leading-relaxed"
         />
 
+        {/* [Task Bridge] UI Section */}
         {detectedTasks.length > 0 && (
-          <div className="mt-4 p-3 bg-indigo-50 border border-indigo-100 rounded-xl">
-            <div className="text-xs font-bold text-indigo-500 mb-2 flex items-center gap-2"><CheckCircle size={12} /> Extracted Tasks</div>
+          <div className="mt-4 bg-blue-50 border border-blue-100 rounded-xl p-3 animate-fade-in">
+            <div className="flex justify-between items-center mb-2">
+              <span className="text-xs font-bold text-blue-600 flex items-center gap-1"><ListTodo size={12} /> AI Task Bridge</span>
+              <div className="flex gap-2">
+                <button onClick={() => { copyToClipboard(detectedTasks.join('\n')); showToast("Tasks Copied!"); }} className="text-[10px] bg-white px-2 py-1 rounded border border-blue-200 text-blue-600 hover:bg-blue-100 flex items-center gap-1"><Copy size={10} /> Copy All</button>
+                <a href="https://tasks.google.com/embed/?origin=https://mail.google.com" target="_blank" rel="noopener noreferrer" className="text-[10px] bg-blue-600 px-2 py-1 rounded text-white hover:bg-blue-700 flex items-center gap-1"><ExternalLink size={10} /> Open GTasks</a>
+              </div>
+            </div>
             <ul className="space-y-1">
-              {detectedTasks.map((t, i) => <li key={i} className="text-xs text-indigo-700 flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-indigo-400"></span>{t}</li>)}
+              {detectedTasks.map((t, i) => (
+                <li key={i} className="text-xs text-blue-800 flex items-start gap-2">
+                  <span className="mt-1 w-1.5 h-1.5 rounded-full bg-blue-400 flex-shrink-0"></span>
+                  {t}
+                </li>
+              ))}
             </ul>
           </div>
         )}
 
+        <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-3">
+          <div className="bg-slate-50 p-3 rounded-xl border border-slate-100">
+            <div className="flex items-center gap-2 mb-2 text-slate-400 text-xs font-bold uppercase tracking-wider"><GitMerge size={12} /> Graph Context</div>
+            <textarea
+              placeholder="Paste your ## Graph section here or let AI parse it..."
+              value={entry.graphSeeds?.content || ''}
+              onChange={e => setEntry({ ...entry, graphSeeds: { ...entry.graphSeeds, content: e.target.value } })}
+              className="bg-transparent w-full text-xs font-mono outline-none text-slate-700 placeholder:text-slate-300 resize-none h-16"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-indigo-50 p-2 rounded-xl flex items-center gap-2 border border-indigo-100">
+              <Hash className="w-4 h-4 text-indigo-400" />
+              <input placeholder="Tags" value={entry.graphSeeds?.tags || ''} onChange={e => setEntry({ ...entry, graphSeeds: { ...entry.graphSeeds, tags: e.target.value } })} className="bg-transparent w-full text-xs font-mono outline-none text-indigo-800 placeholder:text-indigo-300" />
+            </div>
+            <div className="bg-indigo-50 p-2 rounded-xl flex items-center gap-2 border border-indigo-100">
+              <LinkIcon className="w-4 h-4 text-indigo-400" />
+              <input placeholder="Links" value={entry.graphSeeds?.links || ''} onChange={e => setEntry({ ...entry, graphSeeds: { ...entry.graphSeeds, links: e.target.value } })} className="bg-transparent w-full text-xs font-mono outline-none text-indigo-800 placeholder:text-indigo-300" />
+            </div>
+          </div>
+        </div>
         <div className="flex justify-end gap-2 mt-4">
-          <button
-            onClick={handleAIParse}
-            disabled={isAiAnalyzing}
-            className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition-colors flex items-center gap-2"
-          >
-            <Cpu className={`w-3 h-3 ${isAiAnalyzing ? 'animate-pulse' : ''}`} /> AI Agent
-          </button>
-
-          <button onClick={handleSave} className="px-6 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 flex items-center gap-2">
-            <Activity className="w-3 h-3" /> Save
-          </button>
+          <button onClick={handleAIParse} className="px-4 py-2 rounded-xl bg-slate-100 text-slate-600 text-xs font-bold hover:bg-slate-200 transition-colors flex items-center gap-2"><Cpu className="w-3 h-3" /> AI Agent</button>
+          <button onClick={handleSaveEntry} className="px-6 py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-colors shadow-lg shadow-indigo-200 flex items-center gap-2"><Save className="w-3 h-3" /> Save</button>
         </div>
       </div>
 
-      {/* Habits Grid */}
-      <div className="grid grid-cols-2 gap-3 mt-4">
+      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-4">
+        {[{ k: 'mood', c: 'indigo', l: 'Mood' }, { k: 'focus', c: 'rose', l: 'Focus' }, { k: 'energy', c: 'amber', l: 'Energy' }, { k: 'readingTime', c: 'blue', l: 'Deep Work', m: 240, s: 10 }].map(m => (
+          <div key={m.k} className="flex items-center gap-4">
+            <label className="w-20 text-xs font-bold text-slate-400 uppercase">{m.l}</label>
+            <input type="range" min="0" max={m.m || 10} step={m.s || 1} value={(entry as any)[m.k]} onChange={e => setEntry({ ...entry, [m.k]: parseInt(e.target.value) })} className={`flex-1 h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-${m.c}-500`} />
+            <span className={`w-8 text-right text-sm font-black text-${m.c}-500`}>{(entry as any)[m.k]}</span>
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
         {DEFAULT_HABITS.map(habit => {
-          const isActive = (entry.habits as any)?.[habit.id] || false;
-          const Icon = CoreEngine ? CoreEngine.getIconComponent(habit.icon) : Activity;
+          const Icon = CoreEngine.getIconComponent(habit.icon);
+          const isActive = entry.habits[habit.id];
           return (
-            <button
-              key={habit.id}
-              onClick={() => setEntry({ ...entry, habits: { ...entry.habits, [habit.id]: !isActive } })}
-              className={`p-4 rounded-2xl border transition-all flex items-center justify-between shadow-sm ${isActive ? 'bg-slate-800 border-slate-800 text-white' : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'}`}
-            >
-              <span className="text-xs font-bold">{habit.label}</span>
-              <Icon className={`w-5 h-5 ${isActive ? 'opacity-100' : 'opacity-20'}`} />
+            <button key={habit.id} onClick={() => setEntry({ ...entry, habits: { ...entry.habits, [habit.id]: !isActive } })}
+              className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${isActive ? 'bg-slate-800 border-slate-800 text-white shadow-lg' : 'bg-white border-slate-100 text-slate-400'}`}>
+              <span className="text-xs font-bold">{habit.label}</span><Icon className={`w-5 h-5 ${isActive ? 'opacity-100' : 'opacity-20'}`} />
             </button>
           );
         })}
-      </div>
-
-      {/* Sliders */}
-      <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 space-y-5 mt-4">
-        {['mood', 'focus', 'energy'].map(k => (
-          <div key={k} className="flex items-center gap-4">
-            <label className="w-16 text-xs font-bold text-slate-400 uppercase">{k}</label>
-            <input
-              type="range" min="0" max="10"
-              value={(entry as any)[k]}
-              onChange={e => setEntry({ ...entry, [k]: parseInt(e.target.value) })}
-              className="flex-1 h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-indigo-500"
-            />
-            <span className="w-6 text-right text-sm font-bold text-indigo-600">{(entry as any)[k]}</span>
-          </div>
-        ))}
       </div>
     </div>
   );

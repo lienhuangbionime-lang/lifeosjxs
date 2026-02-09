@@ -1,116 +1,103 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { List, Calendar, AlertCircle, Loader2 } from 'lucide-react';
+import React from 'react';
+import { Activity, Zap, TrendingUp, Clock, AlertTriangle } from 'lucide-react';
+import { CoreEngine, DEFAULT_HABITS } from '@/lib/ai/core';
 
-// 定義資料型別
-interface LogEntry {
-  id: string;
-  date: string;
-  note: string | null; // 注意：Supabase 表單通常是 note 或 content，請根據實際調整
-  mood: number | null;
+interface HistoryViewProps {
+  logs?: any[];
+  onSelectEntry?: (log: any) => void;
 }
 
-// 輔助函式：截斷過長的文字
-const shortContent = (content: string, max: number) => {
-  if (!content) return "";
-  return content.length > max ? content.slice(0, max) + "…" : content;
-}
+export const HistoryView = ({ logs = [], onSelectEntry }: HistoryViewProps) => {
+  const historyLogs = [...logs].reverse();
 
-// [Fix] 使用正確的箭頭函式語法 (export const Component = () => {})
-export const HistoryView = () => {
-  const [memories, setMemories] = useState<LogEntry[] | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  // Fallback if onSelectEntry is not provided (though it should be)
+  const handleSelect = (log: any) => {
+    if (onSelectEntry) onSelectEntry(log);
+  };
 
-  useEffect(() => {
-    const fetchMemories = async () => {
-      try {
-        setLoading(true);
-        // [V3.1] 呼叫 Cortex (FastAPI) 的記憶端點
-        // 透過 next.config.js 的 rewrite: /api/py/ -> http://localhost:8001/api/v1/
-        const res = await fetch('/api/py/memories/daily?limit=30');
-        
-        if (!res.ok) {
-            // 如果後端還沒準備好，使用 Mock Data 防止白屏
-            console.warn("Cortex Offline, switching to local cache.");
-            const saved = localStorage.getItem('life_os_logs_v8_0');
-            if (saved) setMemories(JSON.parse(saved));
-            else throw new Error("Cortex 連線失敗且無本地快取");
-            return;
-        }
-
-        const data = await res.json();
-        setMemories(data);
-      } catch (err: any) {
-        console.error("Recall Error:", err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchMemories();
-  }, []);
+  const getPreviewText = (text: string) => {
+    if (!text) return '無詳細內容';
+    return CoreEngine.extractInsight(text).text;
+  };
 
   return (
-    <div className="h-full overflow-y-auto p-4 custom-scrollbar pb-24">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-indigo-500/20 flex items-center justify-center text-indigo-400 border border-indigo-500/30">
-           <List size={20}/>
-        </div>
-        <div>
-           <h2 className="text-xl font-bold text-slate-100">Neural History</h2>
-           <p className="text-slate-400 text-xs">海馬迴記憶庫 (Hippocampus)</p>
-        </div>
+    <div className="space-y-4 pb-24 animate-fade-in px-4 pt-4">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-base font-bold text-slate-700 px-1">近期足跡 ({historyLogs.length})</h3>
       </div>
+      {historyLogs.map((log) => {
+        const insight = CoreEngine.extractInsight(log.note);
+        const isDrift = insight.type === 'drift';
+        const m = log.metrics?.mood ?? 5;
+        const moodColor = m >= 8 ? 'bg-emerald-400' : m <= 3 ? 'bg-red-400' : 'bg-indigo-400';
 
-      {loading ? (
-        <div className="flex flex-col items-center justify-center py-12 text-slate-500 gap-2">
-          <Loader2 className="animate-spin" size={24} />
-          <span className="text-xs font-mono">Retrieving Memories...</span>
-        </div>
-      ) : error ? (
-        <div className="p-4 bg-rose-950/30 border border-rose-500/30 rounded-xl flex items-center gap-3 text-rose-400">
-          <AlertCircle size={20} />
-          <span className="text-sm">記憶讀取錯誤: {error}</span>
-        </div>
-      ) : !memories || memories.length === 0 ? (
-        <div className="py-12 text-center text-slate-600 border border-dashed border-slate-800 rounded-xl">
-            <Calendar className="mx-auto mb-2 opacity-20" size={32}/>
-            <p>尚無記憶痕跡</p>
-        </div>
-      ) : (
-        <ul className="space-y-3">
-          {memories.map((m, idx) => (
-            <li key={m.id || idx} className="bg-slate-800/50 backdrop-blur-sm border border-slate-700/50 p-4 rounded-xl hover:bg-slate-800 hover:border-indigo-500/30 transition-all group">
-              <div className="flex justify-between items-start">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                      <span className="text-xs font-mono text-indigo-400 bg-indigo-950/30 px-2 py-0.5 rounded">
-                        {m.date}
-                      </span>
-                  </div>
-                  <div className="text-sm text-slate-300 leading-relaxed font-sans">
-                    {shortContent(m.note || "(無內容)", 120)}
-                  </div>
+        // Active Habits (using DEFAULT_HABITS for icons logic if needed)
+        const activeHabits = Object.keys(log.habits || {}).filter(h => log.habits[h]);
+
+        return (
+          <div
+            key={log.date}
+            onClick={() => handleSelect(log)}
+            className={`group p-5 rounded-3xl border relative cursor-pointer hover:shadow-lg transition-all bg-white border-slate-100 overflow-hidden`}
+          >
+            {/* Visual DNA Border */}
+            <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${moodColor}`} />
+
+            <div className="flex justify-between items-start mb-3 pl-3">
+              <div className="flex flex-col">
+                <span className="text-xl font-black text-slate-800 font-mono tracking-tight">{log.date}</span>
+                <span className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                  {new Date(log.date).toLocaleDateString('en-US', { weekday: 'long' })}
+                </span>
+              </div>
+
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex gap-1">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 bg-indigo-50 text-indigo-600`}>
+                    <Activity size={10} /> {m}
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 bg-rose-50 text-rose-600">
+                    <Zap size={10} /> {log.metrics?.focus}
+                  </span>
                 </div>
-                
-                {/* 右側情緒指標 */}
-                <div className="ml-4 flex flex-col items-end gap-1">
-                  <div className="text-[10px] text-slate-500 uppercase tracking-wider">Mood</div>
-                  <div className={`text-sm font-bold ${
-                      (m.mood || 5) >= 7 ? 'text-emerald-400' : 
-                      (m.mood || 5) <= 3 ? 'text-rose-400' : 'text-amber-400'
-                  }`}>
-                    {typeof m.mood === "number" ? m.mood : "—"}
-                  </div>
+                <div className="flex gap-1">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 bg-amber-50 text-amber-600">
+                    <TrendingUp size={10} /> {log.metrics?.energy}
+                  </span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 bg-blue-50 text-blue-600">
+                    <Clock size={10} /> {log.metrics?.deepWork}
+                  </span>
                 </div>
               </div>
-            </li>
-          ))}
-        </ul>
-      )}
+            </div>
+
+            <div className="text-sm text-slate-600 font-sans leading-relaxed line-clamp-2 mb-3 pl-3 pr-1">
+              {log.sections?.summary || getPreviewText(log.note)}
+            </div>
+
+            <div className="pl-3 flex flex-col gap-2">
+              {isDrift && (
+                <div className="p-2 bg-slate-900 text-white rounded-lg text-xs font-mono flex items-center gap-2 shadow-sm w-fit">
+                  <AlertTriangle size={12} className="text-amber-400" />
+                  <span className="truncate max-w-[200px]">{insight.text}</span>
+                </div>
+              )}
+              {activeHabits.length > 0 && (
+                <div className="flex gap-2 mt-1">
+                  {activeHabits.map(h => {
+                    const habitConfig = DEFAULT_HABITS.find(ch => ch.id === h);
+                    if (!habitConfig) return null;
+                    const Icon = CoreEngine.getIconComponent(habitConfig.icon);
+                    return <div key={h} className="text-slate-400 bg-slate-50 p-1 rounded-md"><Icon size={12} /></div>
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 };

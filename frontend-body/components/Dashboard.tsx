@@ -1,86 +1,120 @@
-// 檔案位置: components/Dashboard.tsx
 'use client';
 
-import React, { useState } from 'react';
-import { Target, Rocket, FileText, RefreshCw, AlertTriangle, Play } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import {
+    ComposedChart, Area, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer
+} from 'recharts';
+import { Activity, Rocket, Edit3, Eye, Filter, Target, FileText } from 'lucide-react';
+import { MarkdownRenderer } from '@/components/MarkdownRenderer';
 
-export const Dashboard = () => {
-    const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
-    const [analysis, setAnalysis] = useState<any>(null);
-    const [loading, setLoading] = useState(false);
+// Helper for safe loading CCA data locally or from props? 
+// For now, let's assume parent passes data or we use local state if standalone.
+// BUT, Dashboard in V3 might fetch from backend.
+// Let's stick to the Legacy UI which is "Static Prop" based mostly, allowing for interactivity.
 
-    const handleAnalyze = async () => {
-        setLoading(true);
-        try {
-            const res = await fetch('/api/py/analyze/monthly', { method: 'POST', body: JSON.stringify({ month }) });
-            const data = await res.json();
-            if (data.success) {
-                setAnalysis(data.data);
-            } else {
-                alert("分析失敗: " + (data.error || "未知錯誤"));
-            }
-        } catch (e) {
-            console.error(e);
-            alert("系統錯誤，請檢查 Console");
-        } finally {
-            setLoading(false);
-        }
+interface DashboardProps {
+    logs?: any[]; // Optional if we fetch or use context
+    ccaData?: any;
+    onUpdateCCA?: (month: string, field: string, value: string) => void;
+    onUpgradeSystem?: (month: string) => void;
+}
+
+export const Dashboard = ({ logs = [], ccaData = {}, onUpdateCCA, onUpgradeSystem }: DashboardProps) => {
+    // Local state for Month selection
+    const [dashboardMonth, setDashboardMonth] = useState(new Date().toISOString().slice(0, 7));
+    const [isEditingReview, setIsEditingReview] = useState(false);
+
+    // Filter Logs
+    const filteredLogs = logs.filter(l => l.date.startsWith(dashboardMonth));
+    const data = filteredLogs.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    const handleUpdate = (val: string) => {
+        if (onUpdateCCA) onUpdateCCA(dashboardMonth, 'review', val);
     };
 
     return (
-        <div className="h-full overflow-y-auto pb-32 px-4 pt-6 animate-fade-in custom-scrollbar">
-            {/* Control Panel */}
-            <div className="bg-white p-5 rounded-3xl border border-slate-200 flex justify-between items-center shadow-sm mb-6">
-                <div className="flex items-center gap-3">
-                    <div className="p-3 bg-indigo-50 text-indigo-600 rounded-xl"><Target size={20} /></div>
-                    <div>
-                        <h2 className="text-slate-800 font-bold">CCA 戰略室</h2>
-                        <input type="month" value={month} onChange={(e) => setMonth(e.target.value)} className="bg-transparent text-slate-500 text-xs font-mono outline-none" />
-                    </div>
+        <div className="space-y-6 pb-24 animate-fade-in">
+            {/* Month Selector */}
+            <div className="flex justify-between items-center bg-white p-3 rounded-2xl shadow-sm border border-slate-100">
+                <div className="flex items-center gap-2 text-slate-700">
+                    <Filter className="w-4 h-4 text-indigo-500" />
+                    <span className="text-sm font-bold">Month View</span>
                 </div>
-                <button onClick={handleAnalyze} disabled={loading} className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold flex items-center gap-2 transition-all shadow-lg shadow-indigo-200 disabled:opacity-50">
-                    {loading ? <RefreshCw className="animate-spin w-4 h-4" /> : <Play className="w-4 h-4" />}
-                    {loading ? "Thinking..." : "Run Agent"}
-                </button>
+                <input
+                    type="month"
+                    value={dashboardMonth}
+                    onChange={(e) => setDashboardMonth(e.target.value)}
+                    className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 text-sm font-mono outline-none focus:ring-2 focus:ring-indigo-100"
+                />
             </div>
 
-            {/* Report Viewer */}
-            {analysis ? (
-                <div className="space-y-6">
-                    {/* Strategy Card - [Fix] 安全存取 strategy */}
-                    <div className="bg-gradient-to-br from-indigo-50 to-white p-6 rounded-3xl border border-indigo-100 shadow-sm">
-                        <h3 className="text-sm font-bold text-indigo-900 uppercase tracking-widest mb-4">Next Month Strategy</h3>
-                        {analysis.strategy ? (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div className="p-4 bg-white rounded-2xl border border-indigo-100">
-                                    <span className="text-xs text-indigo-400 block mb-1">Focus Project</span>
-                                    <span className="text-slate-800 font-bold text-lg">{analysis.strategy.focus_project || '未定義'}</span>
-                                </div>
-                                <div className="p-4 bg-white rounded-2xl border border-emerald-100">
-                                    <span className="text-xs text-emerald-500 block mb-1">New Habits</span>
-                                    <div className="flex flex-wrap gap-2 mt-1">
-                                        {(analysis.strategy.new_habits || []).map((h: string, i: number) => (
-                                            <span key={i} className="text-xs bg-emerald-50 text-emerald-600 px-3 py-1 rounded-full border border-emerald-100">{h}</span>
-                                        ))}
-                                        {(!analysis.strategy.new_habits || analysis.strategy.new_habits.length === 0) && <span className="text-slate-400 text-xs">無新習慣建議</span>}
-                                    </div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="p-4 bg-amber-50 text-amber-600 rounded-xl text-xs flex items-center gap-2"><AlertTriangle size={14} /> 策略資料解析不完整，請查看下方報告。</div>
-                        )}
-                    </div>
+            {/* Trends Chart */}
+            <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 h-64">
+                <h3 className="text-sm font-bold text-slate-700 mb-4 flex items-center gap-2">
+                    <Activity className="w-4 h-4 text-indigo-500" /> 近期趨勢 (Recent Trends)
+                </h3>
+                <div style={{ width: '100%', height: '100%', minHeight: '200px' }}>
+                    <ResponsiveContainer>
+                        <ComposedChart data={data} style={{ cursor: 'pointer' }}>
+                            <defs>
+                                <linearGradient id="colorMood" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.2} />
+                                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                            <XAxis dataKey="date" tick={{ fontSize: 10 }} tickFormatter={(v: string) => v.slice(8)} axisLine={false} tickLine={false} />
+                            <YAxis yAxisId="left" orientation="left" stroke="#6366f1" hide domain={[0, 10]} />
+                            <YAxis yAxisId="right" orientation="right" stroke="#3b82f6" hide />
+                            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                            <Area yAxisId="left" type="monotone" dataKey="metrics.mood" stroke="#6366f1" fill="url(#colorMood)" strokeWidth={3} />
+                            <Line yAxisId="left" type="monotone" dataKey="metrics.focus" stroke="#f43f5e" strokeWidth={2} dot={false} />
+                            <Bar yAxisId="right" dataKey="metrics.deepWork" fill="#93c5fd" opacity={0.3} barSize={20} radius={[4, 4, 0, 0]} />
+                        </ComposedChart>
+                    </ResponsiveContainer>
+                </div>
+            </div>
 
-                    {/* Markdown Report */}
-                    <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-                        <div className="prose prose-sm max-w-none font-mono leading-relaxed text-slate-600">
-                            <pre className="whitespace-pre-wrap font-sans">{analysis.content || "無報告內容"}</pre>
-                        </div>
+            {/* CCA Review */}
+            <div className="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+                <div className="flex justify-between items-center mb-4">
+                    <div className="flex items-center gap-2">
+                        <Target className="w-4 h-4 text-emerald-500" />
+                        <h3 className="text-sm font-bold text-slate-700">月度復盤 (CCA)</h3>
+                    </div>
+                    <div className="flex gap-2">
+                        <button onClick={() => setIsEditingReview(!isEditingReview)} className="p-1.5 rounded bg-slate-100 hover:bg-slate-200 text-slate-500">
+                            {isEditingReview ? <Eye className="w-3 h-3" /> : <Edit3 className="w-3 h-3" />}
+                        </button>
+                        <button
+                            onClick={() => onUpgradeSystem && onUpgradeSystem(dashboardMonth)}
+                            className="text-[10px] bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg hover:bg-emerald-100 font-bold flex items-center gap-1 border border-emerald-200"
+                        >
+                            <Rocket className="w-3 h-3" /> 升級系統
+                        </button>
                     </div>
                 </div>
-            ) : (
-                <div className="text-center py-20 text-slate-400 italic">準備就緒，等待戰略指令...</div>
-            )}
+
+                {isEditingReview ? (
+                    <textarea
+                        value={ccaData[dashboardMonth]?.review || ''}
+                        onChange={(e) => handleUpdate(e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-200 rounded-xl p-3 text-sm resize-none outline-none h-48 font-mono"
+                        placeholder="Paste your CCA Agent report here..."
+                    />
+                ) : (
+                    <div className="h-48 overflow-y-auto text-sm text-slate-600 font-mono bg-slate-50 p-3 rounded-xl custom-scrollbar border border-slate-100">
+                        {ccaData[dashboardMonth]?.review ? (
+                            <MarkdownRenderer content={ccaData[dashboardMonth].review} />
+                        ) : (
+                            <span className="text-slate-400 italic flex flex-col items-center justify-center h-full gap-2">
+                                <FileText className="w-6 h-6 opacity-20" />
+                                請貼上報告或使用 Agent 分析...
+                            </span>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 };
