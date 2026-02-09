@@ -222,9 +222,6 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
 
       {/* --- Submit --- */}
       <div className="flex justify-end items-center gap-4 relative z-10">
-        <span className="text-xs text-slate-600 font-mono hidden sm:block">
-          <span className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">⌘</span> + <span className="bg-slate-800 px-1.5 py-0.5 rounded text-slate-400">Enter</span> to save
-        </span>
         <button
           onClick={handleSubmit}
           disabled={!text.trim() || isSubmitting}
