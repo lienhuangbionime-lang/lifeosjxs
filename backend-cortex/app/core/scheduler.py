@@ -4,7 +4,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 # Import service logic
-from app.api.v1.analyze import analyze_monthly
+# from app.api.v1.analyze import analyze_monthly (moved inside function)
 # from app.api.v1.ingest import process_daily_digest (example)
 
 logger = logging.getLogger("cortex.scheduler")
@@ -38,7 +38,7 @@ class SubconsciousScheduler:
 
     async def run_monthly_analysis(self):
         logger.info("Running scheduled monthly analysis...")
-        # verify implementation of analyze_monthly before calling
+        from app.api.v1.analyze import analyze_monthly
         # await analyze_monthly(...)
         pass
 
