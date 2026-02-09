@@ -148,6 +148,20 @@ export const cortex = {
     });
   },
 
+  // [New] Ingest with Habits Support
+  ingest: {
+    submit: async (data: { content: string; habits: string[] }): Promise<IngestResponse> => {
+      return await fetchProxy<IngestResponse>("/api/v1/ingest", {
+        method: "POST",
+        body: JSON.stringify({
+          date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+          text: data.content,
+          habits: data.habits
+        }),
+      });
+    }
+  },
+
   // 5. 專案管理 (Project Management)
   async updateProject(id: number | string, data: any): Promise<any> {
     return await fetchProxy(`/api/v1/projects/${id}`, {

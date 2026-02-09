@@ -22,7 +22,7 @@ export const Dock = ({ activeTab, onTabChange }: DockProps) => {
 
     return (
         <div
-            className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50 flex items-end gap-3 px-4 py-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl"
+            className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-40 flex items-end gap-3 px-4 py-3 bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl shadow-2xl"
             onMouseMove={(e) => mouseX.set(e.pageX)}
             onMouseLeave={() => mouseX.set(Infinity)}
         >
