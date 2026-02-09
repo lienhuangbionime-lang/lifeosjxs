@@ -11,7 +11,7 @@ requests
 langchain
 langchain-google-genai
 langchain-community
+langchain-text-splitters
 pypdf
 python-multipart
-openai
 tiktoken

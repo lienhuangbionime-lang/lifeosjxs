@@ -49,7 +49,7 @@ export default function Home() {
   };
 
   // --- Render Helpers ---
-  if (!isMounted) return <div className="h-screen bg-[#020617] flex items-center justify-center"><div className="w-6 h-6 border-2 border-indigo-500 rounded-full animate-spin"></div></div>;
+  if (!isMounted) return <div className="h-screen bg-red-900 flex flex-col gap-4 items-center justify-center"><div className="w-6 h-6 border-2 border-white rounded-full animate-spin"></div><div className="text-white font-bold">LOADING...</div></div>;
 
   const bgClass = activeTab === 'graph' ? 'bg-[#0f172a] text-slate-200' : 'bg-[#f8fafc] text-slate-900';
 
