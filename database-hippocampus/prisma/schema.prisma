@@ -19,4 +19,10 @@ model LogEntry {
   aiModel   String?  @default("gemini-flash") 
   isAi      Boolean  @default(false)
   createdAt DateTime @default(now())
+  
+  // V7.1 新增：結構化資料
+  tags      String[] @default([])
+  habits    Json?    @default("{}")
+  meta      Json?    @default("{}")
+  updatedAt DateTime @updatedAt
 }

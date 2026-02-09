@@ -50,7 +50,7 @@ export const CortexChat = () => {
         setIsLoading(true);
 
         try {
-            const response = await fetch('http://localhost:8001/api/v1/chat/message', {
+            const response = await fetch('http://localhost:8000/api/v1/chat/message', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: userMsg })
@@ -92,7 +92,7 @@ export const CortexChat = () => {
         formData.append('file', file);
 
         try {
-            const res = await fetch('http://localhost:8001/api/v1/chat/ingest', {
+            const res = await fetch('http://localhost:8000/api/v1/chat/ingest', {
                 method: 'POST',
                 body: formData
             });

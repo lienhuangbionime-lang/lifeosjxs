@@ -123,16 +123,18 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
 
-      // 4. Reset form
-      setText('');
-      setActiveHabits({});
+      // 4. Reset form ONLY if skipAi (SAVE button) - otherwise keep the input to show with analysis
+      if (skipAi) {
+        setText('');
+        setActiveHabits({});
+      }
 
       // 5. Optionally notify parent (for local state update)
       if (onSave) {
         // Construct a full LogEntry-like object for immediate UI update
         const newEntry = {
           date: new Date().toISOString().split('T')[0], // Use simplified date for now or request.date
-          content: analysis || text, // Use analyzed markdown if available, else raw text
+          content: response.data?.markdown_body || text, // Use analyzed markdown if available, else raw text
           mood: response.data?.meta?.metrics?.mood || 5,
           focus: response.data?.meta?.metrics?.focus || 5,
           energy: response.data?.meta?.metrics?.energy || 5,
@@ -185,7 +187,7 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
   };
 
   return (
-    <div className="flex flex-col h-full p-6 pb-32 animate-fade-in relative max-w-3xl mx-auto w-full">
+    <div className="flex flex-col h-full p-6 pb-32 animate-fade-in relative max-w-3xl mx-auto w-full overflow-y-auto custom-scrollbar">
       {/* --- Header --- */}
       <div className="mb-8">
         <h2 className="text-3xl font-black text-white flex items-center gap-3">
@@ -200,7 +202,7 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
       </div>
 
       {/* --- Input Area --- */}
-      <div className="relative group mb-8 flex-1 min-h-[200px]">
+      <div className="relative group mb-8 min-h-[200px]">
         <textarea
           autoFocus
           value={text}
@@ -260,6 +262,7 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.3 }}
             className="mb-8 overflow-hidden relative z-10"
           >
             <div className="bg-black/80 border border-neon-blue/30 rounded-2xl p-6 shadow-[0_0_20px_rgba(0,243,255,0.1)]">
@@ -284,14 +287,24 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
               </div>
 
               {/* Terminal Content */}
-              <div className="max-h-96 overflow-y-auto custom-scrollbar">
+              <div className="overflow-y-auto custom-scrollbar">
                 <pre className="font-mono text-sm text-green-400 whitespace-pre-wrap leading-relaxed">
                   {analysis}
                 </pre>
               </div>
 
               {/* Terminal Footer */}
-              <div className="mt-4 pt-3 border-t border-neon-blue/20 flex justify-end">
+              <div className="mt-4 pt-3 border-t border-neon-blue/20 flex justify-between items-center">
+                <button
+                  onClick={() => {
+                    setAnalysis(null);
+                    setText('');
+                    setActiveHabits({});
+                  }}
+                  className="px-4 py-2 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 text-slate-300 hover:text-white rounded-lg transition-all text-xs font-mono uppercase tracking-wider"
+                >
+                  Clear & New Entry
+                </button>
                 <button
                   onClick={async () => {
                     try {
@@ -336,7 +349,7 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
       </div>
 
       {/* --- Submit --- */}
-      <div className="flex justify-end items-center gap-4 relative z-10">
+      <div className="flex justify-end items-center gap-4 relative z-10 mb-8">
 
         {/* Quick Save Button */}
         <button
