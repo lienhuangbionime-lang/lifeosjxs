@@ -9,16 +9,10 @@ import { NeuralGraph } from '@/components/NeuralGraph';
 import { HistoryView } from '@/components/HistoryView';
 import { SettingsView } from '@/components/SettingsView';
 import { Dashboard } from '@/components/Dashboard';
-import { ProjectBoard } from '@/components/ProjectBoard';
-import { SystemStatus } from '@/components/SystemStatus';
-import { ConfirmModal, ContextModal } from '@/components/Modals';
-import { CoreEngine, DEFAULT_HABITS } from '@/lib/ai/core';
-import { MarkdownRenderer } from '@/components/MarkdownRenderer';
+import { Dock } from '@/components/Dock';
+import { CommandPalette } from '@/components/CommandPalette';
 
-// MOCK / DEFAULT DATA
-const STORAGE_KEY_LOGS = 'life_os_logs_v10'; // Bumping version for new data structure if needed
-const STORAGE_KEY_CONFIG = 'life_os_config_v10';
-const STORAGE_KEY_CCA = 'life_os_cca_v10';
+// ... existing code ...
 
 export default function Home() {
   // 1. State Definition
@@ -26,6 +20,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<'capture' | 'graph' | 'list' | 'settings' | 'dashboard' | 'project'>('capture');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [isCmdOpen, setIsCmdOpen] = useState(false); // [NEW] Command Palette State
 
   // Modal States
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
@@ -34,6 +29,18 @@ export default function Home() {
 
   // Other Data
   const [ccaData, setCcaData] = useState<any>({});
+
+  // Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsCmdOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // 2. Lifecycle: Init
   useEffect(() => {
@@ -247,22 +254,14 @@ export default function Home() {
         </AnimatePresence>
       </main>
 
-      {/* --- Bottom Nav --- */}
-      <nav className={`${activeTab === 'graph' ? 'bg-slate-900 border-slate-800' : 'bg-white border-slate-200'} border-t p-2 flex justify-around items-center z-30 pb-safe`}>
-        {[
-          { id: 'capture', icon: PenTool, label: 'Log' },
-          { id: 'graph', icon: Layers, label: 'Graph' },
-          { id: 'project', icon: LayoutTemplate, label: 'Board' },
-          { id: 'dashboard', icon: Activity, label: 'Dash' },
-          { id: 'list', icon: ListIcon, label: 'Foot' },
-          { id: 'settings', icon: Settings, label: 'Sys' }
-        ].map((tab: any) => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all w-14 ${activeTab === tab.id ? 'text-indigo-500 bg-indigo-500/10' : (activeTab === 'graph' ? 'text-slate-500 hover:text-slate-300' : 'text-slate-400 hover:text-slate-600')}`}>
-            <tab.icon size={20} className={activeTab === tab.id ? 'stroke-[2.5px]' : 'stroke-2'} />
-            <span className="text-[9px] font-bold">{tab.label}</span>
-          </button>
-        ))}
-      </nav>
+      {/* --- Shell Overlays --- */}
+      <CommandPalette
+        isOpen={isCmdOpen}
+        onClose={() => setIsCmdOpen(false)}
+        onNavigate={(tab) => { setActiveTab(tab as any); }}
+      />
+
+      <Dock activeTab={activeTab} onTabChange={(t) => setActiveTab(t as any)} />
 
     </div>
   );
