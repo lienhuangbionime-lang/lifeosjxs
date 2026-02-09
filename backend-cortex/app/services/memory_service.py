@@ -1,14 +1,15 @@
 import os
 import logging
 from typing import List, Dict, Any, Optional
-from langchain_openai import OpenAIEmbeddings
+import textwrap
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from supabase.client import Client, create_client
 
 # Init Logger
 logger = logging.getLogger("cortex.memory")
 
-# Using text-embedding-3-small as requested
-embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
+# Using Google Gemini Embedding 004 (768 dimensions)
+embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
 
 class MemoryService:
     def __init__(self):
@@ -29,7 +30,9 @@ class MemoryService:
         """
         Embed content and save to 'documents' table via direct insert.
         """
-        if not self.client:
+        # Strict Client Check
+        client = self.client
+        if client is None:
             logger.error("MemoryService: Client not ready.")
             return False
 
@@ -45,14 +48,13 @@ class MemoryService:
             }
 
             # 3. Insert
-            # Explicit non-None check for linter
-            if self.client:
-                self.client.table("documents").insert(payload).execute()
-                # Simplify logging to avoid slice type error
-                preview = content if len(content) < 30 else content[:30]
-                logger.info(f"Memory saved: {preview}...")
-                return True
-            return False
+            client.table("documents").insert(payload).execute()
+            
+            # Safe Logging
+            import textwrap
+            log_preview = textwrap.shorten(content, width=30, placeholder="...")
+            logger.info(f"Memory saved: {log_preview}")
+            return True
         except Exception as e:
             logger.error(f"MemoryService: Info save failed: {e}")
             return False
@@ -61,7 +63,8 @@ class MemoryService:
         """
         Embed query and call RPC 'match_documents'
         """
-        if not self.client:
+        client = self.client
+        if client is None:
             return []
 
         try:
@@ -69,7 +72,7 @@ class MemoryService:
             vector = embeddings.embed_query(query)
 
             # 2. RPC Call
-            response = self.client.rpc(
+            response = client.rpc(
                 'match_documents',
                 {
                     'query_embedding': vector,

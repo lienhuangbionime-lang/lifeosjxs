@@ -9,7 +9,7 @@ python-dotenv
 apscheduler
 requests
 langchain
-langchain-openai
+langchain-google-genai
 langchain-community
 pypdf
 python-multipart

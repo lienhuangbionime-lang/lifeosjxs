@@ -1,5 +1,5 @@
-// 檔案位置: lib/ai/core.ts
 import { BookOpen, Activity, Zap, Brain, Star, TrendingUp, Target, Heart, Rocket, Terminal, Moon } from 'lucide-react';
+import type { SimulationNodeDatum } from 'd3';
 
 // --- Type Definitions ---
 export interface LogEntry {
@@ -24,11 +24,16 @@ export interface Task {
     status: 'pending' | 'completed';
 }
 
-export interface GraphNode {
+export interface GraphNode extends SimulationNodeDatum {
     id: string;
     group: number | string; // 1=Log, 2=Tag or 'tag'
     val?: number; // for D3
     raw?: LogEntry; // Link back to source
+    // D3 Simulation Props (optional but needed for TS)
+    x?: number;
+    y?: number;
+    fx?: number | null;
+    fy?: number | null;
 }
 
 export interface GraphLink {
