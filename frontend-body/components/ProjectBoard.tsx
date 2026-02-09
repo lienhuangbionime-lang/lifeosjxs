@@ -144,7 +144,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
     };
 
     return (
-        <div className="h-full overflow-y-auto pb-32 px-4 pt-6 custom-scrollbar animate-fade-in bg-slate-50/50 relative">
+        <div className="h-full overflow-y-auto pb-32 px-4 pt-6 custom-scrollbar animate-fade-in bg-[#0f0f0f] bg-grid-white/[0.02] relative">
             {/* ... (keep existing toast and merge mode overlay) ... */}
             {toast && (
                 <div className={`fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-50 animate-fade-in-up font-bold text-sm ${toast.type === 'success' ? 'bg-slate-800 text-white' : 'bg-red-500 text-white'}`}>
@@ -157,7 +157,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
             {/* Header */}
             <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h2 className="text-3xl font-black text-slate-800 flex items-center gap-3 tracking-tight">
+                    <h2 className="text-3xl font-black text-gray-200 flex items-center gap-3 tracking-tight">
                         <span className="text-4xl">🚀</span> Projects
                         <button
                             onClick={onCreateProject}
@@ -167,7 +167,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
                             <Plus size={20} />
                         </button>
                     </h2>
-                    <p className="text-slate-500 text-sm mt-1 font-medium">Ship your life & work.</p>
+                    <p className="text-gray-400 text-sm mt-1 font-medium">Ship your life & work.</p>
                 </div>
 
                 {/* Filters & Actions */}
