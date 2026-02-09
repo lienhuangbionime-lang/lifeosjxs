@@ -19,7 +19,7 @@ export const HistoryView = ({ logs = [], onSelectEntry }: HistoryViewProps) => {
 
   const getPreviewText = (text: string) => {
     if (!text) return '無詳細內容';
-    return CoreEngine.extractInsight(text).text;
+    return CoreEngine.extractInsight(text);
   };
 
   return (
@@ -29,7 +29,9 @@ export const HistoryView = ({ logs = [], onSelectEntry }: HistoryViewProps) => {
       </div>
       {historyLogs.map((log) => {
         const insight = CoreEngine.extractInsight(log.note);
-        const isDrift = insight.type === 'drift';
+        // Current CoreEngine returns string, so no 'type' property. 
+        // We can check if it contains "Alert" or similar if we really want, but for now disable drift.
+        const isDrift = false;
         const m = log.metrics?.mood ?? 5;
         const moodColor = m >= 8 ? 'bg-emerald-400' : m <= 3 ? 'bg-red-400' : 'bg-indigo-400';
 
@@ -81,7 +83,7 @@ export const HistoryView = ({ logs = [], onSelectEntry }: HistoryViewProps) => {
               {isDrift && (
                 <div className="p-2 bg-slate-900 text-white rounded-lg text-xs font-mono flex items-center gap-2 shadow-sm w-fit">
                   <AlertTriangle size={12} className="text-amber-400" />
-                  <span className="truncate max-w-[200px]">{insight.text}</span>
+                  <span className="truncate max-w-[200px]">{insight}</span>
                 </div>
               )}
               {activeHabits.length > 0 && (
