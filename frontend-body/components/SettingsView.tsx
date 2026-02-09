@@ -1,98 +1,182 @@
-// 檔案: frontend-body/components/SettingsView.tsx
+'use client';
 import React, { useState } from 'react';
-import { UploadCloud, CheckCircle, AlertTriangle, FileUp } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Trash2, Plus, RotateCcw, Save, Settings, CheckSquare, MessageSquare, Shield } from 'lucide-react';
+import { useSettings } from '@/lib/hooks/useSettings';
+import { SettingsModal } from './SettingsModal';
 
-// [V3 Fix] 定義這個元件能接收什麼資料
 interface SettingsProps {
   logs: any[];
   onImport: (logs: any[]) => void;
 }
 
 export const SettingsView = ({ logs, onImport }: SettingsProps) => {
-  const [status, setStatus] = useState("idle"); 
+  const { prompts, habits, apiKeys, addPrompt, removePrompt, addHabit, removeHabit, setApiKey, resetDefaults } = useSettings();
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // --- 功能 A: 舊記憶遷移 ---
-  const migrateToCloud = async () => {
-    const localData = localStorage.getItem('life_os_logs_v8_0');
-    if (!localData) return alert("瀏覽器中沒有舊資料可遷移");
-    
-    const localLogs = JSON.parse(localData);
-    if (!confirm(`準備將 ${localLogs.length} 筆本地日記上傳至雲端大腦？`)) return;
+  // Local state for inputs
+  const [newPrompt, setNewPrompt] = useState('');
+  const [newHabit, setNewHabit] = useState('');
 
-    setStatus("uploading");
+  // Helper (Legacy inline input - consider removing if fully moving to modal, but keeping for now)
+  const APIInput = ({ label, skey, placeholder }: { label: string, skey: string, placeholder: string }) => (
+    <div className="space-y-1">
+      <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">{label}</label>
+      <div className="relative">
+        <input
+          type="password"
+          value={apiKeys[skey] || ''}
+          onChange={(e) => setApiKey(skey, e.target.value)}
+          placeholder={placeholder}
+          className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-1 focus:ring-pink-500/50 outline-none font-mono tracking-tighter"
+        />
+        <div className="absolute right-3 top-2.5 text-slate-600 pointer-events-none">
+          <Save size={14} className={apiKeys[skey] ? "text-emerald-500" : ""} />
+        </div>
+      </div>
+    </div>
+  );
 
-    try {
-      let successCount = 0;
-      for (const log of localLogs) {
-        // 呼叫後端 API
-        const res = await fetch('/api/py/api/v1/ingest', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: log.note || log.markdown_body || "Old Entry",
-            date: log.date
-          }),
-        });
+  // Handlers
+  const handleAddPrompt = () => {
+    if (newPrompt.trim()) {
+      addPrompt(newPrompt.trim());
+      setNewPrompt('');
+    }
+  };
 
-        if (res.ok) successCount++;
-        console.log(`Uploading ${log.date}: ${res.status}`);
-      }
-      
-      alert(`遷移成功！共上傳 ${successCount} 筆回憶。`);
-      setStatus("done");
-
-    } catch (e) {
-      console.error(e);
-      alert("遷移過程中發生錯誤，請檢查 Console");
-      setStatus("idle");
+  const handleAddHabit = () => {
+    if (newHabit.trim()) {
+      addHabit(newHabit.trim());
+      setNewHabit('');
     }
   };
 
   return (
-    <div className="p-6 text-slate-300 space-y-8">
-      
-      {/* 區塊 1: 記憶遷移 */}
-      <section>
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <UploadCloud className="text-indigo-400"/> 
-          記憶同步中心
-        </h2>
-        
-        <div className="bg-slate-800 p-6 rounded-xl border border-slate-700">
-          <p className="mb-4 text-sm text-slate-400">
-            目前系統共有 <span className="text-white font-bold">{logs.length}</span> 筆記憶正在運作。
-            <br/>
-            若您剛從 V2 升級，請點擊下方按鈕將瀏覽器快取寫入雲端資料庫。
-          </p>
-          
-          <button 
-            onClick={migrateToCloud}
-            disabled={status === 'uploading'}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold flex items-center gap-2 disabled:opacity-50 transition-colors"
+    <div className="p-6 pb-24 space-y-8 animate-fade-in text-slate-300">
+      <SettingsModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+
+      {/* Header */}
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-black text-white flex items-center gap-3">
+            <Settings className="text-indigo-400 animate-spin-slow" /> System Settings
+          </h2>
+          <p className="text-slate-500 text-sm mt-1">Configure your Neural Operating System.</p>
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 text-xs font-bold transition-colors border border-indigo-500/20"
           >
-            {status === 'uploading' ? (
-              <>⏳ 正在上傳中...</>
-            ) : status === 'done' ? (
-              <><CheckCircle size={18}/> 遷移完成</>
-            ) : (
-              <><UploadCloud size={18}/> 開始上傳至雲端</>
-            )}
+            <Shield size={12} /> System Core
+          </button>
+          <button
+            onClick={() => { if (confirm('Reset to defaults?')) resetDefaults(); }}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-bold transition-colors"
+          >
+            <RotateCcw size={12} /> Reset System
           </button>
         </div>
-      </section>
+      </div>
 
-      {/* 區塊 2: 系統資訊 */}
-      <section>
-        <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-          <AlertTriangle className="text-amber-400"/> 
-          系統狀態
-        </h2>
-        <div className="bg-slate-900 p-4 rounded-xl border border-slate-800 text-xs font-mono text-slate-500">
-          <div>VERSION: LifeOS v3.1 (Autopoiesis)</div>
-          <div>ENV: {process.env.NODE_ENV === 'development' ? 'Localhost' : 'Production'}</div>
-          <div>BRAIN: Connected</div>
-        </div>
-      </section>
+      {/* ... Prompts and Habits ... */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+
+        {/* 1. Daily Prompts */}
+        <section className="bg-neutral-800/50 backdrop-blur-md rounded-3xl p-6 border border-white/5 shadow-xl">
+          {/* ... existing code ... */}
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <MessageSquare className="text-emerald-400" size={20} /> Daily Prompts
+          </h3>
+          <div className="space-y-3 mb-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+            <AnimatePresence>
+              {prompts.map((p, idx) => (
+                <motion.div
+                  key={`${p}-${idx}`}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  className="group flex justify-between items-center bg-neutral-900/80 p-3 rounded-xl border border-white/5 hover:border-emerald-500/30 transition-colors"
+                >
+                  <span className="text-sm text-slate-300 font-medium">{p}</span>
+                  <button
+                    onClick={() => removePrompt(idx)}
+                    className="text-slate-600 hover:text-red-400 p-1.5 rounded-lg hover:bg-white/5 transition-colors opacity-0 group-hover:opacity-100"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+          <div className="flex gap-2 relative">
+            <input
+              value={newPrompt}
+              onChange={e => setNewPrompt(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAddPrompt()}
+              placeholder="Add a new reflection question..."
+              className="flex-1 bg-neutral-900 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-2 focus:ring-emerald-500/50 outline-none placeholder:text-slate-600"
+            />
+            <button onClick={handleAddPrompt} className="bg-emerald-500 hover:bg-emerald-400 text-emerald-950 p-2.5 rounded-xl transition-colors font-bold"><Plus size={18} /></button>
+          </div>
+        </section>
+
+        {/* 2. Habit Tracker */}
+        <section className="bg-neutral-800/50 backdrop-blur-md rounded-3xl p-6 border border-white/5 shadow-xl">
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <CheckSquare className="text-indigo-400" size={20} /> Habit Tracker
+          </h3>
+          <div className="space-y-3 mb-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+            <AnimatePresence>
+              {habits.map((h, idx) => (
+                <motion.div
+                  key={`${h.id}-${idx}`}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                  className="group flex justify-between items-center bg-neutral-900/80 p-3 rounded-xl border border-white/5 hover:border-indigo-500/30 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-500/20 flex items-center justify-center text-indigo-400 font-bold text-xs">
+                      {h.label.slice(0, 1)}
+                    </div>
+                    <span className="text-sm text-slate-300 font-bold">{h.label}</span>
+                  </div>
+                  <button onClick={() => removeHabit(idx)} className="text-slate-600 hover:text-red-400 p-1.5 rounded-lg hover:bg-white/5 transition-colors opacity-0 group-hover:opacity-100"><Trash2 size={14} /></button>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+          <div className="flex gap-2 relative">
+            <input
+              value={newHabit}
+              onChange={e => setNewHabit(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAddHabit()}
+              placeholder="Add a new habit..."
+              className="flex-1 bg-neutral-900 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white focus:ring-2 focus:ring-indigo-500/50 outline-none placeholder:text-slate-600"
+            />
+            <button onClick={handleAddHabit} className="bg-indigo-500 hover:bg-indigo-400 text-white p-2.5 rounded-xl transition-colors font-bold"><Plus size={18} /></button>
+          </div>
+        </section>
+
+        {/* 3. API Connections (Full Width) */}
+        <section className="lg:col-span-2 bg-neutral-800/50 backdrop-blur-md rounded-3xl p-6 border border-white/5 shadow-xl">
+          <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+            <Settings className="text-pink-500" size={20} /> API Connections
+          </h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <APIInput label="OpenAI API Key" skey="openai" placeholder="sk-..." />
+            <APIInput label="Supabase URL" skey="supabase_url" placeholder="https://..." />
+            <APIInput label="Supabase Key" skey="supabase_key" placeholder="eyJ..." />
+            <APIInput label="Anthropic API Key" skey="anthropic" placeholder="sk-ant-..." />
+          </div>
+        </section>
+      </div>
+
+      <div className="flex items-center justify-center pt-8 opacity-50">
+        <span className="text-[10px] font-mono tracking-widest text-slate-600">SYSTEM CONFIGURATION V3.1 // PERSISTENCE ACTIVE</span>
+      </div>
     </div>
   );
 };

@@ -186,18 +186,65 @@ export default function Home() {
       </header>
 
       {/* --- Main Content --- */}
-      <main className="flex-1 overflow-y-auto p-0 relative z-10 custom-scrollbar">
-        {activeTab === 'capture' && <CaptureView onSave={handleSaveLog} />}
-        {activeTab === 'graph' && (
-          <div className="h-full flex flex-col p-4">
-            <h3 className="text-white text-sm font-bold mb-2 flex items-center gap-2"><Activity size={16} className="text-emerald-400" /> Infinite Graph</h3>
-            <NeuralGraph logs={logs} onNodeClick={setContextNode} />
-          </div>
-        )}
-        {activeTab === 'dashboard' && <Dashboard logs={logs} ccaData={ccaData} onUpdateCCA={handleUpdateCCA} />}
-        {activeTab === 'project' && <ProjectBoard logs={logs} onUpdateLogs={handleUpdateLogs} />}
-        {activeTab === 'list' && <HistoryView logs={logs} onSelectEntry={setSelectedEntry} />}
-        {activeTab === 'settings' && <SettingsView logs={logs} onImport={(l: any) => setLogs(prev => [...prev, ...l])} />}
+      <main className="flex-1 overflow-y-auto p-0 relative z-10 custom-scrollbar bg-[#f8fafc]">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
+            animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+            exit={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
+            transition={{ duration: 0.25, ease: "easeOut" }}
+            className="h-full"
+          >
+            {activeTab === 'capture' && <CaptureView onSave={handleSaveLog} />}
+
+            {/* Command Center (Integrated Dashboard) */}
+            {activeTab === 'dashboard' && (
+              <div className="h-full flex flex-col p-4 gap-4 overflow-y-auto">
+                {/* Top: Quick Capture */}
+                <div className="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden shrink-0">
+                  <div className="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                    <span className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                      <PenTool size={12} /> Quick Ingest
+                    </span>
+                  </div>
+                  <div className="p-0">
+                    {/* Compact Capture View Mode? passing props? For now just render it. */}
+                    <CaptureView onSave={handleSaveLog} />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-[500px]">
+                  {/* Left: Charts & Analysis */}
+                  <div className="flex flex-col gap-4">
+                    <Dashboard logs={logs} ccaData={ccaData} onUpdateCCA={handleUpdateCCA} />
+                  </div>
+
+                  {/* Right: Neural Graph */}
+                  <div className="bg-[#0a0a0a] rounded-3xl shadow-lg border border-slate-800 overflow-hidden flex flex-col relative">
+                    <div className="absolute top-4 left-4 z-10">
+                      <span className="text-xs font-bold text-emerald-400 bg-slate-900/80 px-2 py-1 rounded-full border border-emerald-500/30">Live Graph</span>
+                    </div>
+                    <div className="flex-1">
+                      <NeuralGraph logs={logs} onNodeClick={setContextNode} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === 'graph' && (
+              <div className="h-full flex flex-col p-4 bg-[#0f172a]">
+                {/* Full Screen Graph */}
+                <NeuralGraph logs={logs} onNodeClick={setContextNode} />
+              </div>
+            )}
+
+            {activeTab === 'project' && <ProjectBoard />}
+            {activeTab === 'list' && <HistoryView logs={logs} onSelectEntry={setSelectedEntry} />}
+            {activeTab === 'settings' && <SettingsView logs={logs} onImport={(l: any) => setLogs(prev => [...prev, ...l])} />}
+          </motion.div>
+        </AnimatePresence>
       </main>
 
       {/* --- Bottom Nav --- */}

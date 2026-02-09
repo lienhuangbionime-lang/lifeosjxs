@@ -2,79 +2,24 @@
 
 import React, { memo, useRef, useState, useMemo, useEffect } from 'react';
 import * as d3 from 'd3';
-import { Activity } from 'lucide-react';
-import { CoreEngine, NEON_PALETTE } from '@/lib/ai/core';
+import { Activity, Share2, Maximize2 } from 'lucide-react';
+import { CoreEngine, NEON_PALETTE, LogEntry, GraphNode, GraphLink } from '@/lib/ai/core';
 
 interface NeuralGraphProps {
-    logs: any[];
-    onNodeClick: (node: any) => void;
+    logs: LogEntry[];
+    onNodeClick?: (node: any) => void;
 }
 
-// [GRAPH v10.2.2] HIGH DENSITY NEON ENGINE - VISUAL STABILITY FIX
+// [GRAPH v3.2] Force Directed Graph with Enhanced Neon Palette & Physics
 export const NeuralGraph = memo(({ logs, onNodeClick }: NeuralGraphProps) => {
     const svgRef = useRef<SVGSVGElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [stats, setStats] = useState({ nodes: 0, links: 0 });
 
+    // Data Processing via Core Engine
     const graphData = useMemo(() => {
         if (!logs || logs.length === 0) return { nodes: [], links: [] };
-
-        const nodesMap = new Map();
-        const links: any[] = [];
-
-        logs.forEach(log => {
-            const id = log.date;
-            const seeds = CoreEngine.parseGraphSeeds(log.note, log.graphSeeds?.content);
-            const tags = seeds.tags;
-            const explicitLinks = seeds.links;
-
-            if (!nodesMap.has(id)) {
-                const mood = log.metrics?.mood || 5;
-                const isSignal = log.isSignal;
-                let color = NEON_PALETTE.INDIGO;
-                if (isSignal) color = NEON_PALETTE.BLUE;
-                else if (mood > 7) color = NEON_PALETTE.EMERALD;
-                else if (mood < 4) color = NEON_PALETTE.ROSE;
-
-                nodesMap.set(id, {
-                    id,
-                    group: 'date',
-                    val: isSignal ? 16 : (8 + (log.metrics.focus * 0.5)),
-                    label: id.slice(5),
-                    color: color,
-                    raw: log,
-                    isSignal: isSignal
-                });
-            }
-
-            tags.forEach((tag: string) => {
-                if (!nodesMap.has(tag)) {
-                    nodesMap.set(tag, {
-                        id: tag,
-                        group: 'tag',
-                        val: 10,
-                        label: tag,
-                        color: NEON_PALETTE.PINK
-                    });
-                }
-                links.push({ source: id, target: tag, type: 'tag' });
-            });
-
-            explicitLinks.forEach((targetDate: string) => {
-                if (!nodesMap.has(targetDate)) {
-                    nodesMap.set(targetDate, {
-                        id: targetDate,
-                        group: 'stub',
-                        val: 5,
-                        label: targetDate.slice(5),
-                        color: NEON_PALETTE.SLATE
-                    });
-                }
-                links.push({ source: id, target: targetDate, type: 'manual' });
-            });
-        });
-
-        return { nodes: Array.from(nodesMap.values()), links };
+        return CoreEngine.parseGraphSeeds(logs);
     }, [logs]);
 
     useEffect(() => {
@@ -86,100 +31,136 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: NeuralGraphProps) => {
         setStats({ nodes: graphData.nodes.length, links: graphData.links.length });
 
         const svg = d3.select(svgRef.current);
-        svg.selectAll("*").remove();
+        svg.selectAll("*").remove(); // Clear previous render
 
         const g = svg.append("g");
+
+        // Zoom functionality
+        const zoom = d3.zoom<SVGSVGElement, unknown>()
+            .scaleExtent([0.1, 5])
+            .on("zoom", (event) => g.attr("transform", event.transform));
+        svg.call(zoom);
+
+        // Layers
         const linkLayer = g.append("g").attr("class", "links");
         const nodeLayer = g.append("g").attr("class", "nodes");
         const textLayer = g.append("g").attr("class", "labels");
 
-        const zoom = d3.zoom()
-            .scaleExtent([0.1, 5])
-            .on("zoom", (e: any) => g.attr("transform", e.transform));
-        svg.call(zoom as any);
-
-        const simulation = d3.forceSimulation(graphData.nodes as any)
-            .force("link", d3.forceLink(graphData.links).id((d: any) => d.id).distance(60))
-            .force("charge", d3.forceManyBody().strength(-120))
+        // Simulation Setup
+        const simulation = d3.forceSimulation<GraphNode>(graphData.nodes)
+            .force("link", d3.forceLink<GraphNode, GraphLink>(graphData.links).id(d => d.id).distance(80))
+            .force("charge", d3.forceManyBody().strength(-200))
             .force("center", d3.forceCenter(width / 2, height / 2).strength(0.08))
-            .force("collide", d3.forceCollide().radius((d: any) => d.val + 2).iterations(3));
+            .force("collide", d3.forceCollide().radius((d: any) => (d.val || 5) + 8).iterations(2));
 
+        // Glow Filter Definition
         const defs = svg.append("defs");
-        const filter = defs.append("filter").attr("id", "glow");
+        const filter = defs.append("filter").attr("id", "neon-glow");
         filter.append("feGaussianBlur").attr("stdDeviation", "2.5").attr("result", "coloredBlur");
         const feMerge = filter.append("feMerge");
         feMerge.append("feMergeNode").attr("in", "coloredBlur");
         feMerge.append("feMergeNode").attr("in", "SourceGraphic");
 
+        // Draw Links
         const link = linkLayer
             .selectAll("line")
             .data(graphData.links)
             .join("line")
-            .attr("stroke", "#cbd5e1")
-            .attr("stroke-opacity", 0.6)
-            .attr("stroke-width", (d: any) => d.type === 'manual' ? 1.5 : 0.8)
-            .attr("stroke-dasharray", (d: any) => d.type === 'tag' ? "2,2" : "0");
+            .attr("stroke", NEON_PALETTE.SLATE)
+            .attr("stroke-opacity", 0.3)
+            .attr("stroke-width", (d: any) => Math.sqrt(d.value || 1));
 
-        // Drag functions need to be defined inside or accessible
-        const dragstarted = (e: any, d: any) => {
-            if (!e.active) simulation.alphaTarget(0.3).restart();
-            d.fx = d.x;
-            d.fy = d.y;
-        };
-        const dragged = (e: any, d: any) => {
-            d.fx = e.x;
-            d.fy = e.y;
-        };
-        const dragended = (e: any, d: any) => {
-            if (!e.active) simulation.alphaTarget(0);
-            d.fx = null;
-            d.fy = null;
-        };
-
+        // Draw Nodes
         const node = nodeLayer
             .selectAll("g")
             .data(graphData.nodes)
-            .join("g")
-            .call(d3.drag()
-                .on("start", dragstarted)
-                .on("drag", dragged)
-                .on("end", dragended) as any);
+            .join("circle")
+            .attr("r", (d: any) => (d.val || 5) * 1.5)
+            .attr("fill", (d: any) => {
+                // [Visual Update] Cyberpunk Color Mapping
+                // Log -> Cyan (Standard), Lime (High Mood), Pink (Alert)
+                // Tag -> Violet
 
-        node.append("circle")
-            .filter((d: any) => d.isSignal)
-            .attr("r", (d: any) => d.val + 6)
-            .attr("fill", (d: any) => d.color)
-            .attr("opacity", 0.4)
-            .style("filter", "url(#glow)");
+                if (d.group === 1 || d.group === 'log') {
+                    const mood = (d.raw as any)?.metrics?.mood || 5;
+                    if (mood >= 8) return NEON_PALETTE.NEON_LIME;
+                    if (mood <= 3) return NEON_PALETTE.NEON_PINK; // or Red
+                    return NEON_PALETTE.NEON_CYAN;
+                }
 
-        node.append("circle")
-            .attr("r", (d: any) => d.val)
-            .attr("fill", (d: any) => d.color)
-            .attr("stroke", "#0f172a")
-            .attr("stroke-width", 2)
-            .style("cursor", "pointer")
-            .on("click", (e, d: any) => {
-                e.stopPropagation();
-                // Construct a safe node object to pass back
-                const nodeData = d.raw ? { ...d.raw, group: d.group } : { id: d.id, label: d.label, group: d.group, tags: [], note: "Stub Node", graphSeeds: { tags: '', links: '', content: '' } };
-                onNodeClick(nodeData);
+                if (d.group === 2 || d.group === 'tag') {
+                    return NEON_PALETTE.NEON_VIOLET;
+                }
+
+                return NEON_PALETTE.primary; // Fallback
             })
-            .on("mouseover", function () { d3.select(this).transition().duration(200).attr("stroke", "#fff").attr("stroke-width", 3); })
-            .on("mouseout", function () { d3.select(this).transition().duration(200).attr("stroke", "#0f172a").attr("stroke-width", 2); });
+            .attr("stroke", "#0a0a0a")
+            .attr("stroke-width", 2)
+            .style("cursor", "grab")
+            .style("filter", "url(#neon-glow)") // Apply Glow
+            .call(d3.drag<any, any>()
+                .on("start", (event, d) => {
+                    if (!event.active) simulation.alphaTarget(0.3).restart();
+                    d.fx = d.x;
+                    d.fy = d.y;
+                    d3.select(event.sourceEvent.target).style("cursor", "grabbing");
+                })
+                .on("drag", (event, d) => {
+                    d.fx = event.x;
+                    d.fy = event.y;
+                })
+                .on("end", (event, d) => {
+                    if (!event.active) simulation.alphaTarget(0);
+                    d.fx = null;
+                    d.fy = null;
+                    d3.select(event.sourceEvent.target).style("cursor", "grab");
+                }));
 
+        // Tooltip interaction
+        const tooltip = d3.select("body").append("div")
+            .attr("class", "absolute z-50 px-3 py-2 text-xs font-mono bg-black/90 border border-white/20 text-white rounded-xl shadow-2xl pointer-events-none opacity-0 backdrop-blur-md");
+
+        node.on("mouseover", function (event, d: any) {
+            d3.select(this)
+                .transition().duration(200)
+                .attr("r", (d.val || 5) * 2)
+                .attr("stroke", "#fff");
+
+            tooltip.transition().duration(200).style("opacity", 1);
+            tooltip.html(`
+                <div class="font-bold text-[#00ff9d]">${d.id}</div>
+                <div class="text-slate-400 text-[10px]">${d.group === 1 ? 'LOG ENTRY' : 'TAG NODE'}</div>
+            `)
+                .style("left", (event.pageX + 15) + "px")
+                .style("top", (event.pageY - 28) + "px");
+        })
+            .on("mouseout", function (event, d: any) {
+                d3.select(this)
+                    .transition().duration(200)
+                    .attr("r", (d.val || 5) * 1.5)
+                    .attr("stroke", "#0a0a0a");
+                tooltip.transition().duration(500).style("opacity", 0);
+            })
+            .on("click", (event, d) => {
+                if (onNodeClick) onNodeClick(d);
+            });
+
+        // Labels (Only for larger nodes or tags to avoid clutter)
         const label = textLayer
             .selectAll("text")
-            .data(graphData.nodes)
+            .data(graphData.nodes.filter(n => (n.val || 0) > 3 || n.group === 'tag'))
             .join("text")
-            .attr("dy", (d: any) => d.val + 12)
+            .attr("dy", (d: any) => (d.val || 5) * 1.5 + 12)
             .attr("text-anchor", "middle")
-            .text((d: any) => d.label.length > 8 ? d.label.slice(0, 6) + '..' : d.label)
-            .attr("fill", "#94a3b8")
-            .attr("font-size", "9px")
+            .text((d: any) => d.id.length > 12 ? d.id.slice(0, 10) + '..' : d.id)
+            .attr("fill", (d: any) => d.group === 'tag' ? NEON_PALETTE.NEON_VIOLET : "#94a3b8")
+            .attr("font-size", "10px")
             .attr("font-family", "monospace")
+            .attr("font-weight", "bold")
             .style("pointer-events", "none")
-            .style("text-shadow", "0 2px 4px rgba(0,0,0,1)");
+            .style("text-shadow", "0 0 5px rgba(0,0,0,0.8)");
 
+        // Simulation Tick
         simulation.on("tick", () => {
             link
                 .attr("x1", (d: any) => d.source.x)
@@ -187,24 +168,39 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: NeuralGraphProps) => {
                 .attr("x2", (d: any) => d.target.x)
                 .attr("y2", (d: any) => d.target.y);
 
-            node.attr("transform", (d: any) => `translate(${d.x},${d.y})`);
-            label.attr("x", (d: any) => d.x).attr("y", (d: any) => d.y);
+            node
+                .attr("cx", (d: any) => d.x)
+                .attr("cy", (d: any) => d.y);
+
+            label
+                .attr("x", (d: any) => d.x)
+                .attr("y", (d: any) => d.y);
         });
 
-        return () => simulation.stop();
+        return () => {
+            simulation.stop();
+            tooltip.remove();
+        };
 
     }, [graphData, onNodeClick]);
 
     return (
-        <div ref={containerRef} className="w-full h-[500px] bg-slate-900 rounded-3xl overflow-hidden relative border border-slate-800 shadow-2xl">
+        <div ref={containerRef} className="w-full h-[500px] bg-[#050505] rounded-3xl overflow-hidden relative border border-slate-800 shadow-2xl group">
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-1 pointer-events-none select-none">
-                <div className="bg-slate-900/80 px-3 py-1 rounded-full text-xs text-emerald-400 font-mono flex items-center gap-2 border border-emerald-500/30 backdrop-blur">
-                    <Activity size={12} /> Neon D3 Engine: STABLE
+                <div className="bg-black/40 px-3 py-1 rounded-full text-xs text-[#00ffff] font-mono flex items-center gap-2 border border-[#00ffff]/20 backdrop-blur shadow-[0_0_15px_rgba(0,255,255,0.1)]">
+                    <Activity size={12} className="animate-pulse" /> NEURAL MAP v3.2
                 </div>
-                <div className="text-[10px] text-slate-500 font-mono ml-2">
-                    Nodes: {stats.nodes} | Links: {stats.links}
+                <div className="text-[10px] text-slate-500 font-mono ml-2 flex gap-3">
+                    <span>Nodes: {stats.nodes}</span>
+                    <span>Links: {stats.links}</span>
                 </div>
             </div>
+
+            {/* Interactive Hints */}
+            <div className="absolute bottom-4 right-4 z-10 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-slate-600 font-mono text-right pointer-events-none">
+                SCROLL TO ZOOM<br />DRAG TO MOVE
+            </div>
+
             <svg ref={svgRef} className="w-full h-full cursor-move"></svg>
         </div>
     );

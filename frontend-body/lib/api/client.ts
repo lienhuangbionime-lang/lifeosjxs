@@ -146,5 +146,26 @@ export const cortex = {
       method: "POST",
       body: JSON.stringify({ date, text }),
     });
+  },
+
+  // 5. 專案管理 (Project Management)
+  async updateProject(id: number | string, data: any): Promise<any> {
+    return await fetchProxy(`/api/v1/projects/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  },
+
+  async deleteProject(id: number | string): Promise<any> {
+    return await fetchProxy(`/api/v1/projects/${id}`, {
+      method: "DELETE",
+    });
+  },
+
+  async mergeProject(sourceId: number | string, targetId: number | string): Promise<any> {
+    return await fetchProxy(`/api/v1/projects/${sourceId}/merge`, {
+      method: "POST",
+      body: JSON.stringify({ target_id: targetId }),
+    });
   }
 };
