@@ -166,10 +166,9 @@ export const SettingsView = ({ logs, onImport }: SettingsProps) => {
             <Settings className="text-pink-500" size={20} /> API Connections
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <APIInput label="OpenAI API Key" skey="openai" placeholder="sk-..." />
+            <APIInput label="Google Gemini API Key" skey="google_api_key" placeholder="AIza..." />
             <APIInput label="Supabase URL" skey="supabase_url" placeholder="https://..." />
             <APIInput label="Supabase Key" skey="supabase_key" placeholder="eyJ..." />
-            <APIInput label="Anthropic API Key" skey="anthropic" placeholder="sk-ant-..." />
           </div>
         </section>
       </div>

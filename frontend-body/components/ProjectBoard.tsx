@@ -144,7 +144,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
     };
 
     return (
-        <div className="h-full overflow-y-auto pb-32 px-4 pt-6 custom-scrollbar animate-fade-in bg-[#0f0f0f] bg-grid-white/[0.02] relative">
+        <div className="w-full min-h-screen p-8 overflow-y-auto custom-scrollbar animate-fade-in bg-[#0f0f0f] bg-grid-white/[0.02] relative">
             {/* ... (keep existing toast and merge mode overlay) ... */}
             {toast && (
                 <div className={`fixed top-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full shadow-2xl z-50 animate-fade-in-up font-bold text-sm ${toast.type === 'success' ? 'bg-slate-800 text-white' : 'bg-red-500 text-white'}`}>
@@ -157,32 +157,41 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
             {/* Header */}
             <div className="mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4">
                 <div>
-                    <h2 className="text-3xl font-black text-gray-200 flex items-center gap-3 tracking-tight">
-                        <span className="text-4xl">🚀</span> Projects
+                    <h2 className="text-4xl font-black tracking-tighter flex items-center gap-3">
+                        <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
+                            LifeOS v3.2
+                        </span>
                         <button
                             onClick={onCreateProject}
-                            className="ml-2 p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full transition-all shadow-lg hover:shadow-indigo-500/30 active:scale-95"
+                            className="ml-2 p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full transition-all shadow-lg hover:shadow-indigo-500/50 active:scale-95 ring-2 ring-indigo-500/30"
                             title="New Project"
                         >
                             <Plus size={20} />
                         </button>
                     </h2>
-                    <p className="text-gray-400 text-sm mt-1 font-medium">Ship your life & work.</p>
+                    <p className="text-gray-400 text-sm mt-2 font-medium tracking-wide">
+                        Ship your life & work • <span className="text-indigo-400">Cyberpunk Edition</span>
+                    </p>
                 </div>
 
                 {/* Filters & Actions */}
                 <div className="flex items-center gap-3">
                     {/* Visual Help for DnD */}
-                    <span className="text-[10px] text-slate-400 font-medium hidden sm:block mr-2">
-                        💡 Drag cards to merge • Double-click title to rename
+                    <span className="text-[10px] text-gray-500 font-medium hidden sm:block mr-2 uppercase tracking-wider">
+                        Drag to Merge
                     </span>
 
-                    <div className="flex bg-white p-1.5 rounded-2xl shadow-sm border border-slate-200">
+                    <div className="flex gap-2 bg-black/40 p-1.5 rounded-full border border-white/5 backdrop-blur-md">
                         {['active', 'idea', 'archived', 'all'].map(t => (
                             <button
                                 key={t}
                                 onClick={() => setFilter(t as any)}
-                                className={`px-4 py-1.5 rounded-xl text-xs font-bold capitalize transition-all ${filter === t ? 'bg-slate-800 text-white shadow-md' : 'text-slate-400 hover:text-slate-600 hover:bg-slate-50'}`}
+                                className={`
+                                    px-4 py-1.5 rounded-full text-xs font-bold capitalize transition-all duration-300
+                                    ${filter === t
+                                        ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white shadow-[0_0_15px_rgba(124,58,237,0.5)] scale-105'
+                                        : 'text-gray-400 hover:text-white hover:bg-white/5'}
+                                `}
                             >
                                 {t}
                             </button>
@@ -192,7 +201,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
             </div>
 
             {/* Nomad List Style Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredProjects.map((proj) => (
                     <ProjectCard
                         key={proj.id}

@@ -5,23 +5,21 @@
 @tailwind utilities;
 
 :root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
+  --bg-dark: #0a0a0a;
+  --card-bg: #171717;
+  --foreground-rgb: 255, 255, 255;
+  --background-start-rgb: 15, 15, 15;
+  --background-end-rgb: 0, 0, 0;
 }
 
 body {
-  /* 確保背景色與 layout.tsx 一致 */
-  background-color: rgb(2, 6, 23); /* slate-950 */
-  color: rgb(241, 245, 249); /* slate-100 */
+  background-color: var(--bg-dark);
+  color: #e5e5e5;
+  /* 加入微弱的 Grid 背景圖紋 */
+  background-image: linear-gradient(to right, #202020 1px, transparent 1px),
+    linear-gradient(to bottom, #202020 1px, transparent 1px);
+  background-size: 40px 40px;
+  min-height: 100vh;
 }
 
 /* --- 自定義滾動條 (配合 CaptureView) --- */
@@ -36,12 +34,14 @@ body {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(71, 85, 105, 0.5); /* slate-600/50 */
+  background: rgba(71, 85, 105, 0.5);
+  /* slate-600/50 */
   border-radius: 8px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(99, 102, 241, 0.6); /* indigo-500/60 */
+  background: rgba(99, 102, 241, 0.6);
+  /* indigo-500/60 */
 }
 
 /* --- 動畫 (配合 Menu 彈出) --- */
@@ -50,6 +50,7 @@ body {
     opacity: 0;
     transform: scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: scale(1);
@@ -65,3 +66,28 @@ body {
   filter: drop-shadow(0 0 8px rgba(99, 102, 241, 0.5));
 }
 
+/* --- Neon Glow Effects --- */
+.neon-glow-blue {
+  box-shadow: 0 0 10px rgba(0, 243, 255, 0.5), 0 0 20px rgba(0, 243, 255, 0.3);
+}
+
+.neon-glow-purple {
+  box-shadow: 0 0 10px rgba(188, 19, 254, 0.5), 0 0 20px rgba(188, 19, 254, 0.3);
+}
+
+/* --- Grid Background Utility --- */
+.bg-grid-white\/\[0\.02\] {
+  background-image: linear-gradient(to right, rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* --- No Scrollbar Utility --- */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

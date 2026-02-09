@@ -71,10 +71,11 @@ export const ProjectCard = ({ project, isSelectionMode, isSelected, onSelect, on
 
     // Vibe Pill Logic
     const getVibePill = () => {
-        if (project.progress >= 80) return { label: '🔥 Hot', color: 'bg-orange-500/20 text-orange-300 border-orange-500/20' };
-        if (project.progress >= 50) return { label: '⚡ Active', color: 'bg-blue-500/20 text-blue-300 border-blue-500/20' };
-        if (project.status === 'idea') return { label: '💡 Idea', color: 'bg-purple-500/20 text-purple-300 border-purple-500/20' };
-        return { label: '🌱 Growing', color: 'bg-green-500/20 text-green-300 border-green-500/20' };
+        // Mock logic for "High Energy" based on progress, or random tag
+        if (project.progress >= 80) return { label: 'HIGH ENERGY', color: 'bg-orange-500/20 text-orange-300 border-orange-500/30' };
+        if (project.progress >= 50) return { label: 'ACTIVE FLOW', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' };
+        if (project.status === 'idea') return { label: 'CONCEPT', color: 'bg-purple-500/20 text-purple-300 border-purple-500/30' };
+        return { label: 'CHILL', color: 'bg-green-500/20 text-green-300 border-green-500/30' };
     };
 
     const vibe = getVibePill();
@@ -89,11 +90,11 @@ export const ProjectCard = ({ project, isSelectionMode, isSelected, onSelect, on
             onDrop={handleDropInternal}
             onClick={() => isSelectionMode && onSelect(project.id)}
             className={`
-                relative overflow-hidden rounded-xl border bg-gray-900/50 backdrop-blur-md 
+                relative overflow-hidden rounded-2xl border border-white/10 bg-gray-900/60 backdrop-blur-xl 
                 transition-all duration-300 group
-                ${isSelectionMode ? 'cursor-pointer' : 'hover:border-white/20'}
-                ${isSelected ? 'ring-4 ring-amber-400 border-amber-400 scale-95' : 'border-white/10'}
-                ${isTargeted ? 'ring-4 ring-indigo-500 border-indigo-500 shadow-[0_0_30px_rgba(99,102,241,0.6)] scale-[1.02]' : ''}
+                ${isSelectionMode ? 'cursor-pointer' : 'hover:border-white/20 hover:shadow-[0_0_20px_rgba(0,255,255,0.1)]'}
+                ${isSelected ? 'ring-2 ring-amber-400 border-amber-400 scale-95' : ''}
+                ${isTargeted ? 'ring-2 ring-indigo-500 border-indigo-500 shadow-[0_0_30px_rgba(99,102,241,0.6)] scale-[1.02]' : ''}
             `}
         >
             {/* Merge Indicators */}
@@ -113,24 +114,24 @@ export const ProjectCard = ({ project, isSelectionMode, isSelected, onSelect, on
                 </div>
             )}
 
-            {/* Cover Image with Gradient Overlay */}
+            {/* Header Image (Cover) */}
             <div className="h-32 relative shrink-0">
                 {project.meta?.cover_image ? (
                     <img src={project.meta.cover_image} className="w-full h-full object-cover" alt="" />
                 ) : (
-                    <div className="w-full h-full bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500" />
+                    <div className="w-full h-full bg-gradient-to-br from-gray-800 to-gray-900" />
                 )}
-                {/* Gradient Overlay for Text Clarity */}
-                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent" />
+                {/* Gradient Overlay */}
+                <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-gray-900/40 to-transparent" />
 
                 {/* Emoji - Floating on Cover */}
-                <div className="absolute bottom-3 left-4 text-4xl z-10 drop-shadow-2xl">
+                <div className="text-4xl absolute bottom-[-16px] left-4 drop-shadow-lg z-10">
                     {project.meta?.emoji || '📦'}
                 </div>
             </div>
 
-            {/* Title & Pills */}
-            <div className="p-4 space-y-3">
+            {/* Title */}
+            <div className="mt-6 px-4">
                 {isEditing ? (
                     <input
                         ref={inputRef}
@@ -138,47 +139,44 @@ export const ProjectCard = ({ project, isSelectionMode, isSelected, onSelect, on
                         onChange={(e) => setEditName(e.target.value)}
                         onBlur={handleRename}
                         onKeyDown={handleKeyDown}
-                        className="w-full text-xl font-bold text-white bg-white/5 border-b-2 border-indigo-500 outline-none px-1"
+                        className="w-full text-xl font-bold text-white bg-white/5 border-b border-indigo-500 outline-none px-1"
                     />
                 ) : (
                     <h3
                         onDoubleClick={() => !isSelectionMode && setIsEditing(true)}
-                        className="text-xl font-bold text-white tracking-tight cursor-text hover:text-indigo-300 transition-colors"
+                        className="text-xl font-bold tracking-tight text-white cursor-text hover:text-indigo-300 transition-colors"
                         title="Double click to rename"
                     >
                         {project.name}
                     </h3>
                 )}
+            </div>
 
-                {/* Data Pills */}
-                <div className="flex gap-2 overflow-x-auto no-scrollbar py-2">
-                    {/* Vibe Pill */}
-                    <span className={`rounded-full px-3 py-1 text-xs font-medium border whitespace-nowrap ${vibe.color}`}>
-                        {vibe.label}
+            {/* Meta Pills */}
+            <div className="px-4 mt-2 flex gap-2 overflow-x-auto no-scrollbar">
+                {/* Vibe Pill */}
+                <span className={`text-[10px] uppercase tracking-wider px-2 py-1 rounded-md bg-white/5 border border-white/5 whitespace-nowrap ${vibe.color}`}>
+                    {vibe.label}
+                </span>
+
+                {/* Tags */}
+                {project.tags?.slice(0, 2).map(tag => (
+                    <span key={tag} className="text-[10px] uppercase tracking-wider px-2 py-1 rounded-md bg-white/5 border border-white/5 text-gray-400 whitespace-nowrap">
+                        #{tag}
                     </span>
-
-                    {/* Status Pill */}
-                    <span className="rounded-full px-3 py-1 text-xs font-medium bg-white/5 border border-white/5 text-gray-300 whitespace-nowrap capitalize">
-                        {project.status}
-                    </span>
-
-                    {/* Tags */}
-                    {project.tags?.slice(0, 2).map(tag => (
-                        <span key={tag} className="rounded-full px-3 py-1 text-xs font-medium bg-white/5 border border-white/5 text-gray-300 whitespace-nowrap">
-                            #{tag}
-                        </span>
-                    ))}
-                </div>
+                ))}
             </div>
 
             {/* Fluid Progress Bar */}
-            <div className="h-1.5 bg-gray-800 relative overflow-hidden">
+            <div className="h-1.5 w-full bg-gray-800 mt-4 relative overflow-hidden">
                 <motion.div
-                    layoutId={`progress-${project.id}`}
                     className="h-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500"
                     initial={{ width: 0 }}
                     animate={{ width: `${project.progress}%` }}
                     transition={{ duration: 1, ease: "easeOut" }}
+                    style={{
+                        boxShadow: '0 0 10px #bc13fe'
+                    }}
                 />
             </div>
 

@@ -86,4 +86,52 @@ class MemoryService:
             logger.error(f"MemoryService: Search failed: {e}")
             return []
 
+    async def ask_brain(self, question: str, limit: int = 5) -> str:
+        """
+        Ask the brain a question:
+        1. Search for relevant memories
+        2. Use Gemini Pro to generate an answer based on context
+        """
+        try:
+            # Import Gemini LLM
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            from langchain_core.prompts import ChatPromptTemplate
+            
+            # 1. Search for relevant memories
+            memories = await self.search_memory(question, limit=limit)
+            
+            if not memories:
+                return "I don't have any relevant memories to answer this question."
+            
+            # 2. Build context from memories
+            context = "\n\n".join([
+                f"Memory {i+1}: {mem.get('content', '')}"
+                for i, mem in enumerate(memories)
+            ])
+            
+            # 3. Create prompt
+            template = """You are a helpful AI assistant with access to the user's memories.
+            
+Context from memories:
+{context}
+
+User question: {question}
+
+Please provide a helpful answer based on the context above. If the context doesn't contain relevant information, say so."""
+            
+            prompt = ChatPromptTemplate.from_template(template)
+            
+            # 4. Initialize Gemini Pro
+            llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.7)
+            
+            # 5. Generate response
+            chain = prompt | llm
+            response = await chain.ainvoke({"context": context, "question": question})
+            
+            return response.content
+            
+        except Exception as e:
+            logger.error(f"MemoryService: ask_brain failed: {e}")
+            return f"Error generating response: {str(e)}"
+
 memory_service = MemoryService()
