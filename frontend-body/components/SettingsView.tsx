@@ -6,8 +6,8 @@ import { useSettings } from '@/lib/hooks/useSettings';
 import { SettingsModal } from './SettingsModal';
 
 interface SettingsProps {
-  logs: any[];
-  onImport: (logs: any[]) => void;
+  logs?: any[];
+  onImport?: (logs: any[]) => void;
 }
 
 export const SettingsView = ({ logs, onImport }: SettingsProps) => {
@@ -91,7 +91,7 @@ export const SettingsView = ({ logs, onImport }: SettingsProps) => {
           </h3>
           <div className="space-y-3 mb-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
             <AnimatePresence>
-              {prompts.map((p, idx) => (
+              {prompts.map((p: string, idx: number) => (
                 <motion.div
                   key={`${p}-${idx}`}
                   initial={{ opacity: 0, x: -10 }}
@@ -129,7 +129,7 @@ export const SettingsView = ({ logs, onImport }: SettingsProps) => {
           </h3>
           <div className="space-y-3 mb-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
             <AnimatePresence>
-              {habits.map((h, idx) => (
+              {habits.map((h: any, idx: number) => (
                 <motion.div
                   key={`${h.id}-${idx}`}
                   initial={{ opacity: 0, x: -10 }}

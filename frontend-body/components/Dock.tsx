@@ -6,6 +6,7 @@ import { Home, Layers, Brain, Settings, Plus } from 'lucide-react';
 interface DockProps {
     activeTab: string;
     onTabChange: (tab: string) => void;
+    onMenuToggle?: () => void;
 }
 
 export const Dock = ({ activeTab, onTabChange }: DockProps) => {

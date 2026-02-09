@@ -100,7 +100,66 @@ export default function Home() {
         </div>
       )}
 
-      {/* ... */}
+      {/* Command Palette */}
+      <CommandPalette
+        isOpen={isCmdOpen}
+        onClose={() => setIsCmdOpen(false)}
+        activeTab={activeTab}
+        onNavigate={(tab) => setActiveTab(tab as any)}
+        onCreateProject={() => setIsCreateProjectOpen(true)}
+      />
+
+      {/* Main Content Area */}
+      <main className="flex-1 overflow-hidden relative flex flex-col items-center justify-center p-4">
+        {activeTab === 'capture' && (
+          <CaptureView
+            onSave={(entry) => {
+              // Handle save
+              // cortex.ingestLog(entry...)
+              console.log("Saved", entry);
+            }}
+          />
+        )}
+
+        {activeTab === 'graph' && (
+          <NeuralGraph
+            logs={logs}
+            onNodeClick={(node) => {
+              if (node.group === 1) setSelectedEntry(node.raw);
+              else setContextNode(node);
+            }}
+          />
+        )}
+
+        {activeTab === 'list' && (
+          <HistoryView
+            logs={logs}
+            onSelectEntry={setSelectedEntry}
+          />
+        )}
+
+        {activeTab === 'project' && (
+          <ProjectBoard
+            onCreateProject={() => setIsCreateProjectOpen(true)}
+          />
+        )}
+
+        {activeTab === 'dashboard' && (
+          <Dashboard logs={logs} />
+        )}
+
+        {activeTab === 'settings' && (
+          <SettingsView logs={logs} />
+        )}
+      </main>
+
+      {/* Dock (Navigation) */}
+      <Dock
+        activeTab={activeTab}
+        onTabChange={(tab: string) => setActiveTab(tab as any)}
+        onMenuToggle={() => setIsMenuOpen(!isMenuOpen)}
+      />
+
     </div>
   );
 }

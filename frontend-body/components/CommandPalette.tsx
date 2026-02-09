@@ -8,7 +8,9 @@ interface CommandPaletteProps {
     isOpen: boolean;
     onClose: () => void;
     onNavigate: (tab: string) => void;
-    onCreateProject?: () => void; // [NEW]
+    onCreateProject?: () => void;
+    activeTab?: string; // Added for compatibility
+    logs?: any[]; // Added for compatibility
 }
 
 export const CommandPalette = ({ isOpen, onClose, onNavigate, onCreateProject }: CommandPaletteProps) => {

@@ -45,3 +45,10 @@ else:
         except Exception as e:
             logger.exception("Failed to create supabase client: %s", e)
             supabase = None
+
+def get_supabase_client() -> Client:
+    # Explicit check if we want to enforce it, or just return Optional
+    if supabase is None:
+        # In production this might be fatal, or we can handle it at call site
+        raise Exception("Supabase client is not initialized. Check SUPABASE_URL and SUPABASE_KEY.")
+    return supabase
