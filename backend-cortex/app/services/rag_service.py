@@ -34,7 +34,7 @@ if SUPABASE_URL and SUPABASE_KEY:
 try:
     from app.core.gemini import get_model
     
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
     
     # Use smart model for chat (gemini-3.0-pro-preview)
     smart_config = get_model("smart")
