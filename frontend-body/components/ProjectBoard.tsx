@@ -14,7 +14,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
     const supabase = createClientComponentClient();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState<'all' | 'active' | 'archived' | 'idea'>('active');
+    const [filter, setFilter] = useState<'all' | 'active' | 'archived' | 'idea' | 'completed'>('active');
 
     // Merge Mode State
     const [isMergeMode, setIsMergeMode] = useState(false);
@@ -32,7 +32,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
     const fetchProjects = async () => {
         setLoading(true);
         const { data, error } = await supabase
-            .from('projects')
+            .from('Project')
             .select('*')
             .order('progress', { ascending: false });
 
@@ -42,6 +42,19 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
 
     useEffect(() => {
         fetchProjects();
+
+        // Realtime Subscription
+        const channel = supabase
+            .channel('realtime projects')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'Project' }, (payload) => {
+                console.log('Realtime change:', payload);
+                fetchProjects();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
     }, [supabase]);
 
     const filteredProjects = projects.filter(p => filter === 'all' || p.status === filter);
@@ -182,7 +195,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
                     </span>
 
                     <div className="flex gap-2 bg-black/40 p-1.5 rounded-full border border-white/5 backdrop-blur-md">
-                        {['active', 'idea', 'archived', 'all'].map(t => (
+                        {['active', 'idea', 'completed', 'archived', 'all'].map(t => (
                             <button
                                 key={t}
                                 onClick={() => setFilter(t as any)}

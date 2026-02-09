@@ -5,6 +5,7 @@ export interface Project {
   id: string;
   created_at?: string;
   name: string;
+  category?: 'macro' | 'micro' | 'daemon'; // [NEW]
   status: 'active' | 'archived' | 'completed' | 'idea';
   progress: number;
   meta: {
@@ -13,7 +14,7 @@ export interface Project {
     cover_image?: string;
     [key: string]: any;
   };
-  tags: string[];
+  tags?: string[];
 }
 
 export interface paths {

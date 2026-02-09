@@ -32,8 +32,14 @@ if SUPABASE_URL and SUPABASE_KEY:
 # Init Gemini (Lazy or Module Level - assumming GOOGLE_API_KEY is present)
 # If GOOGLE_API_KEY is missing, this might also throw, but let's assume it's set for now.
 try:
+    from app.core.gemini import get_model
+    
     embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
-    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0)
+    
+    # Use smart model for chat (gemini-3.0-pro-preview)
+    smart_config = get_model("smart")
+    llm = ChatGoogleGenerativeAI(model=smart_config["model"], temperature=0)
+    logger.info(f"RAG Service initialized with model: {smart_config['model']}")
 except Exception as e:
     logger.warning(f"Failed to init Gemini: {e}")
     embeddings = None
@@ -55,6 +61,7 @@ class RAGService:
             table_name="documents",
             query_name="match_documents",
         )
+        self.llm = llm
 
     async def ingest_text(self, text: str, meta: Dict[str, Any] = {}):
         """
@@ -120,29 +127,56 @@ class RAGService:
 
     async def query(self, question: str):
         """
-        RAG Query
+        RAG Query (Fallback to LLM only if RAG is unavailable)
         """
         logger.info(f"Querying: {question}")
         
-        retriever = self.vector_store.as_retriever(search_kwargs={"k": 5})
-        
-        template = """Answer the question based only on the following context:
-        {context}
+        if not self.vector_store:
+            logger.warning("Vector Store unavailable. Falling back to direct LLM chat.")
+            if not self.llm:
+                yield "Error: Cortex Offline (No LLM Configured)"
+                return
 
-        Question: {question}
-        """
-        prompt = ChatPromptTemplate.from_template(template)
-        
-        def format_docs(docs):
-            return "\n\n".join(doc.page_content for doc in docs)
+            # Direct LLM Chat
+            try:
+                # Use a specific prompt for direct chat
+                direct_prompt = ChatPromptTemplate.from_template("You are Cortex, LifeOS Intelligent Assistant. Answer the user: {question}")
+                chain = direct_prompt | self.llm | StrOutputParser()
+                async for chunk in chain.astream({"question": question}):
+                    yield chunk
+            except Exception as e:
+                logger.error(f"LLM Chat Error: {e}")
+                yield f"Error: {str(e)}"
+            return
 
-        rag_chain = (
-            RunnableParallel({"context": retriever | format_docs, "question": RunnablePassthrough()})
-            | prompt
-            | llm
-            | StrOutputParser()
-        )
+        # RAG Flow
+        try:
+            retriever = self.vector_store.as_retriever(search_kwargs={"k": 5})
+            
+            template = """Answer the question based ONLY on the following context. If you cannot find the answer in the context, say so, but then try to answer from your general knowledge with a disclaimer.
+            
+            Context:
+            {context}
 
-        return rag_chain.stream(question)
+            Question: {question}
+            """
+            prompt = ChatPromptTemplate.from_template(template)
+            
+            def format_docs(docs):
+                return "\n\n".join(doc.page_content for doc in docs)
+
+            rag_chain = (
+                RunnableParallel({"context": retriever | format_docs, "question": RunnablePassthrough()})
+                | prompt
+                | self.llm
+                | StrOutputParser()
+            )
+
+            async for chunk in rag_chain.astream(question):
+                 yield chunk
+
+        except Exception as e:
+            logger.error(f"RAG Chain Error: {e}")
+            yield f"Cortex Error: {str(e)}"
 
 rag_service = RAGService()

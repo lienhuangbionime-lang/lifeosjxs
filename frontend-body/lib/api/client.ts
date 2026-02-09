@@ -2,7 +2,7 @@
 
 export const API_BASE =
   (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "")) ||
-  "http://localhost:8001";
+  "http://localhost:8000";
 
 async function fetchJSON<T>(input: string, init?: RequestInit): Promise<T> {
   const url = `${API_BASE}${input}`;
@@ -32,6 +32,8 @@ export interface EvolutionStatus {
   status: 'stable' | 'available' | 'offline';
   current_model: string;
   recommended_upgrade: string | null; // 這是 UI 判斷是否亮燈的關鍵
+  model_versions?: string[]; // [New] Available model versions [fast, smart]
+  remaining_requests?: string | null; // [New]
   note?: string;
 }
 
@@ -150,19 +152,27 @@ export const cortex = {
 
   // [New] Ingest with Habits Support
   ingest: {
-    submit: async (data: { content: string; habits: string[] }): Promise<IngestResponse> => {
+    submit: async (data: { content: string; habits: string[]; skipAi?: boolean }): Promise<IngestResponse> => {
       return await fetchProxy<IngestResponse>("/api/v1/ingest", {
         method: "POST",
         body: JSON.stringify({
           date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
           text: data.content,
-          habits: data.habits
+          habits: data.habits,
+          skip_ai: data.skipAi
         }),
       });
     }
   },
 
   // 5. 專案管理 (Project Management)
+  async createProject(data: any): Promise<any> {
+    return await fetchProxy("/api/v1/projects", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
   async updateProject(id: number | string, data: any): Promise<any> {
     return await fetchProxy(`/api/v1/projects/${id}`, {
       method: "PATCH",

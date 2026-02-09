@@ -45,16 +45,12 @@ export const CreateProjectModal = ({ isOpen, onClose, onCreated }: CreateProject
             });
             */
             // Simulating a fetch call to what likely exists based on `projects.py` pattern
-            await fetch('/api/py/projects', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name,
-                    category,
-                    status: 'active',
-                    progress: 0,
-                    meta: { emoji }
-                })
+            await cortex.createProject({
+                name,
+                category,
+                status: 'active',
+                progress: 0,
+                meta: { emoji }
             });
 
             onCreated();
@@ -112,8 +108,8 @@ export const CreateProjectModal = ({ isOpen, onClose, onCreated }: CreateProject
                                         type="button"
                                         onClick={() => setCategory(cat.id as any)}
                                         className={`flex flex-col items-center gap-1 p-3 rounded-xl border transition-all ${category === cat.id
-                                                ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/20'
-                                                : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
+                                            ? 'bg-indigo-500 border-indigo-400 text-white shadow-lg shadow-indigo-500/20'
+                                            : 'bg-white/5 border-white/5 text-slate-400 hover:bg-white/10 hover:text-white'
                                             }`}
                                     >
                                         <cat.icon size={18} />

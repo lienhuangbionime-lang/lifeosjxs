@@ -23,6 +23,8 @@ export const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }: an
 };
 
 export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: any) => {
+    const [copied, setCopied] = React.useState(false);
+
     const connections = React.useMemo(() => {
         if (!mainNode) return [];
 
@@ -63,25 +65,44 @@ export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: any) => {
         return [mainLog, ...related];
     }, [mainNode, logs]);
 
+    const handleCopy = () => {
+        const text = connections.map((c: any) => `[${c.date}] (${c.connectionReason})\n${c.note || ''}`).join('\n\n---\n\n');
+        navigator.clipboard.writeText(text).then(() => {
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        });
+    };
+
     return (
         <Modal isOpen={!!mainNode} onClose={onClose} className="max-w-2xl max-h-[85vh] h-full flex flex-col bg-slate-900/95 border-slate-700 text-white" title={`Context Cluster: ${mainNode?.id}`}>
-            <div className="overflow-y-auto custom-scrollbar p-4 h-full">
-                {connections.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {connections.map((conn: any, idx: number) => (
-                            <div key={conn.date} onClick={() => onOpenEntry(conn)}
-                                className={`rounded-xl p-4 cursor-pointer hover:scale-[1.01] transition-all shadow-lg border-l-4 group relative overflow-hidden ${idx === 0 ? 'bg-indigo-900/40 border-indigo-500' : 'bg-slate-800/80 hover:bg-slate-800 border-slate-600'}`}>
-                                <div className="flex justify-between items-center mb-1">
-                                    <span className="font-bold text-slate-200 text-sm flex items-center gap-2">{conn.date} {idx === 0 && <MapPin size={12} className="text-indigo-400" />}</span>
-                                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${idx === 0 ? 'bg-indigo-900 text-indigo-300 border-indigo-700' : 'bg-slate-700 text-slate-400 border-slate-600'}`}>{conn.connectionReason}</span>
+            <div className="relative h-full flex flex-col">
+                <div className="absolute top-[-3.5rem] right-12 z-20">
+                    <button
+                        onClick={handleCopy}
+                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black transition-all ${copied ? 'bg-green-500 text-white' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-600'}`}
+                    >
+                        {copied ? 'COPIED!' : 'COPY CONTEXT'}
+                    </button>
+                </div>
+
+                <div className="overflow-y-auto custom-scrollbar p-4 h-full">
+                    {connections.length > 0 ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            {connections.map((conn: any, idx: number) => (
+                                <div key={conn.date} onClick={() => onOpenEntry(conn)}
+                                    className={`rounded-xl p-4 cursor-pointer hover:scale-[1.01] transition-all shadow-lg border-l-4 group relative overflow-hidden ${idx === 0 ? 'bg-indigo-900/40 border-indigo-500' : 'bg-slate-800/80 hover:bg-slate-800 border-slate-600'}`}>
+                                    <div className="flex justify-between items-center mb-1">
+                                        <span className="font-bold text-slate-200 text-sm flex items-center gap-2">{conn.date} {idx === 0 && <MapPin size={12} className="text-indigo-400" />}</span>
+                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${idx === 0 ? 'bg-indigo-900 text-indigo-300 border-indigo-700' : 'bg-slate-700 text-slate-400 border-slate-600'}`}>{conn.connectionReason}</span>
+                                    </div>
+                                    <p className="text-xs text-slate-400 line-clamp-2">{conn.note || 'No content'}</p>
                                 </div>
-                                <p className="text-xs text-slate-400 line-clamp-2">{conn.note || 'No content'}</p>
-                            </div>
-                        ))}
-                    </div>
-                ) : (
-                    <div className="text-white/50 text-center py-10 italic">No direct connections found.</div>
-                )}
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="text-white/50 text-center py-10 italic">No direct connections found.</div>
+                    )}
+                </div>
             </div>
         </Modal>
     );

@@ -1,9 +1,10 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Send, Image as ImageIcon, CheckCircle, Brain, X, Trash2 } from 'lucide-react';
+import { Mic, Send, Image as ImageIcon, CheckCircle, Brain, X, Trash2, Save } from 'lucide-react';
 import { CoreEngine } from '@/lib/ai/core';
 import { useSettings, Habit } from '@/lib/hooks/useSettings';
+import { cortex, EvolutionStatus } from '@/lib/api/client'; // Import cortex and EvolutionStatus
 
 interface CaptureViewProps {
   onSave: (entry: any) => void;
@@ -13,6 +14,20 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
   const [text, setText] = useState('');
   const [isRecording, setIsRecording] = useState(false); // Mock
   const { habits } = useSettings();
+  const [systemStatus, setSystemStatus] = useState<EvolutionStatus | null>(null); // State for system status
+
+  // Fetch system status on mount
+  useEffect(() => {
+    const fetchStatus = async () => {
+      try {
+        const status = await cortex.checkEvolution();
+        setSystemStatus(status);
+      } catch (e) {
+        console.error("Failed to fetch system status", e);
+      }
+    };
+    fetchStatus();
+  }, []);
 
   // Local state for the current entry being crafted
   const [activeHabits, setActiveHabits] = useState<Record<string, boolean>>({});
@@ -34,11 +49,51 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
     if (hasChange) setActiveHabits(detected);
   }, [text, habits]);
 
+  // Voice Recognition
+  useEffect(() => {
+    let recognition: any;
+    if (isRecording) {
+      if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+        // @ts-ignore
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        recognition = new SpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+        recognition.lang = 'zh-TW'; // Default to Traditional Chinese, maybe make configurable
+
+        recognition.onresult = (event: any) => {
+          let finalTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript;
+            }
+          }
+          if (finalTranscript) {
+            setText(prev => prev + (prev ? ' ' : '') + finalTranscript);
+          }
+        };
+
+        recognition.onerror = (event: any) => {
+          console.error("Speech error", event);
+          setIsRecording(false);
+        };
+
+        recognition.start();
+      } else {
+        alert("Voice recognition not supported in this browser.");
+        setIsRecording(false);
+      }
+    }
+    return () => {
+      if (recognition) recognition.stop();
+    };
+  }, [isRecording]);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [analysis, setAnalysis] = useState<string | null>(null);
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (skipAi: boolean = false) => {
     if (!text.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -51,13 +106,15 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
         .filter(Boolean) as string[];
 
       // 2. Call backend API
-      const { cortex } = await import('@/lib/api/client');
+      // Always use ingest to save, but skipAi will bypass Gemini
       const response = await cortex.ingest.submit({
         content: text,
-        habits: habitLabels
+        habits: habitLabels,
+        skipAi: skipAi // [New] Pass skipAi flag
       });
 
       // 2.5. Store analysis result
+      // If skipAi is true, analysis might be null, but we might get markdown_body from backend fallback
       if (response.data && response.data.markdown_body) {
         setAnalysis(response.data.markdown_body);
       }
@@ -72,11 +129,19 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
 
       // 5. Optionally notify parent (for local state update)
       if (onSave) {
-        onSave({
-          content: text,
-          habits: activeHabits,
-          date: new Date().toISOString()
-        });
+        // Construct a full LogEntry-like object for immediate UI update
+        const newEntry = {
+          date: new Date().toISOString().split('T')[0], // Use simplified date for now or request.date
+          content: analysis || text, // Use analyzed markdown if available, else raw text
+          mood: response.data?.meta?.metrics?.mood || 5,
+          focus: response.data?.meta?.metrics?.focus || 5,
+          energy: response.data?.meta?.metrics?.energy || 5,
+          isAi: !skipAi,
+          aiModel: skipAi ? "None" : response.model,
+          // Merge raw inputs too just in case
+          habits: activeHabits
+        };
+        onSave(newEntry);
       }
     } catch (error: any) {
       console.error('🔥 Ingest API Error:', {
@@ -99,8 +164,24 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      handleSubmit();
+      handleSubmit(false); // Default to Analyze on Ctrl+Enter
     }
+  };
+
+  const handleImageUpload = (file: File) => {
+    if (!file) return;
+
+    // 1. Convert image to Base64/DataURL for immediate preview/text integration
+    // (In a production app, we would upload to Supabase Storage and get a URL)
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      // Insert markdown image syntax into text area
+      const imageMarkdown = `\n![${file.name}](${result})\n`;
+      setText(prev => prev + imageMarkdown);
+      alert("Image added to log!");
+    };
+    reader.readAsDataURL(file);
   };
 
   return (
@@ -110,8 +191,11 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
         <h2 className="text-3xl font-black text-white flex items-center gap-3">
           <Brain className="text-indigo-400 animate-pulse-slow" /> Neural Capture
         </h2>
-        <p className="text-slate-500 font-mono text-sm mt-2">
-          What is on your mind? <span className="text-indigo-500/50">#ideas #tasks #journal</span>
+        <p className="text-slate-500 font-mono text-sm mt-2 flex items-center justify-between">
+          <span>What is on your mind? <span className="text-indigo-500/50">#ideas #tasks</span></span>
+          <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded border border-white/10 text-slate-400">
+            AI: {systemStatus ? `${systemStatus.current_model} (${systemStatus.remaining_requests || 'N/A'})` : 'Loading...'}
+          </span>
         </p>
       </div>
 
@@ -122,19 +206,46 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Log your reality..."
+          onDrop={(e) => {
+            e.preventDefault();
+            const file = e.dataTransfer.files?.[0];
+            if (file && file.type.startsWith('image/')) {
+              handleImageUpload(file);
+            }
+          }}
+          onDragOver={(e) => e.preventDefault()}
+          placeholder="Log your reality... (Drag & Drop images supported)"
           className="w-full h-full bg-[#0f172a] text-lg text-slate-200 placeholder:text-slate-600 p-6 rounded-3xl border border-slate-800 focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all resize-none outline-none custom-scrollbar leading-relaxed"
         />
 
         {/* Quick Actions */}
         <div className="absolute bottom-4 right-4 flex gap-2">
           <button
-            onClick={() => setIsRecording(!isRecording)}
+            onClick={() => {
+              if (isRecording) {
+                setIsRecording(false);
+                // Stop logic handled by effect
+              } else {
+                setIsRecording(true);
+                // Start logic handled by effect
+              }
+            }}
             className={`p-3 rounded-full transition-all ${isRecording ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}`}
           >
             <Mic size={20} />
           </button>
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            id="image-upload"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) handleImageUpload(file);
+            }}
+          />
           <button
+            onClick={() => document.getElementById('image-upload')?.click()}
             className="p-3 rounded-full bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-all"
           >
             <ImageIcon size={20} />
@@ -182,10 +293,14 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
               {/* Terminal Footer */}
               <div className="mt-4 pt-3 border-t border-neon-blue/20 flex justify-end">
                 <button
-                  onClick={() => {
-                    navigator.clipboard.writeText(analysis);
-                    setShowToast(true);
-                    setTimeout(() => setShowToast(false), 2000);
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(analysis);
+                      setShowToast(true);
+                      setTimeout(() => setShowToast(false), 2000);
+                    } catch (e) {
+                      alert("Clipboard Error: " + e);
+                    }
                   }}
                   className="px-4 py-2 bg-neon-blue/10 hover:bg-neon-blue/20 border border-neon-blue/30 text-neon-blue rounded-lg transition-all text-xs font-mono uppercase tracking-wider"
                 >
@@ -222,8 +337,19 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
 
       {/* --- Submit --- */}
       <div className="flex justify-end items-center gap-4 relative z-10">
+
+        {/* Quick Save Button */}
         <button
-          onClick={handleSubmit}
+          onClick={() => handleSubmit(true)}
+          disabled={!text.trim() || isSubmitting}
+          className="px-6 py-4 bg-slate-800 text-slate-300 rounded-2xl font-bold text-sm hover:bg-slate-700 hover:text-white transition-all shadow-lg disabled:opacity-50 flex items-center gap-2"
+        >
+          <Save size={18} /> SAVE
+        </button>
+
+        {/* Ingest Button */}
+        <button
+          onClick={() => handleSubmit(false)}
           disabled={!text.trim() || isSubmitting}
           className="px-8 py-4 bg-white text-slate-900 rounded-2xl font-black text-sm hover:scale-105 active:scale-95 transition-all shadow-xl disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2"
         >
@@ -238,7 +364,7 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
             </>
           ) : (
             <>
-              <Send size={18} /> INGEST
+              <Send size={18} /> INGEST & ANALYZE
             </>
           )}
         </button>

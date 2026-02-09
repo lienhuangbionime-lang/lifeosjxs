@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Paperclip, MessageSquare, X, Bot, User, FileText, Loader2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
+import { cortex, EvolutionStatus } from '@/lib/api/client';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -17,8 +18,22 @@ export const CortexChat = () => {
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
+    const [systemStatus, setSystemStatus] = useState<EvolutionStatus | null>(null);
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Fetch system status on mount
+    useEffect(() => {
+        const fetchStatus = async () => {
+            try {
+                const status = await cortex.checkEvolution();
+                setSystemStatus(status);
+            } catch (e) {
+                console.error("Failed to fetch system status", e);
+            }
+        };
+        fetchStatus();
+    }, []);
 
     useEffect(() => {
         if (scrollRef.current) {
@@ -110,12 +125,20 @@ export const CortexChat = () => {
                         <div className="w-8 h-8 rounded-full bg-emerald-500 flex items-center justify-center text-slate-900 font-bold">
                             C
                         </div>
-                        <div>
+                        <div className="flex-1">
                             <h3 className="text-white font-bold text-sm">Cortex v3.1</h3>
                             <p className="text-slate-400 text-[10px] flex items-center gap-1">
                                 <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse"></span>
                                 Online
                             </p>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-[9px] text-slate-500 font-mono">
+                                {systemStatus?.model_versions?.[1] || 'gemini-3.0-pro-preview'}
+                            </div>
+                            <div className="text-[8px] text-emerald-400 font-mono">
+                                {systemStatus?.remaining_requests || 'N/A'}
+                            </div>
                         </div>
                     </div>
 

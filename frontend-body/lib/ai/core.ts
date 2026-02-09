@@ -146,62 +146,86 @@ export const CoreEngine = {
 
     parseGraphSeeds: (logs: LogEntry[]): GraphData => {
         const nodes = new Map<string, GraphNode>();
-        const links: GraphLink[] = [];
-        const tagMap = new Map<string, string[]>(); // tag -> list of log dates
+        const linkMap = new Map<string, GraphLink>();
 
         logs.forEach(log => {
             // 1. Create Log Node
+            // Use log.date as ID, but maybe append a prefix if ID conflict is possible?
+            // For now assuming date is unique enough for the log node ID.
             if (!nodes.has(log.date)) {
-                nodes.set(log.date, { id: log.date, group: 1, val: 5, raw: log });
+                nodes.set(log.date, {
+                    id: log.date,
+                    group: 1,
+                    val: 5,
+                    raw: log
+                });
             }
 
-            // 2. Extract Tags from note if not pre-parsed
-            const content = log.note + (log.graphSeeds?.content || '');
-            const foundTags = (content.match(/#([\w\u4e00-\u9fa5]+)/g) || []).map(t => t.slice(1));
+            // Combine all content sources
+            const content = (log.note || '') + '\n' + (log.graphSeeds?.content || '');
 
-            // Deduplicate tags for this log
-            const uniqueTags = Array.from(new Set(foundTags));
+            // 2. Extract Tags (#tag)
+            const tagMatches = content.match(/#([\w\u4e00-\u9fa5]+)/g) || [];
+            const tags = Array.from(new Set(tagMatches.map(t => t.slice(1))));
 
-            uniqueTags.forEach(tag => {
-                // Register Tag Node
+            // 3. Extract Wiki Links ([[Link]])
+            const linkMatches = content.match(/\[\[(.*?)\]\]/g) || [];
+            const wikiLinks = Array.from(new Set(linkMatches.map(l => l.slice(2, -2))));
+
+            // Process Tags
+            tags.forEach(tag => {
                 if (!nodes.has(tag)) {
                     nodes.set(tag, { id: tag, group: 'tag', val: 3 });
                 }
 
-                // Create Link: Log -> Tag
-                links.push({ source: log.date, target: tag, value: 1 });
+                // Link: Log -> Tag
+                const linkKey = `${log.date}-${tag}`;
+                if (!linkMap.has(linkKey)) {
+                    linkMap.set(linkKey, { source: log.date, target: tag, value: 1 });
+                } else {
+                    linkMap.get(linkKey)!.value! += 0.5;
+                }
+            });
 
-                // Track for co-occurrence
-                // For each tag in this log, link it to all OTHER tags in this log
-                uniqueTags.forEach(otherTag => {
-                    if (tag !== otherTag) {
-                        // To avoid duplicate links (A-B and B-A), sort them
-                        const [source, target] = [tag, otherTag].sort();
-                        // Check if link already exists? D3 force handles multiples usually fine, but strictly we might want to sum weight
-                        // For now, simpler: push link. Optimization: we could aggregate weights later.
-                        links.push({ source, target, value: 0.5 });
+            // Process Wiki Links
+            wikiLinks.forEach(linkTarget => {
+                const targetId = linkTarget.trim();
+                if (!targetId) return;
+
+                if (!nodes.has(targetId)) {
+                    // Wiki link target might be another Log Date or a Concept
+                    // If it looks like a date, treat as Log group? Or generic concept?
+                    // Let's treat as 'concept' (group 2/tag-like for now) unless we find a matching log later
+                    nodes.set(targetId, { id: targetId, group: 'concept', val: 4 });
+                }
+
+                // Link: Log -> Concept
+                const linkKey = `${log.date}-${targetId}`;
+                if (!linkMap.has(linkKey)) {
+                    linkMap.set(linkKey, { source: log.date, target: targetId, value: 2 }); // Stronger link
+                } else {
+                    linkMap.get(linkKey)!.value! += 1;
+                }
+            });
+
+            // 4. Co-occurrence (Tag <-> Tag)
+            tags.forEach((t1, i) => {
+                tags.slice(i + 1).forEach(t2 => {
+                    const [source, target] = [t1, t2].sort();
+                    const linkKey = `${source}-${target}`;
+                    if (!linkMap.has(linkKey)) {
+                        linkMap.set(linkKey, { source, target, value: 0.2 }); // Weaker link
+                    } else {
+                        linkMap.get(linkKey)!.value! += 0.1;
                     }
                 });
             });
         });
 
-        // Dedup links for performance? 
-        // For D3 force, having multiple links between nodes increases strength.
-        // But for graph visual cleanliness, maybe unique links with weight is better.
-        // Let's implement unique link map.
-        const linkMap = new Map<string, GraphLink>();
-        links.forEach(l => {
-            const key = `${l.source}-${l.target}`;
-            if (linkMap.has(key)) {
-                linkMap.get(key)!.value! += l.value!;
-            } else {
-                linkMap.set(key, { ...l });
-            }
-        });
+        // Convert Maps to Arrays
+        const nodesArray = Array.from(nodes.values());
+        const linksArray = Array.from(linkMap.values());
 
-        return {
-            nodes: Array.from(nodes.values()),
-            links: Array.from(linkMap.values())
-        };
+        return { nodes: nodesArray, links: linksArray };
     }
 };

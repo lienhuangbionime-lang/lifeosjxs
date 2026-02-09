@@ -8,8 +8,18 @@ from supabase.client import Client, create_client
 # Init Logger
 logger = logging.getLogger("cortex.memory")
 
-# Using Google Gemini Embedding 004 (768 dimensions)
-embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+# Lazy load or safe init embeddings
+embeddings = None
+try:
+    # Check if key is available (it should be if main.py ran, but for direct import safety)
+    gemini_key = os.getenv("GEMINI_API_KEY")
+    if not os.getenv("GOOGLE_API_KEY") and gemini_key:
+        os.environ["GOOGLE_API_KEY"] = gemini_key
+        
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
+except Exception as e:
+    logger.error(f"Failed to init Gemini Embeddings: {e}")
+    embeddings = None
 
 class MemoryService:
     def __init__(self):
@@ -38,6 +48,9 @@ class MemoryService:
 
         try:
             # 1. Generate Embedding
+            if not embeddings:
+                logger.error("MemoryService: Embeddings not initialized.")
+                return False
             vector = embeddings.embed_query(content)
 
             # 2. Prepare Payload
@@ -69,6 +82,9 @@ class MemoryService:
 
         try:
             # 1. Embed Query
+            if not embeddings:
+                logger.error("MemoryService: Embeddings not initialized.")
+                return []
             vector = embeddings.embed_query(query)
 
             # 2. RPC Call

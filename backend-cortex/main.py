@@ -1,5 +1,15 @@
 import os
 import logging
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Map GEMINI_API_KEY to GOOGLE_API_KEY for LangChain if missing
+gemini_key = os.getenv("GEMINI_API_KEY")
+if not os.getenv("GOOGLE_API_KEY") and gemini_key:
+    os.environ["GOOGLE_API_KEY"] = gemini_key
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn

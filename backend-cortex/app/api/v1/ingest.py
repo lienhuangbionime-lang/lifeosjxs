@@ -235,52 +235,68 @@ class IngestRequest(BaseModel):
     text: str
     date: str  # YYYY-MM-DD
     habits: Optional[List[str]] = []
+    skip_ai: Optional[bool] = False
 
 @router.post("/ingest") 
 async def ingest_log(request: IngestRequest):
-    logger.info(f"🧠 Cortex receiving input for {request.date}...")
+    logger.info(f"🧠 Cortex receiving input for {request.date} (Skip AI: {request.skip_ai})...")
     
     try:
-        # 1. 呼叫 Gemini with v7.1 Prompt
+        # 1. 呼叫 Gemini with v7.1 Prompt (Unless skipped)
         import google.generativeai as genai
         
-        model_config = get_model("smart") 
-        if not model_config.get("configured"):
-             logger.warning("Gemini API Key not set, using mock response")
-        
-        # 初始化模型物件
-        model_name = model_config.get("model", "gemini-2.0-flash")
-        model = genai.GenerativeModel(model_name)
-        
-        # 構建使用者輸入
-        user_content = f"""
+        model_config = get_model("smart")
+        ai_data = None
+        model_name = model_config.get("model", "gemini-2.5-flash")
+
+        # Skip AI if requested
+        if not request.skip_ai and model_config.get("configured"):
+            # 初始化模型物件
+            model = genai.GenerativeModel(model_name)
+            
+            # 構建使用者輸入
+            user_content = f"""
 Date: {request.date}
 Habits Tracked: {', '.join(request.habits) if request.habits else 'None'}
 
 User's Daily Log:
 {request.text}
 """
-        
-        # 使用 v7.1 System Prompt
-        full_prompt = f"{LIFEOS_V7_PROMPT}\n\n{user_content}\n\n請嚴格按照上述格式輸出 JSON。"
-        
-        response = model.generate_content(full_prompt)
-        
-        # 2. 解析 JSON
-        try:
-            cleaned_text = response.text.strip()
-            # 移除可能的 markdown code block 標記
-            if cleaned_text.startswith("```json"):
-                cleaned_text = cleaned_text[7:]
-            if cleaned_text.startswith("```"):
-                cleaned_text = cleaned_text[3:]
-            if cleaned_text.endswith("```"):
-                cleaned_text = cleaned_text[:-3]
+            
+            # 使用 v7.1 System Prompt
+            full_prompt = f"{LIFEOS_V7_PROMPT}\n\n{user_content}\n\n請嚴格按照上述格式輸出 JSON。"
+            
+            try:
+                response = model.generate_content(full_prompt)
                 
-            ai_data = json.loads(cleaned_text.strip())
-        except Exception as e:
-            logger.error(f"JSON Parse Error: {e}")
-            logger.error(f"Raw response: {response.text[:500]}")
+                # 2. 解析 JSON
+                text = response.text.strip()
+                # Robust JSON extraction
+                import re
+                json_match = re.search(r'\{.*\}', text, re.DOTALL)
+                if json_match:
+                    text = json_match.group(0)
+                ai_data = json.loads(text)
+                if not isinstance(ai_data, dict):
+                    raise ValueError("AI response is not a valid JSON object")
+            except Exception as e:
+                logger.error(f"Gemini/JSON Error: {e}")
+                # Safe checking of response text
+                try: 
+                    if 'response' in locals():
+                         # Check if response was blocked or has no text
+                         if response.parts:
+                             logger.error(f"Raw response text (first 500 chars): {response.text[:500]}")
+                         else:
+                             logger.error(f"Response blocked or empty: {response.prompt_feedback}")
+                except Exception as log_err:
+                    logger.error(f"Could not retrieve response details: {log_err}")
+        elif request.skip_ai:
+            logger.info("⏩ AI Generation skipped by user request.")
+        else:
+             logger.warning("Gemini API Key not set, using mock response")
+
+        if ai_data is None:
             # Fallback to basic structure
             ai_data = {
                 "markdown_body": f"# [{request.date}] 日記\n\n{request.text}", 
@@ -294,23 +310,92 @@ User's Daily Log:
             }
 
         # 3. 寫入海馬迴 (Supabase)
-        db_payload = {
-            "date": request.date,
-            "note": ai_data.get("markdown_body", request.text),
-            "mood": ai_data.get("meta", {}).get("metrics", {}).get("mood", 5),
-            "focus": ai_data.get("meta", {}).get("metrics", {}).get("focus", 5),
-            "energy": ai_data.get("meta", {}).get("metrics", {}).get("energy", 5),
-            "is_ai": True,
-            "ai_model": model_name,
-            "created_at": datetime.datetime.now().isoformat()
-        }
+        import uuid
+        
+        # Prepare Meta field (merge graph_seeds into meta for storage)
+        meta_payload = ai_data.get("meta", {})
+        if not isinstance(meta_payload, dict):
+            meta_payload = {}
+            
+        if "graph_seeds" in ai_data:
+            meta_payload["graphSeeds"] = ai_data["graph_seeds"]
+        
+        # Prepare Habits (Convert list to dict for consistency with Schema)
+        habits_payload = {h: True for h in (request.habits or [])}
 
+        # Robust Metrics Extraction
+        metrics = meta_payload.get("metrics")
+        if not isinstance(metrics, dict):
+            metrics = {}
+        
+        mood = metrics.get("mood", 5)
+        focus = metrics.get("focus", 5)
+        energy = metrics.get("energy", 5)
+
+        db_payload = {
+            "id": str(uuid.uuid4()),
+            "date": request.date,
+            "content": ai_data.get("markdown_body", request.text),
+            "mood": mood,
+            "focus": focus,
+            "energy": energy,
+            "isAi": not request.skip_ai and (ai_data is not None),
+            "aiModel": model_name if not request.skip_ai else "None",
+            "tags": ai_data.get("tags", []),
+            "habits": habits_payload,
+            "meta": meta_payload,
+            "updatedAt": datetime.datetime.now().isoformat()
+        }
+        
         if supabase:
             try:
-                data, count = supabase.table("logentry").insert(db_payload).execute()
-                logger.info("✅ Memory stored in Hippocampus.")
+                # 1. Try Full Insert (New Schema)
+                try:
+                    res = supabase.table("LogEntry").insert(db_payload).execute()
+                    logger.info("✅ Memory stored (New Entry).")
+                except Exception as full_insert_error:
+                    error_str = str(full_insert_error)
+                    
+                    # Case A: Column missing (Schema Mismatch)
+                    if "column" in error_str and "does not exist" in error_str:
+                         logger.warning("⚠️ DB Schema missing v7 columns. Falling back to legacy storage...")
+                         # Fallback to legacy payload
+                         legacy_payload = {
+                             "id": db_payload["id"],
+                             "date": db_payload["date"],
+                             "content": db_payload["content"],
+                             "mood": db_payload["mood"],
+                             "focus": db_payload["focus"],
+                             "energy": db_payload["energy"]
+                         }
+                         # Try Legacy Insert
+                         try:
+                             res = supabase.table("LogEntry").insert(legacy_payload).execute()
+                             logger.info("✅ Memory stored (Legacy Entry).")
+                         except Exception as legacy_error:
+                             # Check for duplicate on legacy insert
+                             if "23505" in str(legacy_error) or "duplicate key" in str(legacy_error).lower():
+                                 logger.info("⚠️ Duplicate date detected (Legacy). Updating...")
+                                 del legacy_payload["id"]
+                                 res = supabase.table("LogEntry").update(legacy_payload).eq("date", request.date).execute()
+                             else:
+                                 raise legacy_error
+
+                    # Case B: Duplicate Key (New Schema)
+                    elif "23505" in error_str or "duplicate key" in error_str.lower():
+                        logger.info("⚠️ Duplicate date detected. Updating existing entry...")
+                        update_payload = {k: v for k, v in db_payload.items() if k != "id"}
+                        res = supabase.table("LogEntry").update(update_payload).eq("date", request.date).execute()
+                        logger.info("✅ Memory updated (Existing Entry).")
+                    
+                    # Case C: Other Error
+                    else:
+                        raise full_insert_error
+                        
             except Exception as db_e:
-                logger.error(f"❌ Database Write Failed: {db_e}")
+                logger.error(f"❌ Database Write/Update Failed: {db_e}")
+                # Swallow error to return AI response
+
         
         # 4. 回傳給前端
         return {

@@ -1,13 +1,16 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   async rewrites() {
+    // 判斷是否為開發環境
+    const isDev = process.env.NODE_ENV === 'development';
+
     return [
       {
-        // 前端呼叫路徑
         source: '/api/py/:path*',
-        // [關鍵修改] 填入您剛獲得的 Render 網址
-        // 注意：Render 網址後要加上 /api/v1/ 因為我們後端 main.py 有設定 prefix
-        destination: 'https://lifeosjxs.onrender.com/api/v1/:path*', 
+        // [修正] 本地測試時指向 localhost:8000，上線時才指向 Render
+        destination: isDev
+          ? 'http://127.0.0.1:8000/api/v1/:path*'
+          : 'https://lifeosjxs.onrender.com/api/v1/:path*',
       },
     ]
   },

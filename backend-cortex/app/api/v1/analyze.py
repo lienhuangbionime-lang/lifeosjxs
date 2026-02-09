@@ -2,7 +2,6 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 import logging
 import datetime
-import google.generativeai as genai # Keep direct import for types if needed, or rely on core
 from app.core.gemini import get_model, genai
 
 router = APIRouter()
@@ -41,7 +40,12 @@ async def analyze_monthly(request: AnalyzeRequest):
         # 簡單解析 (建議之後改為更嚴謹的 JSON Parser)
         import json
         text = response.text.strip()
-        if text.startswith("```json"): text = text[7:-3]
+        text = response.text.strip()
+        # Robust JSON extraction
+        import re
+        json_match = re.search(r'\{.*\}', text, re.DOTALL)
+        if json_match:
+            text = json_match.group(0)
         return json.loads(text)
     except Exception as e:
         logger.error(f"Analyze failed: {e}")
