@@ -32,6 +32,11 @@ export default function Home() {
   const [contextNode, setContextNode] = useState<any>(null);
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', action: null as any });
 
+  // Mount effect
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   // ... (rest of state and effects) ...
 
   const requestDelete = (date: string) => {
