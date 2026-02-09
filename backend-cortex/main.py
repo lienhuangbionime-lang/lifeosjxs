@@ -57,7 +57,7 @@ app.add_middleware(
 )
 
 from app.api.v1 import brain as brain_router_mod
-app.include_router(ingest_router_mod.router, prefix="/api/v1/ingest", tags=["Ingest"])
+app.include_router(ingest_router_mod.router, prefix="/api/v1", tags=["Ingest"])
 app.include_router(memories_router_mod.router, prefix="/api/v1/memories", tags=["Memories"])
 app.include_router(system_router_mod.router, prefix="/api/v1/system", tags=["System"])
 app.include_router(brain_router_mod.router, prefix="/api/v1/brain", tags=["Brain"])
