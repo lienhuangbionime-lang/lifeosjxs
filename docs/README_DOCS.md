@@ -7,18 +7,19 @@
 
 ### 1. AI_DEV_GUIDE.md ⭐
 **給未來接手的 AI 開發者**
-- 系統核心理念
-- 技術棧和編碼規範
-- 架構設計
-- 開發工作流程
+- 系統核心理念、規格與原則。
 
-### 2. USER_MANUAL.md ⭐
+### 2. SYSTEM_PROTOCOLS.md ⭐
+**系統運行協議 (AI 記憶核心)**
+- 資料流、API 協議、解析邏輯。**AI 每次啟動必讀**。
+
+### 3. AI_CHANGELOG.md ⭐
+**AI 變更日誌**
+- 所有架構決策與版本演進記錄。
+
+### 4. USER_MANUAL.md ⭐
 **給日記記錄者**
-- 快速開始
-- 如何問問題
-- 日記記錄技巧
-- 專案管理
-- 常見問題
+- 快速開始與使用技巧。
 
 ---
 
@@ -181,20 +182,22 @@
 
 ## 📋 文檔清單
 
-### 總計：14 個文檔
+### 總計：16 個文檔
 
-#### 核心（2 個）⭐
+#### 核心（4 個）⭐
 1. AI_DEV_GUIDE.md
-2. USER_MANUAL.md
+2. SYSTEM_PROTOCOLS.md
+3. AI_CHANGELOG.md
+4. USER_MANUAL.md
 
 #### 架構（3 個）
-3. QUESTION_DRIVEN_ARCHITECTURE.md
-4. MEDIA_CORE_ARCHITECTURE.h
-5. NOMAD_LIST_STYLE_DESIGN.md
+5. QUESTION_DRIVEN_ARCHITECTURE.md
+6. MEDIA_CORE_ARCHITECTURE.h
+7. NOMAD_LIST_STYLE_DESIGN.md
 
 #### 規範（2 個）
-6. SYSTEM_CONTEXT.md
-7. .cursorrules
+8. SYSTEM_CONTEXT.md
+9. .cursorrules
 
 #### Context Engineering（3 個）
 8. CONTEXT_ENGINEERING_GUIDE.md

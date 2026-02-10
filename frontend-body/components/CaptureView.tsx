@@ -32,6 +32,19 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
   // Local state for the current entry being crafted
   const [activeHabits, setActiveHabits] = useState<Record<string, boolean>>({});
 
+  // [New] Auto-Draft: Load from LocalStorage on mount
+  useEffect(() => {
+    const savedDraft = localStorage.getItem('lifeos_capture_draft');
+    if (savedDraft) {
+      setText(savedDraft);
+    }
+  }, []);
+
+  // [New] Auto-Draft: Save to LocalStorage on change
+  useEffect(() => {
+    localStorage.setItem('lifeos_capture_draft', text);
+  }, [text]);
+
   // Auto-detect habits based on text
   useEffect(() => {
     const detected: Record<string, boolean> = { ...activeHabits };
@@ -92,6 +105,7 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showToast, setShowToast] = useState(false);
   const [analysis, setAnalysis] = useState<string | null>(null);
+  const [detectedDate, setDetectedDate] = useState<string | null>(null); // [New] Store AI-detected date
 
   const handleSubmit = async (skipAi: boolean = false) => {
     if (!text.trim() || isSubmitting) return;
@@ -113,10 +127,18 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
         skipAi: skipAi // [New] Pass skipAi flag
       });
 
-      // 2.5. Store analysis result
-      // If skipAi is true, analysis might be null, but we might get markdown_body from backend fallback
+      // 2.5. Check Status
+      if (response.status === 'failed') {
+        throw new Error(response.message || 'Server failed to save entry');
+      }
+
+      // 2.6. Store analysis result
       if (response.data && response.data.markdown_body) {
         setAnalysis(response.data.markdown_body);
+        // [New] Store detected date from AI meta
+        if (response.data.meta?.date) {
+          setDetectedDate(response.data.meta.date);
+        }
       }
 
       // 3. Show success toast
@@ -126,6 +148,7 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
       // 4. Reset form ONLY if skipAi (SAVE button) - otherwise keep the input to show with analysis
       if (skipAi) {
         setText('');
+        localStorage.removeItem('lifeos_capture_draft'); // Clear draft
         setActiveHabits({});
       }
 
@@ -133,7 +156,7 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
       if (onSave) {
         // Construct a full LogEntry-like object for immediate UI update
         const newEntry = {
-          date: new Date().toISOString().split('T')[0], // Use simplified date for now or request.date
+          date: response.data?.meta?.date || detectedDate || new Date().toLocaleDateString('en-CA'),
           content: response.data?.markdown_body || text, // Use analyzed markdown if available, else raw text
           mood: response.data?.meta?.metrics?.mood || 5,
           focus: response.data?.meta?.metrics?.focus || 5,
@@ -294,30 +317,52 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
               </div>
 
               {/* Terminal Footer */}
-              <div className="mt-4 pt-3 border-t border-neon-blue/20 flex justify-between items-center">
+              <div className="mt-4 pt-3 border-t border-neon-blue/20 flex justify-between items-center bg-black/40 -mx-6 -mb-6 p-4">
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => {
+                      setAnalysis(null);
+                      setDetectedDate(null);
+                      setText('');
+                      localStorage.removeItem('lifeos_capture_draft');
+                      setActiveHabits({});
+                    }}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-all text-xs font-bold"
+                  >
+                    DISCARD
+                  </button>
+
+                  <button
+                    onClick={async () => {
+                      try {
+                        await navigator.clipboard.writeText(analysis);
+                        setShowToast(true);
+                        setTimeout(() => setShowToast(false), 2000);
+                      } catch (e) {
+                        alert("Clipboard Error: " + e);
+                      }
+                    }}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-all text-xs font-bold"
+                  >
+                    COPY
+                  </button>
+                </div>
+
                 <button
                   onClick={() => {
                     setAnalysis(null);
+                    setDetectedDate(null);
                     setText('');
+                    localStorage.removeItem('lifeos_capture_draft');
                     setActiveHabits({});
+                    setShowToast(false);
                   }}
-                  className="px-4 py-2 bg-slate-700/50 hover:bg-slate-700 border border-slate-600 text-slate-300 hover:text-white rounded-lg transition-all text-xs font-mono uppercase tracking-wider"
+                  className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2"
                 >
-                  Clear & New Entry
-                </button>
-                <button
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(analysis);
-                      setShowToast(true);
-                      setTimeout(() => setShowToast(false), 2000);
-                    } catch (e) {
-                      alert("Clipboard Error: " + e);
-                    }
-                  }}
-                  className="px-4 py-2 bg-neon-blue/10 hover:bg-neon-blue/20 border border-neon-blue/30 text-neon-blue rounded-lg transition-all text-xs font-mono uppercase tracking-wider"
-                >
-                  Copy to Clipboard
+                  <div className="flex items-center gap-2 text-green-400 font-bold text-xs uppercase tracking-wider mr-2">
+                    <CheckCircle size={14} /> Saved
+                  </div>
+                  <span>Start New Entry</span>
                 </button>
               </div>
             </div>

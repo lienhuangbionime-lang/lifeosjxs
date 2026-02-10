@@ -53,11 +53,16 @@ export interface LogEntry {
 // AI 分析的回傳結果 (配合 ingest.py 的回傳格式)
 export interface IngestResponse {
   success: boolean;
+  status: string;
+  message?: string;
   model: string;
   data: {
     markdown_body: string;
     meta: {
       metrics: { mood: number; focus: number; energy: number };
+      date?: string;
+      tags?: string[];
+      category?: string;
     };
     tasks: Array<{ title: string; status: string }>;
   };
@@ -150,13 +155,18 @@ export const cortex = {
     });
   },
 
+  // [New] Knowledge Graph Support
+  async getBrainGraph(limit: number = 500): Promise<any> {
+    return await fetchProxy(`/api/v1/brain/graph?limit=${limit}`);
+  },
+
   // [New] Ingest with Habits Support
   ingest: {
-    submit: async (data: { content: string; habits: string[]; skipAi?: boolean }): Promise<IngestResponse> => {
+    submit: async (data: { content: string; habits: string[]; skipAi?: boolean; date?: string }): Promise<IngestResponse> => {
       return await fetchProxy<IngestResponse>("/api/v1/ingest", {
         method: "POST",
         body: JSON.stringify({
-          date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+          date: data.date || new Date().toLocaleDateString('en-CA'), // Use custom date if provided, else local date
           text: data.content,
           habits: data.habits,
           skip_ai: data.skipAi

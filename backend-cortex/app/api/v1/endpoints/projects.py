@@ -34,7 +34,7 @@ async def create_project(project: ProjectCreate):
                 data["meta"] = {}
             data["meta"]["category"] = data.pop("category")
         
-        response = supabase.table("Project").insert(data).execute()
+        response = supabase.table("projects").insert(data).execute()
         return {"message": "Project created", "data": response.data}
     except Exception as e:
         import logging
@@ -53,13 +53,13 @@ async def update_project(project_id: int, project: ProjectUpdate):
     # [FIX] Handle missing 'category' column (if update tries to set it, though ProjectUpdate doesn't have it yet)
     # ProjectUpdate model doesn't have category, so this is safe for now.
     
-    response = supabase.table("Project").update(data).eq("id", project_id).execute()
+    response = supabase.table("projects").update(data).eq("id", project_id).execute()
     return {"message": "Project updated", "data": response.data}
 
 @router.delete("/{project_id}")
 async def delete_project(project_id: int):
     supabase = get_supabase_client()
-    response = supabase.table("Project").delete().eq("id", project_id).execute()
+    response = supabase.table("projects").delete().eq("id", project_id).execute()
     return {"message": "Project deleted", "data": response.data}
 
 @router.post("/{source_id}/merge")
@@ -68,8 +68,8 @@ async def merge_project(source_id: int, merge_data: ProjectMerge):
     target_id = merge_data.target_id
     
     # 1. Get Source and Target
-    source_res = supabase.table("Project").select("*").eq("id", source_id).single().execute()
-    target_res = supabase.table("Project").select("*").eq("id", target_id).single().execute()
+    source_res = supabase.table("projects").select("*").eq("id", source_id).single().execute()
+    target_res = supabase.table("projects").select("*").eq("id", target_id).single().execute()
     
     if not source_res.data or not target_res.data:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -81,9 +81,9 @@ async def merge_project(source_id: int, merge_data: ProjectMerge):
     new_tags = list(set((target.get("tags") or []) + (source.get("tags") or []) + [source["name"]]))
     
     # Update Target
-    supabase.table("Project").update({"tags": new_tags}).eq("id", target_id).execute()
+    supabase.table("projects").update({"tags": new_tags}).eq("id", target_id).execute()
     
     # Archive Source
-    supabase.table("Project").update({"status": "archived", "name": f"{source['name']} (Merged)"}).eq("id", source_id).execute()
+    supabase.table("projects").update({"status": "archived", "name": f"{source['name']} (Merged)"}).eq("id", source_id).execute()
 
     return {"message": f"Merged {source['name']} into {target['name']}"}

@@ -1,0 +1,54 @@
+{
+    "version": "1.0",
+    "last_updated": "2026-02-11T03:16:19+08:00",
+    "migrations": [
+        {
+            "id": "001",
+            "timestamp": "2026-02-11T03:00:00+08:00",
+            "description": "Initial schema creation",
+            "type": "create",
+            "status": "completed",
+            "tables_affected": [
+                "memories",
+                "projects",
+                "tasks",
+                "nodes",
+                "edges"
+            ],
+            "sql_file": "migrations/001_initial_schema.sql",
+            "ai_generated": false,
+            "user_approved": true,
+            "rollback_available": false,
+            "notes": "Base schema for LifeOS v3.5"
+        },
+        {
+            "id": "002",
+            "timestamp": "2026-02-11T04:27:00+08:00",
+            "description": "Add system usage tracking",
+            "type": "create",
+            "status": "completed",
+            "tables_affected": [
+                "system_usage"
+            ],
+            "ai_generated": true,
+            "user_approved": true,
+            "notes": "Tracks daily API usage"
+        }
+    ],
+    "pending_migrations": [],
+    "experimental_features": {
+        "memories_metadata_fields": {
+            "description": "Experimental fields being tested in JSONB metadata",
+            "fields": [],
+            "usage_count": {},
+            "promotion_candidates": []
+        }
+    },
+    "ai_suggestions": [],
+    "schema_health": {
+        "last_check": "2026-02-11T03:16:19+08:00",
+        "issues": [],
+        "warnings": [],
+        "optimization_opportunities": []
+    }
+}

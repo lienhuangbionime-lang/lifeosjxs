@@ -16,7 +16,12 @@ import uvicorn
 from contextlib import asynccontextmanager
 
 # Routers
-from app.api.v1 import ingest as ingest_router_mod
+# New Routers (v3.2)
+from routers import ingest_dual as ingest_router_mod
+from routers import media as media_router_mod
+from routers import brain as brain_router_mod  # [New] Brain Logic
+
+# Legacy Routers (Keep until refactored)
 from app.api.v1 import memories as memories_router_mod
 from app.api.v1 import system as system_router_mod
 from app.api.v1 import analyze as analyze_router_mod
@@ -66,11 +71,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.api.v1 import brain as brain_router_mod
-app.include_router(ingest_router_mod.router, prefix="/api/v1", tags=["Ingest"])
+# Include Routers (v3.2 first)
+app.include_router(ingest_router_mod.router) # Prefix /api/v1/ingest defined in router
+app.include_router(media_router_mod.router)
+app.include_router(brain_router_mod.router)  # Prefix /api/v1/brain defined in router
+
+# Include Legacy Routers
 app.include_router(memories_router_mod.router, prefix="/api/v1/memories", tags=["Memories"])
 app.include_router(system_router_mod.router, prefix="/api/v1/system", tags=["System"])
-app.include_router(brain_router_mod.router, prefix="/api/v1/brain", tags=["Brain"])
+# Removed old brain router inclusion
 
 app.include_router(analyze_router_mod.router, prefix="/api/v1/analyze", tags=["Analyze"])
 app.include_router(chat_router_mod.router, prefix="/api/v1/chat", tags=["Chat"])
@@ -86,9 +95,7 @@ def root():
         "cortex": "Active"
     }
 
-
-
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8001))
+    port = int(os.getenv("PORT", 8000)) # Default to 8000 for local proxy
     host = os.getenv("HOST", "0.0.0.0")
     uvicorn.run("main:app", host=host, port=port, log_level="info")

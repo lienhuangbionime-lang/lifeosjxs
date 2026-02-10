@@ -16,7 +16,7 @@ try:
     if not os.getenv("GOOGLE_API_KEY") and gemini_key:
         os.environ["GOOGLE_API_KEY"] = gemini_key
         
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
 except Exception as e:
     logger.error(f"Failed to init Gemini Embeddings: {e}")
     embeddings = None

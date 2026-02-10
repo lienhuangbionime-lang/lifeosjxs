@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Modal } from '@/components/ui/Modal';
-import { Save, Trash2, Calendar, Activity, Zap, X } from 'lucide-react';
+import { Save, Trash2, Calendar, Activity, Zap, X, Target } from 'lucide-react';
 import { LogEntry } from '@/lib/ai/core';
 
 interface EntryDetailModalProps {
@@ -20,7 +20,8 @@ export const EntryDetailModal = ({ entry, isOpen, onClose, onSave, onDelete }: E
     // Reset state when entry changes
     useEffect(() => {
         if (entry) {
-            setContent(entry.note || entry.content || ''); // Handle both field names
+            // @ts-ignore
+            setContent(entry.note || entry.content || '');
             setIsEditing(false);
         }
     }, [entry]);
@@ -28,10 +29,11 @@ export const EntryDetailModal = ({ entry, isOpen, onClose, onSave, onDelete }: E
     const handleSave = () => {
         if (!entry) return;
 
+        // @ts-ignore
         const updated = {
             ...entry,
-            content: content,
-            note: content // Sync both just in case
+            note: content,
+            content: content // Keep both for backward compat
         };
 
         onSave(updated);
@@ -50,8 +52,12 @@ export const EntryDetailModal = ({ entry, isOpen, onClose, onSave, onDelete }: E
             {/* Header Metrics */}
             <div className="flex items-center justify-between px-6 py-3 bg-slate-50 border-b border-slate-100">
                 <div className="flex gap-4 text-xs font-mono text-slate-500">
+                    {/* @ts-ignore */}
                     <span className="flex items-center gap-1"><Activity size={12} className="text-blue-500" /> MOOD: {entry.metrics?.mood || entry.mood || '-'}</span>
+                    {/* @ts-ignore */}
                     <span className="flex items-center gap-1"><Zap size={12} className="text-yellow-500" /> ENERGY: {entry.metrics?.energy || entry.energy || '-'}</span>
+                    {/* @ts-ignore */}
+                    <span className="flex items-center gap-1"><Target size={12} className="text-purple-500" /> FOCUS: {entry.metrics?.focus || entry.focus || '-'}</span>
                 </div>
                 <div className="flex gap-2">
                     {!isEditing ? (

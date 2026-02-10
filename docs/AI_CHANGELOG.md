@@ -3,6 +3,63 @@
 
 ---
 
+## 📅 2026-02-11: Version 3.5.0 (Agentic Ingest Evolution)
+
+### 1. "Prompts as Code" 實作
+為了讓使用者能自由維護日記分析格式，將 System Prompt 從程式碼中抽離：
+*   **外部化**: 建立 `backend-cortex/prompts/system_daily.md`。
+*   **動態讀取**: `SorterAgent` 現在會於每次請求時動態讀取該 Markdown 檔案。
+*   **維護性**: 使用者只需修改 Markdown 檔案即可調整 AI 思考邏輯與日記格式，無需進版或重啟。
+
+### 2. 資料提取協議 (Hidden JSON Protocol)
+為了解決 LLM 輸出 JSON 時換行符易錯的問題，並提高解析效率：
+*   **混合模式**: 讓 AI 輸出「原生 Markdown」(用於顯示) + 「末尾 JSON 塊」(用於數據)。
+*   **Python 解析器**: `SorterAgent._parse_markdown` 使用 Regex 提取末尾 JSON，並自動將其從給使用者看的 `content` 中剔除。
+*   **擴充性**: 新增指標 (如 Sleep) 會自動轉為 `metric:sleep:X` 格式的標籤，實現未來數據無痛增加。
+
+### 3. 前端強化與草稿保護 (UI/UX)
+*   **Auto-Draft**: `CaptureView` 引入 `localStorage` 保存機制，切換頁面不再遺失輸入內容。
+*   **Save to Brain**: 分析終端機中新增「💾 SAVE TO BRAIN」按鈕。
+    *   **Logic**: 修正了過去只能存入「原始內容」的限制，現在可直接將「AI 整理後的 Markdown」存入資料庫。
+*   **API 靈活性**: `next.config.js` 支援 `NEXT_PUBLIC_PYTHON_API_URL` 環境變數，方便本地前端連接遠端生產環境。
+
+### 4. 穩定性修復 (Backend Fixes)
+*   **路徑修復**: `ingest_dual.py` 的 `sys.path` 修正為指向 `backend-cortex` 根目錄，解決 `app` 模組導入問題。
+*   **模型解耦**: 將 API 請求模型命名為 `IngestLogEntry`，與系統內部的 `LogEntry` 區分，解決同名衝突導致的 500 錯誤。
+
+---
+
+## 📅 2026-02-11: Version 3.4.0 (Kernel Evolution)
+
+### 1. C Kernel 重大升級
+核心儲存引擎 `life_v3.c` 經歷了三次迭代，進化為真正可用的「數位原版」：
+
+*   **v3.2 (Temporal Drift Fix)**:
+    *   引入 `get_global_day_offset` 取代簡單的年份乘法。
+    *   修正閏年 (Leap Year) 導致的 Index 錯位問題。
+    *   **Immutability Policy Change**: 從「禁止覆寫」改為「Append-Only」，允許修正過去的錯誤，但保留所有歷史軌跡。
+
+*   **v3.3 (Genesis Header)**:
+    *   引入 `LifeHeader` 結構，佔用檔案前 32 bytes。
+    *   **Self-Describing Data**: 檔案現在會自我描述 `BASE_YEAR`，防止程式碼更新導致舊檔案讀取錯亂。
+
+*   **v3.4 (Dynamic Genesis)**:
+    *   **User-Centric Timeline**: 不再寫死 `2024` 為起始年。
+    *   當使用者**第一次寫入**時，系統會自動將「當下年份」鎖定為該使用者的 `Genesis Year`。
+    *   這確保了每位使用者的資料庫都是最小化且針對個人生命週期優化的。
+
+### 2. Python Driver 適配 (Adapter Pattern)
+為了配合 C Kernel 的演進，`kernel_driver.py` 進行了架構重構：
+
+*   **從 `ctypes` 轉向 `subprocess`**:
+    *   不再依賴脆弱的 DLL/Shared Object (`.so` / `.dll`)Loading。
+    *   改為直接調用編譯好的 CLI 工具 (`life.exe`)。
+    *   **優點**: 更穩定，且更容易測試 (CLI 可以單獨手動執行)。
+*   **Cloud-Only Fallback**:
+    *   新增檢測機制：如果 `life.exe` 不存在 (未編譯)，自動降級為「僅雲端模式」，不影響 App 運行。
+
+---
+
 ## 📅 2026-02-10: Version 3.2.0 (Cleanup & Kernel Integration)
 
 ### 1. 目錄清理與重組 (Directory Cleanup)

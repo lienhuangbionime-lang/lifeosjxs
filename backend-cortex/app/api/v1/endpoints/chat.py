@@ -19,8 +19,13 @@ async def ingest_content(
     try:
         count = 0
         if file:
+            # Track usage
+            from app.core.usage import track_usage
+            await track_usage(1)
             count += await rag_service.ingest_file(file)
         if text:
+            from app.core.usage import track_usage
+            await track_usage(1)
             count += await rag_service.ingest_text(text, {"source": "manual_entry"})
             
         return {"success": True, "chunks_added": count}

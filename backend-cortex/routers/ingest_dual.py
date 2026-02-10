@@ -15,70 +15,173 @@ import sys
 from pathlib import Path
 
 # 添加 backend-cortex 到 Python path
-sys.path.append(str(Path(__file__).parent.parent.parent))
+sys.path.append(str(Path(__file__).parent.parent))
 
-from kernel_driver import LifeKernel
-
+import kernel_driver
+from app.agents.sorter import SorterAgent
 
 router = APIRouter(prefix="/api/v1/ingest", tags=["ingest"])
 
-# 初始化 C Kernel
-try:
-    kernel = LifeKernel(auto_compile=True)
-    print("✅ C Kernel initialized successfully")
-except Exception as e:
-    print(f"⚠️ C Kernel initialization failed: {e}")
-    print("⚠️ Will continue with Supabase only")
-    kernel = None
+# Initialize C Kernel status check
+KERNEL_AVAILABLE = kernel_driver.check_kernel_integrity()
+if KERNEL_AVAILABLE:
+    print("[OK] C Kernel verified (Binary found)")
+else:
+    print("[WARN] C Kernel binary not found. Running in Cloud-Only mode.")
 
 
 # ============================================================================
 # Pydantic Models
 # ============================================================================
 
-class LogEntry(BaseModel):
-    """日記條目"""
+class IngestLogEntry(BaseModel):
+    """日記條目 (用於 API 請求與寫入)"""
     content: str = Field(..., description="日記內容")
     mood: int = Field(..., ge=0, le=10, description="心情 (0-10)")
     focus: int = Field(..., ge=0, le=10, description="專注度 (0-10)")
     energy: int = Field(..., ge=0, le=10, description="能量 (0-10)")
+    tags: list[str] = Field(default=[], description="標籤列表")
     date: Optional[str] = Field(None, description="日期 (YYYY-MM-DD)，不提供則為今天")
 
+
+class AnalysisData(BaseModel):
+    markdown_body: str
+    meta: dict
+    tasks: list
 
 class IngestResponse(BaseModel):
     """寫入回應"""
     status: str
     db_id: Optional[str] = None
-    kernel_locked: bool
+    kernel_locked: bool = False
     kernel_day_offset: Optional[int] = None
     message: str
+    model: str = "None"
+    data: Optional[AnalysisData] = None
 
+
+class IngestRequest(BaseModel):
+    """前端請求格式"""
+    text: str = Field(..., description="日記內容")
+    date: str = Field(..., description="日期 YYYY-MM-DD")
+    habits: list[str] = Field(default=[], description="習慣列表")
+    skip_ai: bool = Field(False, description="是否跳過 AI 分析")
 
 # ============================================================================
 # API Endpoints
 # ============================================================================
 
-@router.post("/log", response_model=IngestResponse)
-async def ingest_log(entry: LogEntry):
+@router.post("", response_model=IngestResponse)
+async def ingest_root(request: IngestRequest):
     """
-    寫入日記（雙寫入策略）
-    
-    流程：
-    1. 寫入 Supabase (雲端 / 可變動層) -> 給前端看
-    2. 寫入 C Kernel (本地 / 不可變層) -> 給自己留底
-    
-    Args:
-        entry: 日記條目
-    
-    Returns:
-        寫入結果
+    處理前端的 Ingest 請求
+    - skip_ai=True: 直接寫入資料庫 (Supabase + Kernel)
+    - skip_ai=False: 僅進行 AI 分析，不寫入資料庫
     """
     try:
-        # 解析日期
+        content = request.text
+        log_date = datetime.strptime(request.date, "%Y-%m-%d")
+        
+        # 情境 A: 僅 AI 分析 (不寫入 DB)
+        # 用戶點擊 "INGEST & ANALYZE"
+        # 使用 LifeOS v7.1 Sorter Agent
+        if not request.skip_ai:
+            try:
+                # Initialize Sorter Agent
+                agent = SorterAgent()
+                result = agent.process(content) # Returns LogEntry (v7.1 structured)
+                
+                # Sorter v7.1 puts the Markdown Analysis directly into result.content
+                # We can use it directly
+                md_output = result.content
+                
+                # Construct internal metrics dict
+                metrics = {
+                    "mood": result.mood or 5,
+                    "focus": result.focus or 5,
+                    "energy": result.energy or 5
+                }
+                
+                # [FIX] Automatically SAVE the analyzed result to DB
+                entry = IngestLogEntry(
+                    content=md_output,
+                    mood=metrics["mood"],
+                    focus=metrics["focus"],
+                    energy=metrics["energy"],
+                    date=result.date or request.date, # Use AI detected date if available
+                    tags=result.tags or []
+                )
+                
+                # Call ingest_log internal logic
+                save_res = await ingest_log(entry)
+                
+                # Attach analysis data to response
+                final_date = result.date or request.date
+                save_res.data = AnalysisData(
+                        markdown_body=md_output,
+                        meta={"metrics": metrics, "tags": result.tags, "category": result.category, "date": final_date},
+                        tasks=[] 
+                )
+                save_res.model = agent.model_name
+                
+                return save_res
+            except Exception as e:
+                print(f"[WARN] Sorter Analysis failed: {e}")
+                
+                # [FIX] Fallback: Save RAW content with default metrics
+                entry = IngestLogEntry(
+                    content=content,
+                    mood=5, focus=5, energy=5,
+                    date=request.date,
+                    tags=[]
+                )
+                
+                save_res = await ingest_log(entry)
+                
+                save_res.status = "analyzed_failed_saved"
+                save_res.message = f"Saved Raw Content (AI Failed: {str(e)})"
+                save_res.data = AnalysisData(
+                        markdown_body=f"## Cortex Offline\n\n{content}\n\n*Error: {str(e)}*",
+                        meta={"metrics": {"mood": 5, "focus": 5, "energy": 5}, "tags": [], "category": "Unsorted", "date": request.date},
+                        tasks=[]
+                )
+                
+                return save_res
+        
+        # 情境 B: 直接寫入 (跳過 AI)
+        # 用戶點擊 "SAVE"
+        entry = IngestLogEntry(
+            content=content,
+            mood=5,
+            focus=5,
+            energy=5,
+            date=request.date
+        )
+        
+        return await ingest_log(entry)
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/log", response_model=IngestResponse)
+async def ingest_log(entry: IngestLogEntry):
+    """
+    寫入日記（雙寫入策略）
+    """
+    try:
+        log_date = datetime.now()
         if entry.date:
-            log_date = datetime.strptime(entry.date, "%Y-%m-%d")
-        else:
-            log_date = datetime.now()
+            try:
+                # Try standard format first
+                log_date = datetime.strptime(entry.date, "%Y-%m-%d")
+            except Exception:
+                try:
+                    # Try flexible parsing
+                    from dateutil import parser
+                    log_date = parser.parse(entry.date)
+                except Exception as date_e:
+                    print(f"⚠️ Invalid date format '{entry.date}', using today: {date_e}")
         
         # ========================================
         # 1. 寫入 Supabase (工作副本)
@@ -90,27 +193,33 @@ async def ingest_log(entry: LogEntry):
             supabase_url = os.getenv("SUPABASE_URL")
             supabase_key = os.getenv("SUPABASE_KEY")
             
+            # 使用更安全的檢查，避免空字串
             if supabase_url and supabase_key:
-                supabase = create_client(supabase_url, supabase_key)
-                
-                data = {
-                    "date": log_date.date().isoformat(),
-                    "content": entry.content,
-                    "mood": entry.mood,
-                    "focus": entry.focus,
-                    "energy": entry.energy,
-                    "created_at": datetime.now().isoformat()
-                }
-                
-                db_result = supabase.table("memories").insert(data).execute()
-                db_id = db_result.data[0]['id'] if db_result.data else None
-                print(f"✅ Supabase: Saved to DB (ID: {db_id})")
+                try:
+                    supabase = create_client(supabase_url, supabase_key)
+                    
+                    data = {
+                        "date": log_date.date().isoformat(),
+                        "content": entry.content,
+                        "mood": entry.mood,
+                        "focus": entry.focus,
+                        "energy": entry.energy,
+                        "tags": entry.tags,
+                        "created_at": datetime.now().isoformat()
+                    }
+                    
+                    db_result = supabase.table("memories").insert(data).execute()
+                    db_id = db_result.data[0]['id'] if db_result.data else None
+                    print(f"[OK] Supabase: Saved to DB (ID: {db_id})")
+                except Exception as inner_e:
+                    print(f"[WARN] Supabase internal error: {inner_e}")
+                    db_id = None
             else:
                 db_id = None
-                print("⚠️ Supabase: Not configured, skipping")
+                print("[WARN] Supabase: Not configured, skipping")
         
         except Exception as e:
-            print(f"⚠️ Supabase write failed: {e}")
+            print(f"[WARN] Supabase write failed: {e}")
             db_id = None
         
         # ========================================
@@ -119,37 +228,85 @@ async def ingest_log(entry: LogEntry):
         kernel_locked = False
         kernel_day_offset = None
         
-        if kernel:
+        if KERNEL_AVAILABLE:
             try:
-                kernel_locked = kernel.save(
-                    date=log_date,
+                # 调用 kernel_driver 的写入函数
+                kernel_locked = kernel_driver.write_to_kernel(
+                    date_obj=log_date,
                     content=entry.content,
                     mood=entry.mood,
-                    focus=entry.focus,
-                    energy=entry.energy
+                    flags=1 # Default text flag
                 )
-                kernel_day_offset = kernel.get_day_offset(log_date)
                 
                 if kernel_locked:
-                    print(f"✅ C Kernel: Locked (Day {kernel_day_offset})")
+                    print(f"[OK] C Kernel: Secured for {log_date.date()}")
                 else:
-                    print(f"⚠️ C Kernel: Already exists (Day {kernel_day_offset})")
+                    print(f"[WARN] C Kernel: Write skipped or failed")
             
             except Exception as e:
-                print(f"❌ C Kernel write failed: {e}")
+                print(f"[ERROR] C Kernel write failed: {e}")
         
         # ========================================
         # 3. 返回結果
         # ========================================
+        # 3. 建立知識圖譜關聯 (Nodes & Edges)
+        # ========================================
+        if db_id:
+            try:
+                # 提取實體
+                import re
+                tags = re.findall(r"#([\w\u4e00-\u9fa5-]+)", entry.content)
+                mentions = re.findall(r"@([\w\u4e00-\u9fa5-]+)", entry.content)
+                wiki_links = re.findall(r"\[\[(.*?)\]\]", entry.content)
+                
+                # 所有的「對象」
+                entities = []
+                for t in tags: entities.append({"label": t, "type": "tag"})
+                for m in mentions: entities.append({"label": m, "type": "person"})
+                for w in wiki_links: entities.append({"label": w.strip(), "type": "concept"})
+                
+                # 去重並排除空值
+                unique_entities = {e["label"]: e for e in entities if e["label"]}.values()
+                
+                # 建立日記節點 ID (使用日期作為標籤以維持與 UI 一致)
+                log_node_label = entry.date or datetime.now().strftime("%Y-%m-%d")
+                
+                # 1. 確保日記節點存在
+                supabase.table("nodes").upsert({"label": log_node_label, "type": "concept", "metadata": {"is_log": True}}).execute()
+                log_node_res = supabase.table("nodes").select("id").eq("label", log_node_label).execute()
+                log_node_id = log_node_res.data[0]["id"] if log_node_res.data else None
+                
+                if log_node_id:
+                    for ent in unique_entities:
+                        # 2. 確保實體節點存在
+                        supabase.table("nodes").upsert({"label": ent["label"], "type": ent["type"]}).execute()
+                        ent_node_res = supabase.table("nodes").select("id").eq("label", ent["label"]).execute()
+                        ent_node_id = ent_node_res.data[0]["id"] if ent_node_res.data else None
+                        
+                        if ent_node_id:
+                            # 3. 建立連線 (Log -> Entity)
+                            supabase.table("edges").upsert({
+                                "source_id": log_node_id,
+                                "target_id": ent_node_id,
+                                "relation": "mentions"
+                            }, on_conflict="source_id, target_id, relation").execute()
+                            
+                print(f"[OK] Graph Sync: Generated {len(unique_entities)} linkages in Supabase")
+            except Exception as graph_e:
+                print(f"[WARN] Graph synchronization failed: {graph_e}")
+
+        # ========================================
+        # 4. 總結回應
+        # ========================================
         if db_id and kernel_locked:
             status = "synced"
-            message = "Successfully synced to both Supabase and C Kernel"
+            message = "Successfully synced to Supabase (Memory + Graph) and C Kernel"
         elif db_id:
             status = "db_only"
-            message = "Saved to Supabase only (Kernel already exists or unavailable)"
+            message = "Saved to Supabase (Memory + Graph) only"
         elif kernel_locked:
             status = "kernel_only"
-            message = "Saved to C Kernel only (Supabase unavailable)"
+            message = "Saved to C Kernel only"
         else:
             status = "failed"
             message = "Failed to save to both systems"
@@ -170,17 +327,6 @@ async def ingest_log(entry: LogEntry):
 async def verify_entry(date: str):
     """
     驗證指定日期的記錄
-    
-    檢查：
-    - Supabase 中是否存在
-    - C Kernel 中是否存在
-    - 兩者內容是否一致
-    
-    Args:
-        date: YYYY-MM-DD
-    
-    Returns:
-        驗證結果
     """
     try:
         log_date = datetime.strptime(date, "%Y-%m-%d")
@@ -201,18 +347,16 @@ async def verify_entry(date: str):
                 if result.data:
                     db_content = result.data[0]['content']
         except Exception as e:
-            print(f"⚠️ Supabase read failed: {e}")
+            print(f"[WARN] Supabase read failed: {e}")
         
         # 從 C Kernel 讀取
         kernel_content = None
-        if kernel:
+        if KERNEL_AVAILABLE:
             try:
-                result = kernel.read(log_date)
-                if result:
-                    marker, text = result
-                    kernel_content = text
+                # kernel_driver.read_from_kernel returns string content or None
+                kernel_content = kernel_driver.read_from_kernel(log_date)
             except Exception as e:
-                print(f"⚠️ C Kernel read failed: {e}")
+                print(f"[WARN] C Kernel read failed: {e}")
         
         # 比較
         exists_in_db = db_content is not None
@@ -237,41 +381,21 @@ async def verify_entry(date: str):
 async def read_from_kernel(date: str):
     """
     直接從 C Kernel 讀取（用於驗證數位原版）
-    
-    Args:
-        date: YYYY-MM-DD
-    
-    Returns:
-        C Kernel 中的原始記錄
     """
-    if not kernel:
+    if not KERNEL_AVAILABLE:
         raise HTTPException(status_code=503, detail="C Kernel not available")
     
     try:
         log_date = datetime.strptime(date, "%Y-%m-%d")
-        result = kernel.read(log_date)
+        text = kernel_driver.read_from_kernel(log_date)
         
-        if not result:
+        if not text:
             raise HTTPException(status_code=404, detail="Entry not found in C Kernel")
-        
-        marker, text = result
         
         return {
             "date": date,
-            "day_offset": kernel.get_day_offset(log_date),
             "content": text,
-            "metrics": {
-                "mood": marker.mood,
-                "focus": marker.focus,
-                "energy": marker.energy
-            },
-            "metadata": {
-                "text_offset": marker.text_offset,
-                "text_len": marker.text_len,
-                "created_at": datetime.fromtimestamp(marker.created_at).isoformat(),
-                "word_count": marker.word_count,
-                "media_count": marker.media_count
-            },
+            "params": "Metadata temporarily unavailable in Driver v3.4", 
             "source": "C Kernel (Digital Original)"
         }
     
@@ -285,9 +409,6 @@ async def read_from_kernel(date: str):
 async def kernel_status():
     """
     獲取 C Kernel 狀態
-    
-    Returns:
-        Kernel 狀態信息
     """
     from pathlib import Path
     
@@ -295,7 +416,7 @@ async def kernel_status():
     txt_path = Path("backend-cortex/kernel/storage/life.text")
     
     return {
-        "kernel_available": kernel is not None,
+        "kernel_available": KERNEL_AVAILABLE,
         "index_file_exists": idx_path.exists(),
         "text_file_exists": txt_path.exists(),
         "index_file_size": idx_path.stat().st_size if idx_path.exists() else 0,

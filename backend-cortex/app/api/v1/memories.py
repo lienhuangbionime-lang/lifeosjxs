@@ -25,7 +25,7 @@ async def get_recent_memories(limit: int = 20):
         # supabase client is sync; run in thread to avoid blocking event loop
         def query():
             try:
-                result = supabase.table("LogEntry").select("*").order("date", desc=True).limit(limit).execute()
+                result = supabase.table("memories").select("*").order("date", desc=True).limit(limit).execute()
                 return result
             except Exception as e:
                 # bubble up

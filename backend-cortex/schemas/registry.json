@@ -1,0 +1,453 @@
+{
+    "schema_version": "3.5",
+    "last_updated": "2026-02-11T03:16:19+08:00",
+    "database": "supabase",
+    "tables": {
+        "memories": {
+            "description": "核心日記與記憶表",
+            "columns": {
+                "id": {
+                    "type": "UUID",
+                    "primary_key": true,
+                    "nullable": false,
+                    "default": "gen_random_uuid()"
+                },
+                "content": {
+                    "type": "TEXT",
+                    "nullable": false,
+                    "description": "日記內容（Markdown 格式）"
+                },
+                "date": {
+                    "type": "DATE",
+                    "nullable": false,
+                    "default": "CURRENT_DATE",
+                    "indexed": true,
+                    "description": "日記日期"
+                },
+                "created_at": {
+                    "type": "TIMESTAMPTZ",
+                    "nullable": false,
+                    "default": "NOW()"
+                },
+                "updated_at": {
+                    "type": "TIMESTAMPTZ",
+                    "nullable": false,
+                    "default": "NOW()",
+                    "auto_update": true
+                },
+                "mood": {
+                    "type": "INT",
+                    "nullable": false,
+                    "default": 5,
+                    "check": "mood >= 0 AND mood <= 10",
+                    "description": "心情指標 (0-10)"
+                },
+                "focus": {
+                    "type": "INT",
+                    "nullable": false,
+                    "default": 5,
+                    "check": "focus >= 0 AND focus <= 10",
+                    "description": "專注度 (0-10)"
+                },
+                "energy": {
+                    "type": "INT",
+                    "nullable": false,
+                    "default": 5,
+                    "check": "energy >= 0 AND energy <= 10",
+                    "description": "能量值 (0-10)"
+                },
+                "tags": {
+                    "type": "TEXT[]",
+                    "nullable": false,
+                    "default": "'{}'",
+                    "indexed": true,
+                    "description": "標籤陣列"
+                },
+                "category": {
+                    "type": "TEXT",
+                    "nullable": true,
+                    "default": "'Life'",
+                    "description": "分類"
+                },
+                "is_ai": {
+                    "type": "BOOLEAN",
+                    "nullable": false,
+                    "default": false,
+                    "description": "是否由 AI 分析"
+                },
+                "ai_model": {
+                    "type": "TEXT",
+                    "nullable": true,
+                    "description": "使用的 AI 模型"
+                },
+                "embedding": {
+                    "type": "VECTOR(768)",
+                    "nullable": true,
+                    "description": "向量嵌入（用於語義搜索）"
+                }
+            },
+            "indexes": [
+                {
+                    "name": "idx_memories_date",
+                    "columns": [
+                        "date"
+                    ],
+                    "order": "DESC"
+                },
+                {
+                    "name": "idx_memories_tags",
+                    "columns": [
+                        "tags"
+                    ],
+                    "type": "GIN"
+                },
+                {
+                    "name": "idx_memories_created_at",
+                    "columns": [
+                        "created_at"
+                    ],
+                    "order": "DESC"
+                }
+            ],
+            "relations": [],
+            "rls_enabled": true,
+            "policies": [
+                {
+                    "name": "Allow all access",
+                    "for": "ALL",
+                    "using": "TRUE",
+                    "check": "TRUE"
+                }
+            ]
+        },
+        "projects": {
+            "description": "專案管理表",
+            "columns": {
+                "id": {
+                    "type": "UUID",
+                    "primary_key": true,
+                    "default": "gen_random_uuid()"
+                },
+                "name": {
+                    "type": "TEXT",
+                    "nullable": false
+                },
+                "description": {
+                    "type": "TEXT",
+                    "nullable": true
+                },
+                "status": {
+                    "type": "TEXT",
+                    "default": "'active'",
+                    "check": "status IN ('active', 'completed', 'on_hold', 'archived')"
+                },
+                "progress": {
+                    "type": "INT",
+                    "default": 0,
+                    "check": "progress >= 0 AND progress <= 100"
+                },
+                "start_date": {
+                    "type": "DATE",
+                    "nullable": true
+                },
+                "due_date": {
+                    "type": "DATE",
+                    "nullable": true
+                },
+                "parent_id": {
+                    "type": "UUID",
+                    "nullable": true,
+                    "references": {
+                        "table": "projects",
+                        "column": "id",
+                        "on_delete": "CASCADE"
+                    }
+                },
+                "created_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()"
+                },
+                "updated_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()",
+                    "auto_update": true
+                }
+            },
+            "indexes": [
+                {
+                    "name": "idx_projects_status",
+                    "columns": [
+                        "status"
+                    ]
+                }
+            ],
+            "rls_enabled": true
+        },
+        "tasks": {
+            "description": "任務清單表",
+            "columns": {
+                "id": {
+                    "type": "UUID",
+                    "primary_key": true,
+                    "default": "gen_random_uuid()"
+                },
+                "title": {
+                    "type": "TEXT",
+                    "nullable": false
+                },
+                "status": {
+                    "type": "TEXT",
+                    "default": "'todo'",
+                    "check": "status IN ('todo', 'in_progress', 'done')"
+                },
+                "project_id": {
+                    "type": "UUID",
+                    "nullable": true,
+                    "references": {
+                        "table": "projects",
+                        "column": "id",
+                        "on_delete": "CASCADE"
+                    }
+                },
+                "source_memory_id": {
+                    "type": "UUID",
+                    "nullable": true,
+                    "references": {
+                        "table": "memories",
+                        "column": "id",
+                        "on_delete": "SET NULL"
+                    }
+                },
+                "due_date": {
+                    "type": "DATE",
+                    "nullable": true
+                },
+                "priority": {
+                    "type": "INT",
+                    "default": 1,
+                    "check": "priority >= 1 AND priority <= 5"
+                },
+                "created_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()"
+                },
+                "updated_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()",
+                    "auto_update": true
+                }
+            },
+            "indexes": [
+                {
+                    "name": "idx_tasks_status",
+                    "columns": [
+                        "status"
+                    ]
+                },
+                {
+                    "name": "idx_tasks_project_id",
+                    "columns": [
+                        "project_id"
+                    ]
+                }
+            ],
+            "rls_enabled": true
+        },
+        "nodes": {
+            "description": "知識圖譜節點表",
+            "columns": {
+                "id": {
+                    "type": "UUID",
+                    "primary_key": true,
+                    "default": "gen_random_uuid()"
+                },
+                "label": {
+                    "type": "TEXT",
+                    "nullable": false,
+                    "unique": true
+                },
+                "type": {
+                    "type": "TEXT",
+                    "default": "'concept'",
+                    "check": "type IN ('concept', 'tag', 'person', 'tool', 'project')"
+                },
+                "metadata": {
+                    "type": "JSONB",
+                    "default": "'{}'"
+                },
+                "created_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()"
+                }
+            },
+            "indexes": [
+                {
+                    "name": "idx_nodes_type",
+                    "columns": [
+                        "type"
+                    ]
+                }
+            ],
+            "rls_enabled": true
+        },
+        "edges": {
+            "description": "知識圖譜連線表",
+            "columns": {
+                "id": {
+                    "type": "UUID",
+                    "primary_key": true,
+                    "default": "gen_random_uuid()"
+                },
+                "source_id": {
+                    "type": "UUID",
+                    "nullable": false,
+                    "references": {
+                        "table": "nodes",
+                        "column": "id",
+                        "on_delete": "CASCADE"
+                    }
+                },
+                "target_id": {
+                    "type": "UUID",
+                    "nullable": false,
+                    "references": {
+                        "table": "nodes",
+                        "column": "id",
+                        "on_delete": "CASCADE"
+                    }
+                },
+                "relation": {
+                    "type": "TEXT",
+                    "default": "'related'"
+                },
+                "weight": {
+                    "type": "FLOAT",
+                    "default": 1.0
+                },
+                "created_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()"
+                }
+            },
+            "indexes": [
+                {
+                    "name": "idx_edges_source",
+                    "columns": [
+                        "source_id"
+                    ]
+                },
+                {
+                    "name": "idx_edges_target",
+                    "columns": [
+                        "target_id"
+                    ]
+                }
+            ],
+            "unique_constraints": [
+                {
+                    "name": "unique_edge",
+                    "columns": [
+                        "source_id",
+                        "target_id",
+                        "relation"
+                    ]
+                }
+            ],
+            "rls_enabled": true
+        },
+        "system_usage": {
+            "description": "API Usage Tracking",
+            "columns": {
+                "id": {
+                    "type": "UUID",
+                    "primary_key": true,
+                    "default": "gen_random_uuid()"
+                },
+                "date": {
+                    "type": "DATE",
+                    "nullable": false,
+                    "unique": true,
+                    "default": "CURRENT_DATE"
+                },
+                "request_count": {
+                    "type": "INT",
+                    "default": 0
+                },
+                "token_usage": {
+                    "type": "INT",
+                    "default": 0
+                },
+                "updated_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()",
+                    "auto_update": true
+                }
+            },
+            "indexes": [
+                {
+                    "name": "idx_usage_date",
+                    "columns": [
+                        "date"
+                    ]
+                }
+            ],
+            "rls_enabled": true
+        }
+    },
+    "metadata_tracking": {
+        "memories": {
+            "experimental_fields": [],
+            "promoted_fields": [],
+            "common_patterns": {}
+        }
+    },
+    "extensions": [
+        {
+            "name": "vector",
+            "description": "向量搜索支持"
+        },
+        {
+            "name": "uuid-ossp",
+            "description": "UUID 生成"
+        }
+    ],
+    "triggers": [
+        {
+            "name": "update_memories_updated_at",
+            "table": "memories",
+            "event": "BEFORE UPDATE",
+            "function": "update_updated_at_column()"
+        },
+        {
+            "name": "update_projects_updated_at",
+            "table": "projects",
+            "event": "BEFORE UPDATE",
+            "function": "update_updated_at_column()"
+        },
+        {
+            "name": "update_tasks_updated_at",
+            "table": "tasks",
+            "event": "BEFORE UPDATE",
+            "function": "update_updated_at_column()"
+        }
+    ],
+    "ai_instructions": {
+        "when_user_wants_new_metric": [
+            "1. Read this registry.json to understand current schema",
+            "2. Analyze the metric type (simple numeric, complex tracking, etc.)",
+            "3. Check metadata_tracking.memories.experimental_fields for similar fields",
+            "4. Generate 2-3 options with pros/cons",
+            "5. Present to user for approval",
+            "6. Generate migration script if needed",
+            "7. Update this registry.json",
+            "8. Update Python Pydantic models",
+            "9. Log to evolution_log.json"
+        ],
+        "decision_tree": {
+            "simple_numeric": "Use JSONB metadata first, promote to column if used frequently",
+            "complex_tracking": "Create related table with foreign key to memories",
+            "boolean_flag": "Add column directly (cheap)",
+            "time_series": "Create dedicated timeseries table"
+        }
+    }
+}

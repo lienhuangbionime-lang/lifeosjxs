@@ -27,25 +27,21 @@ async def get_system_status():
         status = "ok" if (fast.get("configured") or smart.get("configured")) else "degraded"
         
         # Try to fetch real quota information from Gemini API
-        remaining_info = "Unknown"
+        # Get real usage from DB
         try:
-            if smart.get("configured"):
-                # Get model info to check quota
-                model_info = genai.get_model(f"models/{current_model}")
-                
-                # Check if quota info is available
-                if hasattr(model_info, 'rate_limit'):
-                    rate_limit = model_info.rate_limit
-                    # Format: "requests_per_minute / requests_per_day"
-                    rpm = getattr(rate_limit, 'requests_per_minute', 'N/A')
-                    rpd = getattr(rate_limit, 'requests_per_day', 'N/A')
-                    remaining_info = f"RPM: {rpm}, RPD: {rpd}"
-                else:
-                    # Fallback for free tier
-                    remaining_info = "Free Tier (1500 RPD)"
-        except Exception as quota_err:
-            logger.warning(f"Could not fetch quota info: {quota_err}")
-            remaining_info = "Free Tier (Check Console)"
+            from app.core.usage import get_daily_usage
+            usage = await get_daily_usage()
+            count = usage.get("request_count", 0)
+            
+            # Gemini Free Limit: 1500 RPD for Flash/Lite, 50 for Pro
+            is_pro = "pro" in current_model.lower()
+            limit = 50 if is_pro else 1500
+            remaining = max(0, limit - count)
+            
+            model_label = "Pro" if is_pro else "Flash/Lite"
+            remaining_info = f"{remaining} / {limit} ({model_label} Quota Today)"
+        except Exception as e:
+            remaining_info = "Free Tier (Usage tracking active)"
 
         return SystemStatusResponse(
             status=status,

@@ -27,9 +27,6 @@ export const Modal = ({ isOpen, onClose, children, title, className = '' }: Moda
 
                     {/* Content */}
                     <motion.div
-                        drag
-                        dragConstraints={{ left: -500, right: 500, top: -300, bottom: 300 }} // Allow some movement but keep in view
-                        dragElastic={0.1}
                         initial={{ opacity: 0, scale: 0.95, y: 10 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 10 }}
@@ -44,7 +41,7 @@ export const Modal = ({ isOpen, onClose, children, title, className = '' }: Moda
                                 </button>
                             </div>
                         )}
-                        <div className="p-0 cursor-auto" onPointerDown={(e) => e.stopPropagation()}>
+                        <div className="p-0 cursor-auto flex-1 flex flex-col min-h-0" onPointerDown={(e) => e.stopPropagation()}>
                             {children}
                         </div>
                     </motion.div>

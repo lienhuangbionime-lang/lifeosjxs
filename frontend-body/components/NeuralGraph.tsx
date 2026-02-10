@@ -3,7 +3,7 @@
 import React, { memo, useRef, useState, useMemo, useEffect } from 'react';
 import * as d3 from 'd3';
 import { Activity, Share2, Maximize2 } from 'lucide-react';
-import { CoreEngine, NEON_PALETTE, LogEntry, GraphNode, GraphLink } from '@/lib/ai/core';
+import { CoreEngine, NEON_PALETTE, LogEntry, GraphNode, GraphLink, GraphData } from '@/lib/ai/core';
 
 interface NeuralGraphProps {
     logs: LogEntry[];
@@ -16,11 +16,30 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: NeuralGraphProps) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const [stats, setStats] = useState({ nodes: 0, links: 0 });
 
-    // Data Processing via Core Engine
+    // Data Processing: Support both local logs and backend brain data
+    const [remoteData, setRemoteData] = useState<GraphData | null>(null);
+
+    useEffect(() => {
+        const fetchGraph = async () => {
+            try {
+                const { cortex } = await import('@/lib/api/client');
+                const data = await cortex.getBrainGraph(); // We need to add this to client.ts if missing
+                setRemoteData(data);
+            } catch (e) {
+                console.warn("Failed to fetch remote brain graph, falling back to local logs", e);
+            }
+        };
+        fetchGraph();
+    }, [logs]); // Refresh when logs change to stay responsive
+
     const graphData = useMemo(() => {
+        // If we have remote data (the truth from Supabase), use it!
+        if (remoteData && remoteData.nodes.length > 0) return remoteData;
+
+        // Fallback to local parsing for immediate feedback
         if (!logs || logs.length === 0) return { nodes: [], links: [] };
         return CoreEngine.parseGraphSeeds(logs);
-    }, [logs]);
+    }, [logs, remoteData]);
 
     useEffect(() => {
         if (!graphData.nodes.length || !svgRef.current || !containerRef.current) return;
@@ -92,7 +111,15 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: NeuralGraphProps) => {
                     return NEON_PALETTE.NEON_VIOLET;
                 }
 
-                return NEON_PALETTE.primary; // Fallback
+                if (d.group === 'person') {
+                    return NEON_PALETTE.secondary; // Cyan/Blue for People
+                }
+
+                if (d.group === 'concept') {
+                    return NEON_PALETTE.warning; // Yellow for Concepts
+                }
+
+                return NEON_PALETTE.primary; // Fallback Green for Projects/Others
             })
             .attr("stroke", "#0a0a0a")
             .attr("stroke-width", 2)
@@ -148,7 +175,7 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: NeuralGraphProps) => {
         // Labels (Only for larger nodes or tags to avoid clutter)
         const label = textLayer
             .selectAll("text")
-            .data(graphData.nodes.filter(n => (n.val || 0) > 3 || n.group === 'tag'))
+            .data(graphData.nodes.filter((n: GraphNode) => (n.val || 0) > 3 || n.group === 'tag'))
             .join("text")
             .attr("dy", (d: any) => (d.val || 5) * 1.5 + 12)
             .attr("text-anchor", "middle")

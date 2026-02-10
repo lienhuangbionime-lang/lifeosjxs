@@ -12,8 +12,8 @@ except ImportError:
 logger = logging.getLogger("app.core.gemini")
 
 # read defaults from env (these are model ids)
-DEFAULT_FAST = os.getenv("GEMINI_FAST_MODEL", "gemini-2.5-flash")
-DEFAULT_SMART = os.getenv("GEMINI_SMART_MODEL", "gemini-3.0-pro-preview")
+DEFAULT_FAST = os.getenv("GEMINI_FAST_MODEL", "gemini-flash-lite-latest")
+DEFAULT_SMART = os.getenv("GEMINI_SMART_MODEL", "gemini-pro-latest")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # perform genai.configure if possible

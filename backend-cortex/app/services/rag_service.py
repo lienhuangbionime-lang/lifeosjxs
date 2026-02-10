@@ -13,7 +13,16 @@ from langchain_community.vectorstores import SupabaseVectorStore
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough, RunnableParallel
+from langchain_core.messages import HumanMessage
 from supabase.client import Client, create_client
+
+# For Upgrade Features
+from PIL import Image
+import io
+import re
+import requests
+from bs4 import BeautifulSoup
+from youtube_transcript_api import YouTubeTranscriptApi
 
 # Init Logger
 logger = logging.getLogger("cortex.rag")
@@ -29,14 +38,10 @@ if SUPABASE_URL and SUPABASE_KEY:
     except Exception as e:
         logger.error(f"Failed to init Supabase: {e}")
 
-# Init Gemini (Lazy or Module Level - assumming GOOGLE_API_KEY is present)
-# If GOOGLE_API_KEY is missing, this might also throw, but let's assume it's set for now.
+# Init Gemini
 try:
     from app.core.gemini import get_model
-    
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/embedding-001")
-    
-    # Use smart model for chat (gemini-3.0-pro-preview)
+    embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
     smart_config = get_model("smart")
     llm = ChatGoogleGenerativeAI(model=smart_config["model"], temperature=0)
     logger.info(f"RAG Service initialized with model: {smart_config['model']}")
@@ -47,11 +52,8 @@ except Exception as e:
 
 class RAGService:
     def __init__(self):
-        if not supabase:
-            logger.warning("Supabase client not initialized. RAG service will fail.")
-        
-        if not embeddings:
-            logger.warning("Embeddings model not initialized. RAG service will fail.")
+        if not supabase or not embeddings:
+            logger.warning("RAG Service Disabled: Missing Supabase or Gemini Config")
             self.vector_store = None
             return
 
@@ -64,56 +66,55 @@ class RAGService:
         self.llm = llm
 
     async def ingest_text(self, text: str, meta: Dict[str, Any] = {}):
-        """
-        Chunk text and store in Supabase Vector Store
-        """
+        """Chunk text and store in Supabase Vector Store"""
         logger.info(f"Ingesting text... {meta}")
+        
+        # 1. Check for URL/YouTube
+        url_content = self._try_fetch_url_content(text)
+        if url_content:
+            text = f"Source URL: {text}\n\nContent:\n{url_content}"
+            meta["original_url"] = text.strip()
+
+        # 2. Split
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         docs = text_splitter.create_documents([text], metadatas=[meta])
         
-        # Store in Supabase
-        # Store in Supabase
+        # 3. Store
         if self.vector_store:
-            # Type guard for linter
-            vs = self.vector_store
-            vs.add_documents(docs)
+            self.vector_store.add_documents(docs)
             logger.info(f"Ingested {len(docs)} chunks.")
             return len(docs)
         return 0
 
     async def ingest_file(self, file: UploadFile):
-        """
-        Process uploaded file (PDF/TXT) and ingest
-        """
-        logger.info(f"Processing file: {file.filename}")
+        """Process file (PDF/Text/Image)"""
+        logger.info(f"Processing file: {file.filename} ({file.content_type})")
         
-        # Save temp file using tempfile for cross-platform compatibility
+        # 1. Handle Image
+        if file.content_type and file.content_type.startswith("image/"):
+            return await self._process_image(file)
+
+        # 2. Handle Documents (PDF/Text)
         suffix = Path(file.filename).suffix
         with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
             shutil.copyfileobj(file.file, tmp)
             temp_path = tmp.name
             
         try:
-            # Load
             if file.filename.lower().endswith(".pdf"):
                 loader = PyPDFLoader(temp_path)
             else:
                 loader = TextLoader(temp_path)
             
             raw_docs = loader.load()
-            
-            # Split
             text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
             docs = text_splitter.split_documents(raw_docs)
             
-            # Add metadata
             for doc in docs:
                 doc.metadata["source"] = file.filename
                 
-            # Store
             if self.vector_store:
-                vs = self.vector_store
-                vs.add_documents(docs)
+                self.vector_store.add_documents(docs)
                 logger.info(f"Ingested {len(docs)} chunks from {file.filename}")
                 return len(docs)
             return 0
@@ -125,35 +126,102 @@ class RAGService:
             if os.path.exists(temp_path):
                 os.remove(temp_path)
 
+    async def _process_image(self, file: UploadFile) -> int:
+        """Analyze image with Gemini Vision and store description"""
+        try:
+            content = await file.read()
+            image_data = {"mime_type": file.content_type, "data": content}
+            
+            # Use LLM to describe image
+            prompt = "Describe this image in detail. Extract any text, charts, or key information."
+            message = HumanMessage(
+                content=[{"type": "text", "text": prompt}, {"type": "image_url", "image_url": f"data:{file.content_type};base64,{image_data}"}] # Langchain format varies, checking docs
+            )
+            # Actually LangChain Google GenAI supports passing image bytes directly or base64
+            # Simplified: Use PIL and pass to model if strictly typed, but simpler approach:
+            
+            import base64
+            b64_data = base64.b64encode(content).decode("utf-8")
+            
+            message = HumanMessage(
+                content=[
+                    {"type": "text", "text": "Describe this image in detail."},
+                    {"type": "image_url", "image_url": f"data:{file.content_type};base64,{b64_data}"}
+                ]
+            )
+            
+            response = await self.llm.ainvoke([message])
+            description = response.content
+            
+            logger.info(f"Image analysis complete: {description[:50]}...")
+            
+            # Store description
+            return await self.ingest_text(description, {"source": file.filename, "type": "image_description"})
+            
+        except Exception as e:
+            logger.error(f"Image processing failed: {e}")
+            return 0
+
+    def _try_fetch_url_content(self, text: str) -> Optional[str]:
+        """Detect if text is a URL and fetch content"""
+        text = text.strip()
+        url_pattern = re.compile(r'https?://\S+')
+        if not url_pattern.match(text):
+            return None
+            
+        try:
+            # YouTube
+            if "youtube.com" in text or "youtu.be" in text:
+                return self._fetch_youtube_transcript(text)
+            
+            # General Web
+            response = requests.get(text, timeout=10)
+            soup = BeautifulSoup(response.content, 'html.parser')
+            
+            # Remove script/style
+            for script in soup(["script", "style"]):
+                script.decompose()
+                
+            return soup.get_text(separator='\n', strip=True)
+            
+        except Exception as e:
+            logger.warning(f"Failed to fetch URL {text}: {e}")
+            return None
+
+    def _fetch_youtube_transcript(self, url: str) -> str:
+        """Fetch YouTube transcript"""
+        try:
+            video_id = ""
+            if "v=" in url:
+                video_id = url.split("v=")[1].split("&")[0]
+            elif "youtu.be/" in url:
+                video_id = url.split("youtu.be/")[1].split("?")[0]
+            
+            if not video_id:
+                return "Could not extract Video ID"
+                
+            transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
+            full_text = " ".join([t['text'] for t in transcript_list])
+            return f"YouTube Transcript ({video_id}):\n{full_text}"
+            
+        except Exception as e:
+            return f"Failed to fetch YouTube transcript: {e}"
+
     async def query(self, question: str):
-        """
-        RAG Query (Fallback to LLM only if RAG is unavailable)
-        """
+        """RAG Query with fallback"""
         logger.info(f"Querying: {question}")
         
+        # Track usage (Simulated here, but system.py handles real tracking if middleware used)
+        # TODO: Increment usage counter in DB
+        
         if not self.vector_store:
-            logger.warning("Vector Store unavailable. Falling back to direct LLM chat.")
-            if not self.llm:
-                yield "Error: Cortex Offline (No LLM Configured)"
-                return
-
-            # Direct LLM Chat
-            try:
-                # Use a specific prompt for direct chat
-                direct_prompt = ChatPromptTemplate.from_template("You are Cortex, LifeOS Intelligent Assistant. Answer the user: {question}")
-                chain = direct_prompt | self.llm | StrOutputParser()
-                async for chunk in chain.astream({"question": question}):
-                    yield chunk
-            except Exception as e:
-                logger.error(f"LLM Chat Error: {e}")
-                yield f"Error: {str(e)}"
+            yield "Cortex Error: Vector Store Unavailable"
             return
 
-        # RAG Flow
         try:
             retriever = self.vector_store.as_retriever(search_kwargs={"k": 5})
             
-            template = """Answer the question based ONLY on the following context. If you cannot find the answer in the context, say so, but then try to answer from your general knowledge with a disclaimer.
+            template = """Answer based on context. If unknown, use general knowledge.
             
             Context:
             {context}
@@ -176,7 +244,7 @@ class RAGService:
                  yield chunk
 
         except Exception as e:
-            logger.error(f"RAG Chain Error: {e}")
-            yield f"Cortex Error: {str(e)}"
+            logger.error(f"RAG Error: {e}")
+            yield f"Error: {str(e)}"
 
 rag_service = RAGService()

@@ -54,6 +54,8 @@ export default function Home() {
           },
           // Ensure habits is an object
           habits: log.habits || {},
+          // Extract tags from root or meta
+          tags: log.tags || log.meta?.tags || [],
           // Ensure graphSeeds exists if possible (or extract from meta if backend puts it there)
           graphSeeds: log.meta?.graphSeeds || undefined
         }));

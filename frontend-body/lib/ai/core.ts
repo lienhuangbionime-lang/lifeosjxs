@@ -164,13 +164,23 @@ export const CoreEngine = {
             // Combine all content sources
             const content = (log.note || '') + '\n' + (log.graphSeeds?.content || '');
 
-            // 2. Extract Tags (#tag)
-            const tagMatches = content.match(/#([\w\u4e00-\u9fa5]+)/g) || [];
-            const tags = Array.from(new Set(tagMatches.map(t => t.slice(1))));
+            // 2. Extract Tags (#tag) - allow dots/dashes
+            const tagMatches = content.match(/#([\w\u4e00-\u9fa5.-]+)/g) || [];
+            let tags = Array.from(new Set(tagMatches.map(t => t.slice(1))));
+
+            // [FIX] Also include explicit tags from DB
+            if (log.tags && Array.isArray(log.tags)) {
+                const dbTags = log.tags.map(t => t.replace(/^#/, ''));
+                tags = Array.from(new Set([...tags, ...dbTags]));
+            }
 
             // 3. Extract Wiki Links ([[Link]])
             const linkMatches = content.match(/\[\[(.*?)\]\]/g) || [];
             const wikiLinks = Array.from(new Set(linkMatches.map(l => l.slice(2, -2))));
+
+            // 3.1 Extract Mentions (@Name)
+            const mentionMatches = content.match(/@([\w\u4e00-\u9fa5.-]+)/g) || [];
+            const mentions = Array.from(new Set(mentionMatches.map(m => m.slice(1))));
 
             // Process Tags
             tags.forEach(tag => {
@@ -193,16 +203,26 @@ export const CoreEngine = {
                 if (!targetId) return;
 
                 if (!nodes.has(targetId)) {
-                    // Wiki link target might be another Log Date or a Concept
-                    // If it looks like a date, treat as Log group? Or generic concept?
-                    // Let's treat as 'concept' (group 2/tag-like for now) unless we find a matching log later
                     nodes.set(targetId, { id: targetId, group: 'concept', val: 4 });
                 }
 
-                // Link: Log -> Concept
                 const linkKey = `${log.date}-${targetId}`;
                 if (!linkMap.has(linkKey)) {
-                    linkMap.set(linkKey, { source: log.date, target: targetId, value: 2 }); // Stronger link
+                    linkMap.set(linkKey, { source: log.date, target: targetId, value: 2 });
+                } else {
+                    linkMap.get(linkKey)!.value! += 1;
+                }
+            });
+
+            // Process Mentions
+            mentions.forEach(person => {
+                if (!nodes.has(person)) {
+                    nodes.set(person, { id: person, group: 'person', val: 5 });
+                }
+
+                const linkKey = `${log.date}-${person}`;
+                if (!linkMap.has(linkKey)) {
+                    linkMap.set(linkKey, { source: log.date, target: person, value: 2 });
                 } else {
                     linkMap.get(linkKey)!.value! += 1;
                 }
