@@ -91,3 +91,43 @@ body {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
+
+/* --- Mobile Optimizations --- */
+/* Prevent content overflow on mobile */
+html, body {
+  overflow-x: hidden;
+  width: 100%;
+  position: relative;
+}
+
+/* Improve touch interactions */
+* {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+}
+
+/* Smooth scrolling for better UX */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Prevent zoom on input focus (mobile) */
+@media screen and (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+/* Optimize touch dragging */
+.touch-drag {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Ensure full viewport height on mobile */
+@supports (-webkit-touch-callout: none) {
+  .min-h-screen {
+    min-height: -webkit-fill-available;
+  }
+}

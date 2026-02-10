@@ -10,6 +10,7 @@ import { NeuralGraph } from '@/components/NeuralGraph';
 import { HistoryView } from '@/components/HistoryView';
 import { SettingsView } from '@/components/SettingsView';
 import { Dashboard } from '@/components/Dashboard';
+import { CardStackDashboard } from '@/components/CardStackDashboard';
 import { Dock } from '@/components/Dock';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ConfirmModal, ContextModal } from '@/components/Modals'; // Adjust path if needed
@@ -90,7 +91,7 @@ export default function Home() {
 
   return (
 
-    <div className={`max-w-md mx-auto min-h-screen flex flex-col font-sans relative shadow-2xl transition-colors duration-500 ${bgClass}`}>
+    <div className={`w-full min-h-screen flex flex-col font-sans relative transition-colors duration-500 ${bgClass} overflow-x-hidden`}>
 
       {/* Modals */}
       <ConfirmModal
@@ -157,54 +158,56 @@ export default function Home() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-hidden relative flex flex-col items-center justify-center p-4">
-        {activeTab === 'capture' && (
-          <CaptureView
-            onSave={(entry) => {
-              // Update local state immediately
-              setLogs(prev => {
-                // Check if date already exists (upsert)
-                const exists = prev.find(l => l.date === entry.date);
-                if (exists) {
-                  return prev.map(l => l.date === entry.date ? { ...l, ...entry } : l);
-                }
-                return [entry, ...prev];
-              });
-              console.log("Locally saved:", entry);
-            }}
-          />
-        )}
+      <main className="flex-1 overflow-y-auto overflow-x-hidden relative flex flex-col items-center justify-start w-full">
+        <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
+          {activeTab === 'capture' && (
+            <CaptureView
+              onSave={(entry) => {
+                // Update local state immediately
+                setLogs(prev => {
+                  // Check if date already exists (upsert)
+                  const exists = prev.find(l => l.date === entry.date);
+                  if (exists) {
+                    return prev.map(l => l.date === entry.date ? { ...l, ...entry } : l);
+                  }
+                  return [entry, ...prev];
+                });
+                console.log("Locally saved:", entry);
+              }}
+            />
+          )}
 
-        {activeTab === 'graph' && (
-          <NeuralGraph
-            logs={logs}
-            onNodeClick={(node) => {
-              if (node.group === 1) setSelectedEntry(node.raw);
-              else setContextNode(node);
-            }}
-          />
-        )}
+          {activeTab === 'graph' && (
+            <NeuralGraph
+              logs={logs}
+              onNodeClick={(node) => {
+                if (node.group === 1) setSelectedEntry(node.raw);
+                else setContextNode(node);
+              }}
+            />
+          )}
 
-        {activeTab === 'list' && (
-          <HistoryView
-            logs={logs}
-            onSelectEntry={setSelectedEntry}
-          />
-        )}
+          {activeTab === 'list' && (
+            <HistoryView
+              logs={logs}
+              onSelectEntry={setSelectedEntry}
+            />
+          )}
 
-        {activeTab === 'project' && (
-          <ProjectBoard
-            onCreateProject={() => setIsCreateProjectOpen(true)}
-          />
-        )}
+          {activeTab === 'project' && (
+            <ProjectBoard
+              onCreateProject={() => setIsCreateProjectOpen(true)}
+            />
+          )}
 
-        {activeTab === 'dashboard' && (
-          <Dashboard logs={logs} />
-        )}
+          {activeTab === 'dashboard' && (
+            <CardStackDashboard logs={logs} />
+          )}
 
-        {activeTab === 'settings' && (
-          <SettingsView logs={logs} />
-        )}
+          {activeTab === 'settings' && (
+            <SettingsView logs={logs} />
+          )}
+        </div>
       </main>
 
       {/* Dock (Navigation) */}

@@ -1,0 +1,319 @@
+# Cursor AI Rules for LifeOS v3.1
+
+## 🎯 Primary Directive
+You are an AI coding assistant for **LifeOS v3.1**, a Second Brain Operating System.
+
+**BEFORE generating ANY code, you MUST read `SYSTEM_CONTEXT.md` in the project root.**
+
+---
+
+## 📋 Quick Reference
+
+### Tech Stack
+- **Frontend**: Next.js 14 + TypeScript + Tailwind CSS
+- **Backend**: FastAPI + Python 3.11+ + Pydantic v2
+- **Database**: Supabase (PostgreSQL)
+- **AI**: Google Gemini API
+
+### Absolute Rules
+
+#### ✅ ALWAYS Do
+- Use Tailwind CSS for ALL styling
+- Use Pydantic v2 for data validation
+- Use async/await for I/O operations
+- Use TypeScript strict mode
+- Use functional React components
+- Use descriptive variable names
+- Add error handling to all API calls
+- Validate user input
+- Use environment variables for secrets
+
+#### ❌ NEVER Do
+- Use inline styles (`style={{}}`)
+- Use CSS-in-JS libraries
+- Use external UI component libraries
+- Use `any` type without justification
+- Use `requests` library (use `httpx`)
+- Hardcode API URLs or secrets
+- Ignore TypeScript/Pydantic errors
+- Use string interpolation for SQL queries
+
+---
+
+## 🎨 Code Style
+
+### TypeScript/React
+```tsx
+'use client';
+
+import React, { useState } from 'react';
+import { Icon } from 'lucide-react';
+
+interface Props {
+  data: Type[];
+  onAction: (id: string) => void;
+}
+
+export const Component = ({ data, onAction }: Props) => {
+  const [state, setState] = useState<Type>(initial);
+
+  return (
+    <div className="bg-slate-900 rounded-xl p-4">
+      {/* Tailwind classes only */}
+    </div>
+  );
+};
+```
+
+### Python/FastAPI
+```python
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+
+router = APIRouter(prefix="/api/v1")
+
+class Request(BaseModel):
+    field: str = Field(..., description="Description")
+
+@router.post("/endpoint")
+async def endpoint(request: Request) -> dict:
+    try:
+        # Implementation
+        return {"status": "success", "data": result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+```
+
+---
+
+## 🗂️ File Structure
+
+### Component Files
+- Location: `frontend-body/components/`
+- Naming: `PascalCase.tsx`
+- Pattern: One component per file
+
+### API Routes
+- Location: `backend-cortex/routers/`
+- Naming: `snake_case.py`
+- Pattern: Group related endpoints
+
+### Pages
+- Location: `frontend-body/app/`
+- Naming: `page.tsx` (Next.js convention)
+
+---
+
+## 🎨 Styling Guidelines
+
+### Tailwind Classes
+```tsx
+// Layout
+className="flex flex-col gap-4 p-6"
+
+// Colors
+className="bg-slate-900 text-white border-slate-800"
+
+// Responsive
+className="w-full sm:w-1/2 lg:w-1/3"
+
+// States
+className="hover:bg-slate-800 active:scale-95 transition-all"
+
+// Rounded
+className="rounded-xl" // or rounded-2xl, rounded-3xl
+```
+
+### Color Palette
+- Primary: `indigo-500`, `indigo-600`
+- Success: `emerald-500`, `green-400`
+- Warning: `yellow-500`, `amber-400`
+- Error: `red-500`, `pink-500`
+- Neutral: `slate-900`, `slate-800`, `slate-700`
+
+---
+
+## 🔌 API Patterns
+
+### Frontend API Call
+```typescript
+const response = await fetch('http://localhost:8000/api/v1/endpoint', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(data),
+});
+
+if (!response.ok) {
+  throw new Error('API call failed');
+}
+
+const result = await response.json();
+```
+
+### Backend Endpoint
+```python
+@router.post("/endpoint")
+async def endpoint(request: RequestModel) -> dict:
+    try:
+        # Validate input (automatic with Pydantic)
+        # Process data
+        result = await process_data(request)
+        # Return response
+        return {
+            "status": "success",
+            "data": result
+        }
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal error")
+```
+
+---
+
+## 📊 Database Queries
+
+### Supabase Pattern
+```python
+# SELECT
+result = await supabase.table('memories').select('*').eq('user_id', user_id).execute()
+
+# INSERT
+result = await supabase.table('memories').insert(data).execute()
+
+# UPDATE
+result = await supabase.table('memories').update(data).eq('id', id).execute()
+
+# DELETE
+result = await supabase.table('memories').delete().eq('id', id).execute()
+```
+
+---
+
+## 🎯 Component Patterns
+
+### Modal
+```tsx
+<AnimatePresence>
+  {isOpen && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 bg-black/50 z-50"
+    >
+      {/* Modal content */}
+    </motion.div>
+  )}
+</AnimatePresence>
+```
+
+### Card
+```tsx
+<div className="bg-slate-900/50 rounded-3xl p-6 border border-slate-800 backdrop-blur-sm">
+  {/* Content */}
+</div>
+```
+
+### Button
+```tsx
+<button className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all disabled:opacity-50">
+  Action
+</button>
+```
+
+---
+
+## 🚨 Error Handling
+
+### Frontend
+```typescript
+try {
+  const result = await apiCall();
+  // Handle success
+} catch (error) {
+  console.error('Error:', error);
+  // Show user-friendly message
+  alert('Something went wrong. Please try again.');
+}
+```
+
+### Backend
+```python
+try:
+    result = await operation()
+except SpecificError as e:
+    raise HTTPException(status_code=400, detail="User-friendly message")
+except Exception as e:
+    logger.error(f"Unexpected error: {e}")
+    raise HTTPException(status_code=500, detail="Internal server error")
+```
+
+---
+
+## 📝 Documentation
+
+### Code Comments
+```typescript
+// Explain WHY, not WHAT
+// Use debounce to prevent excessive API calls during typing
+const debouncedSearch = useMemo(() => debounce(search, 300), []);
+```
+
+### Function Docs
+```python
+async def function_name(param: Type) -> ReturnType:
+    """
+    Brief description of what this function does.
+    
+    Args:
+        param: Description of parameter
+        
+    Returns:
+        Description of return value
+        
+    Raises:
+        ExceptionType: When this exception occurs
+    """
+```
+
+---
+
+## 🔄 When You Make a Mistake
+
+If you generate code that doesn't follow these rules:
+
+1. **Acknowledge the mistake**
+2. **Explain what was wrong**
+3. **Provide the corrected version**
+4. **Suggest updating SYSTEM_CONTEXT.md if needed**
+
+---
+
+## 📚 Key Files to Reference
+
+Before generating code, check these files:
+- `SYSTEM_CONTEXT.md` - Complete system context
+- `database-hippocampus/schema.sql` - Database schema
+- `frontend-body/lib/ai/core.ts` - Core engine
+- `backend-cortex/main.py` - API structure
+
+---
+
+## 🎓 Philosophy
+
+> Write code that is **obvious**, **consistent**, and **maintainable**.
+> Clever code is bad code. Clear code is good code.
+
+**Remember**:
+- Clarity > Cleverness
+- Consistency > Flexibility
+- Context > Prompts
+
+---
+
+**Last Updated**: 2026-02-10  
+**Version**: 3.1.0
+
+*For complete details, see `SYSTEM_CONTEXT.md`*

@@ -185,7 +185,7 @@ export const NeuralGraph = memo(({ logs, onNodeClick }: NeuralGraphProps) => {
     }, [graphData, onNodeClick]);
 
     return (
-        <div ref={containerRef} className="w-full h-[500px] bg-[#050505] rounded-3xl overflow-hidden relative border border-slate-800 shadow-2xl group">
+        <div ref={containerRef} className="w-full h-[400px] sm:h-[500px] lg:h-[600px] bg-[#050505] rounded-3xl overflow-hidden relative border border-slate-800 shadow-2xl group touch-none">
             <div className="absolute top-4 left-4 z-10 flex flex-col gap-1 pointer-events-none select-none">
                 <div className="bg-black/40 px-3 py-1 rounded-full text-xs text-[#00ffff] font-mono flex items-center gap-2 border border-[#00ffff]/20 backdrop-blur shadow-[0_0_15px_rgba(0,255,255,0.1)]">
                     <Activity size={12} className="animate-pulse" /> NEURAL MAP v3.2

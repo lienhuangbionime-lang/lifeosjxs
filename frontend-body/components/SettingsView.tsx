@@ -1,9 +1,8 @@
 'use client';
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, Plus, RotateCcw, Save, Settings, CheckSquare, MessageSquare, Shield } from 'lucide-react';
+import { Trash2, Plus, RotateCcw, Save, Settings, CheckSquare, MessageSquare } from 'lucide-react';
 import { useSettings } from '@/lib/hooks/useSettings';
-import { SettingsModal } from './SettingsModal';
 
 interface SettingsProps {
   logs?: any[];
@@ -12,7 +11,6 @@ interface SettingsProps {
 
 export const SettingsView = ({ logs, onImport }: SettingsProps) => {
   const { prompts, habits, apiKeys, addPrompt, removePrompt, addHabit, removeHabit, setApiKey, resetDefaults } = useSettings();
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Local state for inputs
   const [newPrompt, setNewPrompt] = useState('');
@@ -54,8 +52,6 @@ export const SettingsView = ({ logs, onImport }: SettingsProps) => {
 
   return (
     <div className="p-6 pb-24 space-y-8 animate-fade-in text-slate-300">
-      <SettingsModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
-
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div>
@@ -65,12 +61,6 @@ export const SettingsView = ({ logs, onImport }: SettingsProps) => {
           <p className="text-slate-500 text-sm mt-1">Configure your Neural Operating System.</p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={() => setIsModalOpen(true)}
-            className="flex items-center gap-2 px-4 py-1.5 rounded-lg bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20 text-xs font-bold transition-colors border border-indigo-500/20"
-          >
-            <Shield size={12} /> System Core
-          </button>
           <button
             onClick={() => { if (confirm('Reset to defaults?')) resetDefaults(); }}
             className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 text-xs font-bold transition-colors"

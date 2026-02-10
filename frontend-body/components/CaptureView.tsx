@@ -187,7 +187,7 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
   };
 
   return (
-    <div className="flex flex-col h-full p-6 pb-32 animate-fade-in relative max-w-3xl mx-auto w-full overflow-y-auto custom-scrollbar">
+    <div className="flex flex-col h-full w-full pb-32 animate-fade-in relative overflow-y-auto custom-scrollbar">
       {/* --- Header --- */}
       <div className="mb-8">
         <h2 className="text-3xl font-black text-white flex items-center gap-3">
