@@ -9,7 +9,6 @@ import { CaptureView } from '@/components/CaptureView';
 import { NeuralGraph } from '@/components/NeuralGraph';
 import { HistoryView } from '@/components/HistoryView';
 import { SettingsView } from '@/components/SettingsView';
-import { Dashboard } from '@/components/Dashboard';
 import { CardStackDashboard } from '@/components/CardStackDashboard';
 import { Dock } from '@/components/Dock';
 import { CommandPalette } from '@/components/CommandPalette';
