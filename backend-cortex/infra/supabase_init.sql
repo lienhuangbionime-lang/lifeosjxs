@@ -26,8 +26,8 @@ create table public.memories (
   is_ai boolean default false,
   ai_model text,
   
-  -- Vector Embedding (for RAG/Search) - 768 dim for Gemini/OpenAI
-  embedding vector(768)
+  -- Vector Embedding (for RAG/Search) - 3072 dim for new Gemini
+  embedding vector(3072)
 );
 
 -- Index for fast retrieval by date (Timeline View)
@@ -126,7 +126,7 @@ create policy "Allow all access" on public.system_usage for all using (true) wit
 
 -- Vector Search Function for RAG
 create or replace function match_memories (
-  query_embedding vector(768),
+  query_embedding vector(3072),
   match_threshold float,
   match_count int
 )

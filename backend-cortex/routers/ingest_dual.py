@@ -70,6 +70,7 @@ class IngestRequest(BaseModel):
     date: str = Field(..., description="日期 YYYY-MM-DD")
     habits: list[str] = Field(default=[], description="習慣列表")
     skip_ai: bool = Field(False, description="是否跳過 AI 分析")
+    mode: str = Field("append", description="寫入模式: overwrite (覆蓋), append (追加/合併)")
 
 # ============================================================================
 # API Endpoints
@@ -124,7 +125,7 @@ async def ingest_root(request: IngestRequest):
                 )
                 
                 # Call ingest_log internal logic
-                save_res = await ingest_log(entry)
+                save_res = await ingest_log(entry, mode=request.mode)
                 
                 # Attach analysis data to response
                 final_date = result.date or request.date
@@ -147,7 +148,7 @@ async def ingest_root(request: IngestRequest):
                     tags=[]
                 )
                 
-                save_res = await ingest_log(entry)
+                save_res = await ingest_log(entry, mode=request.mode)
                 
                 save_res.status = "analyzed_failed_saved"
                 save_res.message = f"Saved Raw Content (AI Failed: {str(e)})"
@@ -169,14 +170,14 @@ async def ingest_root(request: IngestRequest):
             date=request.date
         )
         
-        return await ingest_log(entry)
+        return await ingest_log(entry, mode=request.mode)
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/log", response_model=IngestResponse)
-async def ingest_log(entry: IngestLogEntry):
+async def ingest_log(entry: IngestLogEntry, mode: str = "append"):
     """
     寫入日記（雙寫入策略）
     """
@@ -209,9 +210,17 @@ async def ingest_log(entry: IngestLogEntry):
                 supabase_key = os.getenv("SUPABASE_KEY")
                 
                 if supabase_url and supabase_key:
+                    supabase = create_client(supabase_url, supabase_key)
+                    
+                    # [OVERWRITE MODE] Cleanup existing records for this date
+                    if mode == "overwrite":
+                        print(f"[CLEANUP] Overwrite mode: Removing existing records for {entry.date}")
+                        # 1. Delete Memories
+                        supabase.table("memories").delete().eq("date", entry.date).execute()
+                        # 2. Delete Node (Edges will cascade)
+                        supabase.table("nodes").delete().eq("label", entry.date).execute()
+                    
                     try:
-                        supabase = create_client(supabase_url, supabase_key)
-                        
                         # [NEW] Generate Embedding for RAG
                         from app.core.gemini import get_embeddings
                         embedding = get_embeddings(entry.content)
@@ -255,7 +264,9 @@ async def ingest_log(entry: IngestLogEntry):
                 else:
                     print("[WARN] Supabase: Not configured, skipping")
             except Exception as e:
-                print(f"[WARN] Supabase write failed: {e}")
+                import traceback
+                print(f"[ERROR] Supabase write critical failure: {e}")
+                traceback.print_exc()
                 db_id = None
 
         
@@ -311,6 +322,7 @@ async def ingest_log(entry: IngestLogEntry):
                 # 1. 確保日記節點存在 (儲存完整 Meta 以便圖譜點擊預覽)
                 log_metadata = {
                     "is_log": True,
+                    "memory_id": db_id, # Link back to the memory record
                     "content": entry.content,
                     "mood": entry.mood,
                     "focus": entry.focus,

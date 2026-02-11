@@ -160,16 +160,23 @@ export const cortex = {
     return await fetchProxy(`/api/v1/brain/graph?limit=${limit}`);
   },
 
+  async deleteNode(label: string): Promise<any> {
+    return await fetchProxy(`/api/v1/brain/node/${encodeURIComponent(label)}`, {
+      method: "DELETE",
+    });
+  },
+
   // [New] Ingest with Habits Support
   ingest: {
-    submit: async (data: { content: string; habits: string[]; skipAi?: boolean; date?: string }): Promise<IngestResponse> => {
+    submit: async (data: { content: string; habits: string[]; skipAi?: boolean; date?: string; mode?: 'overwrite' | 'append' }): Promise<IngestResponse> => {
       return await fetchProxy<IngestResponse>("/api/v1/ingest", {
         method: "POST",
         body: JSON.stringify({
           date: data.date || new Date().toLocaleDateString('en-CA'), // Use custom date if provided, else local date
           text: data.content,
           habits: data.habits,
-          skip_ai: data.skipAi
+          skip_ai: data.skipAi,
+          mode: data.mode || 'append'
         }),
       });
     }

@@ -116,3 +116,41 @@ async def ask_brain(request: AskRequest):
         return AskResponse(answer=answer, context=[])
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/node/{label}")
+async def delete_brain_node(label: str):
+    """
+    Delete a node from the Knowledge Graph by its label.
+    If it's a log node, also delete the corresponding memory entry.
+    """
+    try:
+        if not memory_service.client:
+            raise HTTPException(status_code=503, detail="Database connection unavailable")
+
+        # 1. Check if node exists and get metadata
+        node_res = memory_service.client.table("nodes").select("*").eq("label", label).execute()
+        if not node_res.data:
+            raise HTTPException(status_code=404, detail=f"Node '{label}' not found")
+        
+        node = node_res.data[0]
+        metadata = node.get("metadata", {})
+
+        # 2. If it's a log, try to delete the actual memory record
+        if metadata.get("is_log"):
+            # Try memory_id first, then fallback to date
+            memory_id = metadata.get("memory_id")
+            if memory_id:
+                print(f"Deleting memory by ID: {memory_id}")
+                memory_service.client.table("memories").delete().eq("id", memory_id).execute()
+            else:
+                # Fallback: Delete based on date (label)
+                print(f"Deleting memory by date: {label}")
+                memory_service.client.table("memories").delete().eq("date", label).execute()
+
+        # 3. Delete the node (Associated edges will be deleted via CASCADE)
+        res = memory_service.client.table("nodes").delete().eq("label", label).execute()
+        
+        return {"status": "success", "message": f"Node '{label}' and its records deleted."}
+    except Exception as e:
+        print(f"Node deletion error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

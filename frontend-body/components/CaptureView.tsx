@@ -107,7 +107,7 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [detectedDate, setDetectedDate] = useState<string | null>(null); // [New] Store AI-detected date
 
-  const handleSubmit = async (skipAi: boolean = false) => {
+  const handleSubmit = async (skipAi: boolean = false, mode: 'overwrite' | 'append' = 'append') => {
     if (!text.trim() || isSubmitting) return;
 
     setIsSubmitting(true);
@@ -124,7 +124,8 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
       const response = await cortex.ingest.submit({
         content: text,
         habits: habitLabels,
-        skipAi: skipAi // [New] Pass skipAi flag
+        skipAi: skipAi, // [New] Pass skipAi flag
+        mode: mode      // [New] Pass overwrite/append mode
       });
 
       // 2.5. Check Status
@@ -399,7 +400,14 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
 
         {/* Quick Save Button */}
         <button
-          onClick={() => handleSubmit(true)}
+          onClick={async () => {
+            // Basic Conflict Detection
+            const today = new Date().toLocaleDateString('en-CA');
+            // In a real app we'd fetch this, but for now we rely on the prompt or internal backend logic
+            // Let's implement a simple user prompt if we think there's a conflict
+            const choice = confirm("已有今日紀錄。點擊「確定」進行合併 (Merge)，點擊「取消」進行覆蓋 (Overwrite)。") ? 'append' : 'overwrite';
+            handleSubmit(true, choice);
+          }}
           disabled={!text.trim() || isSubmitting}
           className="px-6 py-4 bg-slate-800 text-slate-300 rounded-2xl font-bold text-sm hover:bg-slate-700 hover:text-white transition-all shadow-lg disabled:opacity-50 flex items-center gap-2"
         >
