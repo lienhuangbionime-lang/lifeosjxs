@@ -9,6 +9,7 @@ Read `SYSTEM_CONTEXT.md` FIRST before generating any code.
 - NEVER modify database schema without reading schemas/registry.json
 - NEVER use deprecated google.generativeai (use google.genai)
 - NEVER hardcode credentials
+- NEVER modify `prompts/system_daily.md` without verifying the latest version with the user.
 
 ## ✅ Mandatory Practices
 - ALWAYS use [OK], [WARN], [ERROR] for logs

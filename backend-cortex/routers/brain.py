@@ -60,10 +60,22 @@ def get_brain_graph(limit: int = 1000):
         for n in db_nodes:
             # Determine group based on type
             group_map = {"log": 1, "tag": "tag", "person": "person", "concept": "concept"}
-            group = group_map.get(n.get("type"), "concept")
+            node_metadata = n.get("metadata", {})
+            node_type = n.get("type", "concept")
             
-            # Val (size) based on importance
-            val = 5 if n.get("type") == "person" else (4 if n.get("type") == "concept" else 3)
+            # If metadata has is_log, force it to group 1 (Log)
+            if node_metadata.get("is_log"):
+                group = 1
+                val = 6
+            else:
+                group = group_map.get(node_type, "concept")
+                # Val (size) based on importance
+                if node_type == "person":
+                    val = 5
+                elif node_type == "concept":
+                    val = 4
+                else:
+                    val = 3
             
             formatted_nodes.append(GraphNode(
                 id=n["label"], # UI expects label as ID for matching links

@@ -32,11 +32,12 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
     const fetchProjects = async () => {
         setLoading(true);
         const { data, error } = await supabase
-            .from('Project')
+            .from('projects')
             .select('*')
             .order('progress', { ascending: false });
 
         if (data) setProjects(data as Project[]);
+        if (error) console.error("Fetch projects error:", error);
         setLoading(false);
     };
 
@@ -46,7 +47,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
         // Realtime Subscription
         const channel = supabase
             .channel('realtime projects')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'Project' }, (payload) => {
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, (payload) => {
                 console.log('Realtime change:', payload);
                 fetchProjects();
             })
@@ -147,12 +148,18 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
         if (!source || !target) return;
 
         if (window.confirm(`Merge "${source.name}" into "${target.name}"? This will archive the source project.`)) {
-            // Re-use logic or call API
-            // For now just simulate as per user request (frontend interactions)
-            console.log(`Merging ${sourceId} into ${targetId}`);
-            handleUpdate(sourceId, { status: 'archived' }); // Simulate merge
-            showToast("Projects merged successfully");
-            // In real app, call cortex.mergeProject(sourceId, targetId);
+            const executeMerge = async () => {
+                try {
+                    // Call the real merge API
+                    await cortex.mergeProject(sourceId, targetId);
+                    showToast("Projects merged successfully");
+                    fetchProjects(); // Refresh UI to show archived/merged state
+                } catch (e) {
+                    console.error("Merge failed:", e);
+                    showToast("Merge failed. Please try again.", "error");
+                }
+            };
+            executeMerge();
         }
     };
 

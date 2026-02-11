@@ -1,9 +1,24 @@
-# LifeOS v3.2 - AI Change Log
-**記錄重要變更與架構決策，供未來 AI 參考**
+## 📅 2026-02-11: Version 3.6.0 (Cortex Intelligence & UI Evolution)
+
+### 1. Stateful & Context-Aware Chat (RAG Evolution)
+*   **Memory Retrieval**: 實作了基於 Vector Search 的記憶檢索。`rag_service.py` 現在能從 Supabase `memories` 目錄查找相關歷史。
+*   **System Context Injection**: AI 現在在回答前會自動獲取「當前活躍專案」與「近期日記摘要」，實現真正的 Context-Aware。
+*   **Multi-turn Conversation**: `chat.py` 支援傳遞歷史對話紀錄，讓 Cortex 具備上下文連貫對談能力。
+*   **Real-time Embedding**: 修正 `ingest_dual.py`，現在每一條日記存入時，都會同步調用 `gemini-embedding-001` 產生向量並存入資料庫。
+
+### 2. UI Transformation (Neutral Assistant Look)
+*   **Aesthetic Pivot**: 從復古的「ZELFA // TERMINAL」轉向現代簡潔的「Cortex Assistant」風格（Indigo / Slate 配色）。
+*   **Mobile Optimization**: 將聊天視窗寬度縮小至 360px，並優化響應式佈局，解決手機版遮擋且無法移動的問題。
+*   **Custom Markdown Styling**: 手寫 Markdown 渲染樣式，擺脫對 `@tailwindcss/typography` 的依賴，確保在不同環境下視覺的一致性。
+
+### 3. Client-Side Model Governance
+*   **System Core Modal**: 新增對話框內的設定面板，允許使用者手動切換模型（如 Gemini 1.5 Pro/Flash）與管理 API Key。
+*   **Local Persistence**: 設定值存儲於 `localStorage`，兼顧隱私與使用的便利性。
 
 ---
 
 ## 📅 2026-02-11: Version 3.5.0 (Agentic Ingest Evolution)
+
 
 ### 1. "Prompts as Code" 實作
 為了讓使用者能自由維護日記分析格式，將 System Prompt 從程式碼中抽離：

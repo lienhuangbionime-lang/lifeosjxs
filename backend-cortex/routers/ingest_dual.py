@@ -19,6 +19,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 import kernel_driver
 from app.agents.sorter import SorterAgent
+from tools.scoring_engine import engine as scoring_engine
 
 router = APIRouter(prefix="/api/v1/ingest", tags=["ingest"])
 
@@ -41,7 +42,9 @@ class IngestLogEntry(BaseModel):
     focus: int = Field(..., ge=0, le=10, description="專注度 (0-10)")
     energy: int = Field(..., ge=0, le=10, description="能量 (0-10)")
     tags: list[str] = Field(default=[], description="標籤列表")
+    projects: list[str] = Field(default=[], description="偵測到的專案")
     date: Optional[str] = Field(None, description="日期 (YYYY-MM-DD)，不提供則為今天")
+    is_private: bool = Field(default=False, description="是否隔離 (僅存本地)")
 
 
 class AnalysisData(BaseModel):
@@ -58,6 +61,7 @@ class IngestResponse(BaseModel):
     message: str
     model: str = "None"
     data: Optional[AnalysisData] = None
+    is_private: bool = False
 
 
 class IngestRequest(BaseModel):
@@ -91,15 +95,20 @@ async def ingest_root(request: IngestRequest):
                 agent = SorterAgent()
                 result = agent.process(content) # Returns LogEntry (v7.1 structured)
                 
+                # [FACT-BASED SCORING] Use ScoringEngine for objective metrics
+                objective_focus = scoring_engine.calculate_score("focus", getattr(result, 'facts', []))
+                objective_energy = scoring_engine.calculate_score("energy", getattr(result, 'facts', []))
+
                 # Sorter v7.1 puts the Markdown Analysis directly into result.content
                 # We can use it directly
                 md_output = result.content
                 
                 # Construct internal metrics dict
+                # If AI provided facts, use objective score, else fallback to AI's feeling
                 metrics = {
                     "mood": result.mood or 5,
-                    "focus": result.focus or 5,
-                    "energy": result.energy or 5
+                    "focus": int(objective_focus["score"]) if getattr(result, 'facts', None) else (result.focus or 5),
+                    "energy": int(objective_energy["score"]) if getattr(result, 'facts', None) else (result.energy or 5)
                 }
                 
                 # [FIX] Automatically SAVE the analyzed result to DB
@@ -109,7 +118,9 @@ async def ingest_root(request: IngestRequest):
                     focus=metrics["focus"],
                     energy=metrics["energy"],
                     date=result.date or request.date, # Use AI detected date if available
-                    tags=result.tags or []
+                    tags=result.tags or [],
+                    projects=result.projects or [],
+                    is_private=result.is_private
                 )
                 
                 # Call ingest_log internal logic
@@ -186,41 +197,67 @@ async def ingest_log(entry: IngestLogEntry):
         # ========================================
         # 1. 寫入 Supabase (工作副本)
         # ========================================
-        try:
-            from supabase import create_client
-            import os
-            
-            supabase_url = os.getenv("SUPABASE_URL")
-            supabase_key = os.getenv("SUPABASE_KEY")
-            
-            # 使用更安全的檢查，避免空字串
-            if supabase_url and supabase_key:
-                try:
-                    supabase = create_client(supabase_url, supabase_key)
-                    
-                    data = {
-                        "date": log_date.date().isoformat(),
-                        "content": entry.content,
-                        "mood": entry.mood,
-                        "focus": entry.focus,
-                        "energy": entry.energy,
-                        "tags": entry.tags,
-                        "created_at": datetime.now().isoformat()
-                    }
-                    
-                    db_result = supabase.table("memories").insert(data).execute()
-                    db_id = db_result.data[0]['id'] if db_result.data else None
-                    print(f"[OK] Supabase: Saved to DB (ID: {db_id})")
-                except Exception as inner_e:
-                    print(f"[WARN] Supabase internal error: {inner_e}")
-                    db_id = None
-            else:
+        db_id = None
+        if entry.is_private:
+            print(f"[PRIVACY] Local-Only Mode triggered for {log_date.date()}. Skipping Cloud Sync.")
+        else:
+            try:
+                from supabase import create_client
+                import os
+                
+                supabase_url = os.getenv("SUPABASE_URL")
+                supabase_key = os.getenv("SUPABASE_KEY")
+                
+                if supabase_url and supabase_key:
+                    try:
+                        supabase = create_client(supabase_url, supabase_key)
+                        
+                        # [NEW] Generate Embedding for RAG
+                        from app.core.gemini import get_embeddings
+                        embedding = get_embeddings(entry.content)
+                        
+                        data = {
+                            "date": log_date.date().isoformat(),
+                            "content": entry.content,
+                            "mood": entry.mood,
+                            "focus": entry.focus,
+                            "energy": entry.energy,
+                            "tags": entry.tags,
+                            "embedding": embedding if embedding else None,
+                            "created_at": datetime.now().isoformat()
+                        }
+                        
+                        db_result = supabase.table("memories").insert(data).execute()
+                        db_id = db_result.data[0]['id'] if db_result.data else None
+                        print(f"[OK] Supabase: Saved to DB (ID: {db_id})")
+
+                        # [NEW] Auto-create Projects
+                        if entry.projects:
+                            for p_name in entry.projects:
+                                try:
+                                    p_check = supabase.table("projects").select("id").eq("name", p_name).execute()
+                                    if not p_check.data:
+                                        supabase.table("projects").insert({
+                                            "name": p_name,
+                                            "status": "active",
+                                            "progress": 0,
+                                            "meta": {"category": "macro", "detected_by": "ai"}
+                                        }).execute()
+                                        print(f"[OK] AI Auto-Project Created: {p_name}")
+                                    else:
+                                        print(f"[INFO] Project already exists: {p_name}")
+                                except Exception as proj_e:
+                                    print(f"[WARN] Failed to auto-project sync: {proj_e}")
+
+                    except Exception as inner_e:
+                        print(f"[WARN] Supabase internal error: {inner_e}")
+                        db_id = None
+                else:
+                    print("[WARN] Supabase: Not configured, skipping")
+            except Exception as e:
+                print(f"[WARN] Supabase write failed: {e}")
                 db_id = None
-                print("[WARN] Supabase: Not configured, skipping")
-        
-        except Exception as e:
-            print(f"[WARN] Supabase write failed: {e}")
-            db_id = None
+
         
         # ========================================
         # 2. 寫入 C Kernel (數位原版)
@@ -270,9 +307,22 @@ async def ingest_log(entry: IngestLogEntry):
                 
                 # 建立日記節點 ID (使用日期作為標籤以維持與 UI 一致)
                 log_node_label = entry.date or datetime.now().strftime("%Y-%m-%d")
-                
-                # 1. 確保日記節點存在
-                supabase.table("nodes").upsert({"label": log_node_label, "type": "concept", "metadata": {"is_log": True}}).execute()
+
+                # 1. 確保日記節點存在 (儲存完整 Meta 以便圖譜點擊預覽)
+                log_metadata = {
+                    "is_log": True,
+                    "content": entry.content,
+                    "mood": entry.mood,
+                    "focus": entry.focus,
+                    "energy": entry.energy,
+                    "date": log_node_label,
+                    "tags": entry.tags
+                }
+                supabase.table("nodes").upsert({
+                    "label": log_node_label, 
+                    "type": "concept", # Use concept to pass DB check constraint
+                    "metadata": log_metadata
+                }, on_conflict="label").execute()
                 log_node_res = supabase.table("nodes").select("id").eq("label", log_node_label).execute()
                 log_node_id = log_node_res.data[0]["id"] if log_node_res.data else None
                 
@@ -316,7 +366,8 @@ async def ingest_log(entry: IngestLogEntry):
             db_id=db_id,
             kernel_locked=kernel_locked,
             kernel_day_offset=kernel_day_offset,
-            message=message
+            message=message,
+            is_private=entry.is_private
         )
     
     except Exception as e:

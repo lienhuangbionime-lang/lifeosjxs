@@ -49,3 +49,22 @@ def get_model(mode: Literal["fast", "smart"] = "fast") -> Dict[str, Any]:
     except Exception as e:
         logger.exception("Error in get_model: %s", e)
         return {"model": DEFAULT_FAST, "configured": False}
+
+def get_embeddings(text: str) -> list[float]:
+    """
+    Generate vector embeddings for given text using Gemini.
+    """
+    if not genai or not GEMINI_API_KEY:
+        return []
+        
+    try:
+        result = genai.embed_content(
+            model="models/embedding-001",
+            content=text,
+            task_type="retrieval_document",
+            title="Cortex Memory"
+        )
+        return result['embedding']
+    except Exception as e:
+        logger.error(f"Failed to generate embeddings: {e}")
+        return []

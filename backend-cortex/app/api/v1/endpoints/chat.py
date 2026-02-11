@@ -10,6 +10,7 @@ logger = logging.getLogger("cortex.chat")
 
 class ChatMessage(BaseModel):
     message: str
+    history: list[dict[str, str]] = []
 
 @router.post("/ingest")
 async def ingest_content(
@@ -36,11 +37,16 @@ async def ingest_content(
 @router.post("/message")
 async def chat_message(body: ChatMessage):
     try:
+        # Track usage
+        from app.core.usage import track_usage
+        await track_usage(1)
+        
         # Return Streaming Response
         return StreamingResponse(
-            rag_service.query(body.message), 
+            rag_service.query(body.message, body.history), 
             media_type="text/event-stream"
         )
+
     except Exception as e:
         logger.error(f"Chat failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))

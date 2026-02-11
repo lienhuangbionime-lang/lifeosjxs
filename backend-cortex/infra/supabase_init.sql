@@ -123,3 +123,32 @@ create policy "Allow all access" on public.tasks for all using (true) with check
 create policy "Allow all access" on public.nodes for all using (true) with check (true);
 create policy "Allow all access" on public.edges for all using (true) with check (true);
 create policy "Allow all access" on public.system_usage for all using (true) with check (true);
+
+-- Vector Search Function for RAG
+create or replace function match_memories (
+  query_embedding vector(768),
+  match_threshold float,
+  match_count int
+)
+returns table (
+  id uuid,
+  content text,
+  metadata jsonb,
+  similarity float
+)
+language plpgsql
+as $$
+begin
+  return query
+  select
+    memories.id,
+    memories.content,
+    jsonb_build_object('date', memories.date, 'tags', memories.tags, 'category', memories.category) as metadata,
+    1 - (memories.embedding <=> query_embedding) as similarity
+  from memories
+  where 1 - (memories.embedding <=> query_embedding) > match_threshold
+  order by similarity desc
+  limit match_count;
+end;
+$$;
+

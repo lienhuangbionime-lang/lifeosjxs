@@ -219,9 +219,10 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
         <p className="text-slate-500 font-mono text-sm mt-2 flex items-center justify-between">
           <span>What is on your mind? <span className="text-indigo-500/50">#ideas #tasks</span></span>
           <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded border border-white/10 text-slate-400">
-            AI: {systemStatus ? `${systemStatus.current_model} (${systemStatus.remaining_requests || 'N/A'})` : 'Loading...'}
+            Engine: {systemStatus ? `${systemStatus.model_versions?.[0]?.split('/').pop()} (Fast Mode)` : 'Loading...'}
           </span>
         </p>
+
       </div>
 
       {/* --- Input Area --- */}

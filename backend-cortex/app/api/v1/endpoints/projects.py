@@ -19,7 +19,7 @@ class ProjectCreate(BaseModel):
     meta: Optional[Dict[str, Any]] = {}
     
 class ProjectMerge(BaseModel):
-    target_id: int
+    target_id: str
 
 @router.post("/")
 async def create_project(project: ProjectCreate):
@@ -43,7 +43,7 @@ async def create_project(project: ProjectCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.patch("/{project_id}")
-async def update_project(project_id: int, project: ProjectUpdate):
+async def update_project(project_id: str, project: ProjectUpdate):
     supabase = get_supabase_client()
     data = {k: v for k, v in project.dict().items() if v is not None}
     
@@ -57,13 +57,13 @@ async def update_project(project_id: int, project: ProjectUpdate):
     return {"message": "Project updated", "data": response.data}
 
 @router.delete("/{project_id}")
-async def delete_project(project_id: int):
+async def delete_project(project_id: str):
     supabase = get_supabase_client()
     response = supabase.table("projects").delete().eq("id", project_id).execute()
     return {"message": "Project deleted", "data": response.data}
 
 @router.post("/{source_id}/merge")
-async def merge_project(source_id: int, merge_data: ProjectMerge):
+async def merge_project(source_id: str, merge_data: ProjectMerge):
     supabase = get_supabase_client()
     target_id = merge_data.target_id
     

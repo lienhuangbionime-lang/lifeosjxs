@@ -12,7 +12,8 @@ class SorterAgent:
         if not api_key:
             raise ValueError("GOOGLE_API_KEY or GEMINI_API_KEY not found in environment variables")
         self.client = genai.Client(api_key=api_key)
-        self.model_name = "gemini-flash-lite-latest" # Use available Lite model 
+        # 優先從環境變數讀取，若無則預設為 Flash Lite
+        self.model_name = os.getenv("GEMINI_FAST_MODEL", "gemini-flash-lite-latest")
 
     def process(self, user_input: str) -> LogEntry:
         # Load System Prompt from external file
@@ -63,12 +64,15 @@ class SorterAgent:
         mood, focus, energy = 5, 5, 5
         category = "Life"
         tags_list = []
+        projects_list = []
+        facts_list = []
         
         # 1. Try to find the JSON block at the end
         json_pattern = re.compile(r"```json(.*?)```", re.DOTALL)
         matches = json_pattern.findall(text)
         
         clean_content = text
+        is_private = False
         
         if matches:
             try:
@@ -82,10 +86,20 @@ class SorterAgent:
                 energy = int(data.get("energy", 5))
                 category = str(data.get("category", "Life"))
                 tags_raw = data.get("tags", [])
+                projects_raw = data.get("projects", [])
+                is_private = bool(data.get("is_private", False))
+                facts_list = data.get("facts", [])
+
+                
                 if isinstance(tags_raw, list):
                     tags_list = tags_raw
                 else:
                     tags_list = []
+
+                if isinstance(projects_raw, list):
+                    projects_list = projects_raw
+                else:
+                    projects_list = []
                 
                 # Handle custom metrics by adding them to tags
                 if "custom_metrics" in data and isinstance(data["custom_metrics"], dict):
@@ -128,6 +142,10 @@ class SorterAgent:
             focus=focus,
             energy=energy,
             tags=tags_list,
+            projects=projects_list,
             category=category,
-            date=found_date
+            date=found_date,
+            is_private=is_private,
+            facts=facts_list
         )
+

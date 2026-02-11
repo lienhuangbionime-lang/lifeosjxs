@@ -13,7 +13,7 @@ from langchain_community.vectorstores import SupabaseVectorStore
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnablePassthrough, RunnableParallel
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from supabase.client import Client, create_client
 
 # For Upgrade Features
@@ -60,8 +60,8 @@ class RAGService:
         self.vector_store = SupabaseVectorStore(
             client=supabase,
             embedding=embeddings,
-            table_name="documents",
-            query_name="match_documents",
+            table_name="memories",
+            query_name="match_memories",
         )
         self.llm = llm
 
@@ -207,44 +207,82 @@ class RAGService:
         except Exception as e:
             return f"Failed to fetch YouTube transcript: {e}"
 
-    async def query(self, question: str):
-        """RAG Query with fallback"""
-        logger.info(f"Querying: {question}")
-        
-        # Track usage (Simulated here, but system.py handles real tracking if middleware used)
-        # TODO: Increment usage counter in DB
+    async def query(self, question: str, history: List[Dict[str, str]] = []):
+        """RAG Query with History and System Context"""
+        logger.info(f"Querying: {question} with history of {len(history)} messages")
         
         if not self.vector_store:
             yield "Cortex Error: Vector Store Unavailable"
             return
 
         try:
-            retriever = self.vector_store.as_retriever(search_kwargs={"k": 5})
+            # 1. Fetch System Context (Projects & Recent Memories)
+            system_context = await self._get_system_context()
             
-            template = """Answer based on context. If unknown, use general knowledge.
+            # 2. Prepare Context from Vector Store (RAG)
+            docs = await self.vector_store.asimilarity_search(question, k=5)
+            doc_context = "\n\n".join([d.page_content for d in docs])
             
-            Context:
-            {context}
+            # 3. Load System Persona from Markdown
+            persona_path = Path(__file__).parent.parent.parent / "prompts" / "system_cortex.md"
+            try:
+                cortex_persona = persona_path.read_text(encoding="utf-8")
+            except Exception as e:
+                logger.warning(f"Could not load cortex_brain.md: {e}")
+                cortex_persona = "You are Cortex, a Senior Tech Lead AI Assistant."
 
-            Question: {question}
-            """
-            prompt = ChatPromptTemplate.from_template(template)
+            # 4. Build Messages
+            messages = [
+                SystemMessage(content=f"""{cortex_persona}
+                
+                --- SYSTEM CONTEXT (CURRENT STATE) ---
+                {system_context}
+                
+                --- RETRIEVED KNOWLEDGE (RAG) ---
+                {doc_context}
+                
+                Current Task: Assist 蒼禾 with his request while adhering to the Value Weights and Operational Directives.
+                """)
+            ]
+
             
-            def format_docs(docs):
-                return "\n\n".join(doc.page_content for doc in docs)
-
-            rag_chain = (
-                RunnableParallel({"context": retriever | format_docs, "question": RunnablePassthrough()})
-                | prompt
-                | self.llm
-                | StrOutputParser()
-            )
-
-            async for chunk in rag_chain.astream(question):
-                 yield chunk
+            # Add History
+            for h in history:
+                if h["role"] == "user":
+                    messages.append(HumanMessage(content=h["content"]))
+                else:
+                    messages.append(AIMessage(content=h["content"]))
+            
+            # Add Current Question
+            messages.append(HumanMessage(content=question))
+            
+            # 4. Stream Response
+            async for chunk in self.llm.astream(messages):
+                 yield chunk.content
 
         except Exception as e:
             logger.error(f"RAG Error: {e}")
             yield f"Error: {str(e)}"
+
+    async def _get_system_context(self) -> str:
+        """Fetch current projects and recent memories for prompt context"""
+        if not supabase:
+            return "No system connection."
+        
+        try:
+            # Fetch active projects
+            proj_res = supabase.table("projects").select("name, status, progress").eq("status", "active").limit(5).execute()
+            projects = proj_res.data if proj_res.data else []
+            proj_str = "\n".join([f"- {p['name']} ({p['status']}, {p['progress']}%)" for p in projects])
+            
+            # Fetch recent memories
+            mem_res = supabase.table("memories").select("content, date").order("date", desc=True).limit(5).execute()
+            memories = mem_res.data if mem_res.data else []
+            mem_str = "\n".join([f"[{m['date']}] {m['content'][:100]}..." for m in memories])
+            
+            return f"Active Projects:\n{proj_str}\n\nRecent Memories:\n{mem_str}"
+        except Exception as e:
+            logger.warning(f"Failed to fetch system context: {e}")
+            return "Context unavailable."
 
 rag_service = RAGService()

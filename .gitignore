@@ -1,9 +1,27 @@
+# Credentials
+.env
+.env.local
+backend-cortex/.env
+frontend-body/.env.local
+backend-cortex/client_secret.json
+backend-cortex/token.json
+backend-cortex/gdrive_creds.json
+
+# Build and Dependencies
 node_modules/
 .next/
-.env
-__pycache__/
-backend-cortex/venv/
-backend-cortex/__pycache__/
 dist/
 build/
+backend-cortex/venv/
+
+# Python Cache
+__pycache__/
+backend-cortex/__pycache__/
+*.pyc
+
+# IDE
 .vscode/
+.idea/
+
+# Local backups (handled by GDrive tool, skip in git)
+sync_brain/

@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
-import { MoreHorizontal, Trash2, Edit2, GitMerge } from 'lucide-react';
+import { MoreHorizontal, Trash2, Edit2, GitMerge, CheckCircle } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { Project } from '@/lib/types/api-schema';
 
@@ -133,22 +133,37 @@ export const ProjectCard = ({ project, isSelectionMode, isSelected, onSelect, on
             {/* Title */}
             <div className="mt-6 px-4">
                 {isEditing ? (
-                    <input
-                        ref={inputRef}
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        onBlur={handleRename}
-                        onKeyDown={handleKeyDown}
-                        className="w-full text-xl font-bold text-white bg-white/5 border-b border-indigo-500 outline-none px-1"
-                    />
+                    <div className="flex items-center gap-2">
+                        <input
+                            ref={inputRef}
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            onKeyDown={handleKeyDown}
+                            className="flex-1 text-xl font-bold text-white bg-white/5 border-b-2 border-indigo-500 outline-none px-1 py-1"
+                        />
+                        <button
+                            onClick={(e) => { e.stopPropagation(); handleRename(); }}
+                            className="p-2 bg-indigo-600 text-white rounded-lg shadow-lg"
+                        >
+                            <CheckCircle size={18} />
+                        </button>
+                    </div>
                 ) : (
-                    <h3
-                        onDoubleClick={() => !isSelectionMode && setIsEditing(true)}
-                        className="text-xl font-bold tracking-tight text-white cursor-text hover:text-indigo-300 transition-colors"
-                        title="Double click to rename"
-                    >
-                        {project.name}
-                    </h3>
+                    <div className="flex items-center justify-between group/title">
+                        <h3
+                            onClick={() => !isSelectionMode && setIsEditing(true)}
+                            className="text-xl font-bold tracking-tight text-white cursor-pointer hover:text-indigo-300 transition-colors flex-1"
+                            title="Click to rename"
+                        >
+                            {project.name}
+                        </h3>
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
+                            className="opacity-0 group-hover/title:opacity-100 p-1 text-slate-500 hover:text-indigo-400 transition-all"
+                        >
+                            <Edit2 size={14} />
+                        </button>
+                    </div>
                 )}
             </div>
 

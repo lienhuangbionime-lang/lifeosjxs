@@ -1,10 +1,18 @@
 # app/api/v1/system.py
 from fastapi import APIRouter, HTTPException
 import logging
-from typing import Dict
+import os
+from datetime import datetime
+from typing import Dict, List, Optional
 
 from app.core.gemini import get_model
-from app.models.schemas import SystemStatusResponse, UpgradeResponse
+from app.models.schemas import (
+    SystemStatusResponse, 
+    UpgradeResponse, 
+    PromptRequest, 
+    PromptResponse
+)
+
 
 router = APIRouter()
 logger = logging.getLogger("app.api.v1.system")
@@ -59,14 +67,62 @@ async def get_system_status():
 async def trigger_upgrade():
     """
     Simulate an upgrade/evolution trigger.
-    Note: we MUST NOT write to .env in cloud environments. This endpoint logs the action and returns success.
-    TODO: In the future, record an upgrade request to the supabase `system_config` table and let a deployment job act on it.
     """
     try:
-        # Simulated action
         logger.info("Evolution triggered via /api/v1/system/upgrade")
-        # TODO: optionally write to supabase system_config table (deferred)
         return UpgradeResponse(success=True, message="Evolution triggered (simulated).")
     except Exception as e:
         logger.exception("Upgrade trigger failed: %s", e)
         raise HTTPException(status_code=500, detail="Failed to trigger upgrade")
+
+
+@router.get("/prompts/{name}", response_model=PromptResponse)
+async def get_prompt(name: str):
+    """
+    Retrieve a system prompt by name.
+    """
+    import os
+    from pathlib import Path
+    
+    prompt_dir = Path(__file__).parent.parent.parent.parent / "prompts"
+    file_path = prompt_dir / f"{name}.md"
+    
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail=f"Prompt '{name}' not found")
+    
+    try:
+        content = file_path.read_text(encoding="utf-8")
+        mtime = os.path.getmtime(file_path)
+        last_modified = datetime.fromtimestamp(mtime).isoformat()
+        
+        return PromptResponse(name=name, content=content, last_modified=last_modified)
+    except Exception as e:
+        logger.error(f"Error reading prompt {name}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to read prompt")
+
+
+from app.models.schemas import PromptRequest
+@router.post("/prompts/{name}", response_model=PromptResponse)
+async def update_prompt(name: str, request: PromptRequest):
+    """
+    Update a system prompt.
+    """
+    import os
+    from pathlib import Path
+    
+    prompt_dir = Path(__file__).parent.parent.parent.parent / "prompts"
+    file_path = prompt_dir / f"{name}.md"
+    
+    # Check if directory exists, if not create it (safety)
+    prompt_dir.mkdir(parents=True, exist_ok=True)
+    
+    try:
+        file_path.write_text(request.content, encoding="utf-8")
+        mtime = os.path.getmtime(file_path)
+        last_modified = datetime.fromtimestamp(mtime).isoformat()
+        
+        logger.info(f"Prompt '{name}' updated via API.")
+        return PromptResponse(name=name, content=request.content, last_modified=last_modified)
+    except Exception as e:
+        logger.error(f"Error updating prompt {name}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update prompt")

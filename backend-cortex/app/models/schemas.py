@@ -47,3 +47,13 @@ class SystemStatusResponse(BaseModel):
 class UpgradeResponse(BaseModel):
     success: bool
     message: Optional[str] = None
+
+
+class PromptRequest(BaseModel):
+    content: str
+
+
+class PromptResponse(BaseModel):
+    name: str
+    content: str
+    last_modified: str

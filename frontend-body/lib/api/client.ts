@@ -201,5 +201,17 @@ export const cortex = {
       method: "POST",
       body: JSON.stringify({ target_id: targetId }),
     });
+  },
+
+  // 6. Prompt Management (大腦指引管理)
+  async getPrompt(name: string): Promise<{ name: string; content: string; last_modified: string }> {
+    return await fetchProxy(`/api/v1/system/prompts/${name}`);
+  },
+
+  async updatePrompt(name: string, content: string): Promise<any> {
+    return await fetchProxy(`/api/v1/system/prompts/${name}`, {
+      method: "POST",
+      body: JSON.stringify({ content }),
+    });
   }
 };
