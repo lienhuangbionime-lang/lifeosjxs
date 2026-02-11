@@ -1,8 +1,9 @@
 // frontend-body/lib/api/client.ts
 
 export const API_BASE =
-  (process.env.NEXT_PUBLIC_API_URL && process.env.NEXT_PUBLIC_API_URL.replace(/\/+$/, "")) ||
-  "http://localhost:8000";
+  process.env.NODE_ENV === "development"
+    ? "http://localhost:8000"
+    : (process.env.NEXT_PUBLIC_API_URL || "https://lifeosjxs.onrender.com").replace(/\/+$/, "");
 
 async function fetchJSON<T>(input: string, init?: RequestInit): Promise<T> {
   const url = `${API_BASE}${input}`;
@@ -71,9 +72,10 @@ export interface IngestResponse {
 /* --- Private Helper (神經傳導物質) --- */
 // 自動處理 Rewrite 路徑與錯誤拋出
 async function fetchProxy<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  // [Critical] 強制將 /api/v1 轉為 /api/py 以觸發 next.config.js 的 Rewrite 規則
-  // 這樣才能從 Vercel (Frontend) 穿透到 Render (Backend)
-  const finalUrl = endpoint.replace(/^\/api\/v1/, "/api/py");
+  // [Critical] 在開發模式下，直接連往本地後端以避開可能失效的 Next.js Rewrite 緩存
+  const finalUrl = process.env.NODE_ENV === "development"
+    ? `${API_BASE}${endpoint}`
+    : endpoint.replace(/^\/api\/v1/, "/api/py");
 
   try {
     const res = await fetch(finalUrl, {

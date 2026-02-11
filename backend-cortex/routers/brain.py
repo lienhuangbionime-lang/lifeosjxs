@@ -38,7 +38,7 @@ class AskResponse(BaseModel):
 # --- Endpoints ---
 
 @router.get("/graph", response_model=GraphData)
-def get_brain_graph(limit: int = 1000):
+def get_brain_graph(limit: int = 5000):
     """
     Get Knowledge Graph directly from Supabase nodes and edges tables.
     This ensures the graph represents the actual structured data in the DB.

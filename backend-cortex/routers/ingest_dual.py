@@ -45,6 +45,7 @@ class IngestLogEntry(BaseModel):
     projects: list[str] = Field(default=[], description="偵測到的專案")
     date: Optional[str] = Field(None, description="日期 (YYYY-MM-DD)，不提供則為今天")
     is_private: bool = Field(default=False, description="是否隔離 (僅存本地)")
+    raw_text: Optional[str] = Field(None, description="原始未加工內容 (用於圖譜提取)")
 
 
 class AnalysisData(BaseModel):
@@ -81,8 +82,9 @@ async def ingest_root(request: IngestRequest):
     """
     處理前端的 Ingest 請求
     - skip_ai=True: 直接寫入資料庫 (Supabase + Kernel)
-    - skip_ai=False: 僅進行 AI 分析，不寫入資料庫
+    - skip_ai=False: 僅進行 AI 分析，不寫入 資料庫
     """
+    print(f"[INGEST] Incoming request for {request.date} (skip_ai={request.skip_ai}, mode={request.mode})")
     try:
         content = request.text
         log_date = datetime.strptime(request.date, "%Y-%m-%d")
@@ -106,22 +108,41 @@ async def ingest_root(request: IngestRequest):
                 
                 # Construct internal metrics dict
                 # If AI provided facts, use objective score, else fallback to AI's feeling
+                # [MANUAL OVERRIDE] Detect MOOD: X in raw text to respect user intent over AI/Engine
+                import re
+                manual_mood = re.search(r"(?i)MOOD:\s*(\d+)", content)
+                manual_focus = re.search(r"(?i)FOCUS:\s*(\d+)", content)
+                manual_energy = re.search(r"(?i)ENERGY:\s*(\d+)", content)
+
+                def resolve_metric(manual_match, ai_val, objective_res):
+                    if manual_match:
+                        return int(manual_match.group(1))
+                    # If AI was confident enough to change from 5
+                    if ai_val is not None and ai_val != 5:
+                        return ai_val
+                    # If facts exist, use objective score
+                    if objective_res.get("calculation_log"):
+                        return int(objective_res["score"])
+                    return ai_val or 5
+
                 metrics = {
-                    "mood": result.mood or 5,
-                    "focus": int(objective_focus["score"]) if getattr(result, 'facts', None) else (result.focus or 5),
-                    "energy": int(objective_energy["score"]) if getattr(result, 'facts', None) else (result.energy or 5)
+                    "mood": resolve_metric(manual_mood, result.mood, {"score": 5, "calculation_log": []}), # Mood has no engine yet
+                    "focus": resolve_metric(manual_focus, result.focus, objective_focus),
+                    "energy": resolve_metric(manual_energy, result.energy, objective_energy)
                 }
                 
                 # [FIX] Automatically SAVE the analyzed result to DB
+                # Pass BOTH raw text and processed markdown for logic downstream
                 entry = IngestLogEntry(
                     content=md_output,
                     mood=metrics["mood"],
                     focus=metrics["focus"],
                     energy=metrics["energy"],
-                    date=result.date or request.date, # Use AI detected date if available
+                    date=result.date or request.date,
                     tags=result.tags or [],
                     projects=result.projects or [],
-                    is_private=result.is_private
+                    is_private=result.is_private,
+                    raw_text=content # Pass original raw input for exhaustive graph extraction
                 )
                 
                 # Call ingest_log internal logic
@@ -198,10 +219,12 @@ async def ingest_log(entry: IngestLogEntry, mode: str = "append"):
         # ========================================
         # 1. 寫入 Supabase (工作副本)
         # ========================================
-        db_id = None
+        # [FORCE SYNC] For now, we save everything to Supabase to maintain RAG quality, 
+        # even if AI thinks it's private. C Kernel is preferred for absolute privacy but not ready.
         if entry.is_private:
-            print(f"[PRIVACY] Local-Only Mode triggered for {log_date.date()}. Skipping Cloud Sync.")
-        else:
+            print(f"[PRIVACY-LEVEL] AI tagged as Private for {log_date.date()}, but sinking to Supabase for RAG indexing.")
+        
+        if True: # Force always True for cloud sync until local kernel is active
             try:
                 from supabase import create_client
                 import os
@@ -236,9 +259,15 @@ async def ingest_log(entry: IngestLogEntry, mode: str = "append"):
                             "created_at": datetime.now().isoformat()
                         }
                         
-                        db_result = supabase.table("memories").insert(data).execute()
-                        db_id = db_result.data[0]['id'] if db_result.data else None
-                        print(f"[OK] Supabase: Saved to DB (ID: {db_id})")
+                        # [DEDUPLICATION] Check if identical content exists for this date
+                        dup_check = supabase.table("memories").select("id").eq("date", data["date"]).eq("content", data["content"]).execute()
+                        if dup_check.data:
+                            db_id = dup_check.data[0]["id"]
+                            print(f"[INFO] Supabase: Identical entry exists, skipping insert (ID: {db_id})")
+                        else:
+                            db_result = supabase.table("memories").insert(data).execute()
+                            db_id = db_result.data[0]['id'] if db_result.data else None
+                            print(f"[OK] Supabase: Saved to DB (ID: {db_id})")
 
                         # [NEW] Auto-create Projects
                         if entry.projects:
@@ -259,10 +288,13 @@ async def ingest_log(entry: IngestLogEntry, mode: str = "append"):
                                     print(f"[WARN] Failed to auto-project sync: {proj_e}")
 
                     except Exception as inner_e:
-                        print(f"[WARN] Supabase internal error: {inner_e}")
-                        db_id = None
+                        print(f"[ERROR] Supabase Insert Error: {inner_e}")
+                        import traceback
+                        traceback.print_exc()
+                        db_id = f"ERROR: {str(inner_e)}" 
                 else:
-                    print("[WARN] Supabase: Not configured, skipping")
+                    print("[WARN] Supabase: Not configured (missing URL/KEY)")
+                    db_id = "ERROR: Missing Supabase Env Vars"
             except Exception as e:
                 import traceback
                 print(f"[ERROR] Supabase write critical failure: {e}")
@@ -301,20 +333,42 @@ async def ingest_log(entry: IngestLogEntry, mode: str = "append"):
         # ========================================
         if db_id:
             try:
-                # 提取實體
+                # 提取實體 (從 原始輸入 + 處理過內容 雙重提取)
                 import re
-                tags = re.findall(r"#([\w\u4e00-\u9fa5-]+)", entry.content)
-                mentions = re.findall(r"@([\w\u4e00-\u9fa5-]+)", entry.content)
-                wiki_links = re.findall(r"\[\[(.*?)\]\]", entry.content)
+                processed_content = entry.content or ""
+                raw_text = getattr(entry, 'raw_text', '') or ""
+                combined_text = processed_content + " " + raw_text
                 
-                # 所有的「對象」
+                # 1. 標籤提取 (支持中文、底線、點號)
+                tags = re.findall(r"#([\w\u4e00-\u9fa5\._-]+)", combined_text)
+                # 2. 人物提取
+                mentions = re.findall(r"@([\w\u4e00-\u9fa5\._-]+)", combined_text)
+                # 3. 概念與跨日期引用 [[Name]]
+                wiki_links = re.findall(r"\[\[(.*?)\]\]", combined_text)
+                
+                # 所有的「對象」匯整
                 entities = []
-                for t in tags: entities.append({"label": t, "type": "tag"})
-                for m in mentions: entities.append({"label": m, "type": "person"})
+                for t in tags: entities.append({"label": t.strip(), "type": "tag"})
+                for m in mentions: entities.append({"label": m.strip(), "type": "person"})
                 for w in wiki_links: entities.append({"label": w.strip(), "type": "concept"})
                 
-                # 去重並排除空值
-                unique_entities = {e["label"]: e for e in entities if e["label"]}.values()
+                # 合併 AI 提取出的標籤
+                if hasattr(entry, 'tags') and entry.tags:
+                    for t in entry.tags: entities.append({"label": t.strip(), "type": "tag"})
+                if hasattr(entry, 'projects') and entry.projects:
+                    for p in entry.projects: entities.append({"label": p.strip(), "type": "project"})
+                
+                # 去重並清洗標籤
+                unique_entities = {}
+                for e in entities:
+                    label = e["label"]
+                    if not label: continue
+                    # 統一清洗標籤符號
+                    label_clean = label.strip("[]#@ ")
+                    if label_clean:
+                        # 優先保留非 concept 類型，如果同名
+                        if label_clean not in unique_entities or e["type"] != "concept":
+                            unique_entities[label_clean] = {"label": label_clean, "type": e["type"]}
                 
                 # 建立日記節點 ID (使用日期作為標籤以維持與 UI 一致)
                 log_node_label = entry.date or datetime.now().strftime("%Y-%m-%d")
@@ -338,8 +392,13 @@ async def ingest_log(entry: IngestLogEntry, mode: str = "append"):
                 log_node_res = supabase.table("nodes").select("id").eq("label", log_node_label).execute()
                 log_node_id = log_node_res.data[0]["id"] if log_node_res.data else None
                 
+                sync_count = 0
                 if log_node_id:
-                    for ent in unique_entities:
+                    for ent in unique_entities.values():
+                        # 防止自我連結 (例如 2/2 指向 2/2)
+                        if ent["label"] == log_node_label:
+                            continue
+
                         # 2. 確保實體節點存在
                         supabase.table("nodes").upsert({"label": ent["label"], "type": ent["type"]}).execute()
                         ent_node_res = supabase.table("nodes").select("id").eq("label", ent["label"]).execute()
@@ -347,13 +406,22 @@ async def ingest_log(entry: IngestLogEntry, mode: str = "append"):
                         
                         if ent_node_id:
                             # 3. 建立連線 (Log -> Entity)
-                            supabase.table("edges").upsert({
-                                "source_id": log_node_id,
-                                "target_id": ent_node_id,
-                                "relation": "mentions"
-                            }, on_conflict="source_id, target_id, relation").execute()
+                            # [DEDUPLICATION] Check if edge already exists
+                            edge_check = supabase.table("edges").select("id").eq("source_id", log_node_id).eq("target_id", ent_node_id).eq("relation", "related").execute()
                             
-                print(f"[OK] Graph Sync: Generated {len(unique_entities)} linkages in Supabase")
+                            if not edge_check.data:
+                                supabase.table("edges").insert({
+                                    "source_id": log_node_id,
+                                    "target_id": ent_node_id,
+                                    "relation": "related"
+                                }).execute()
+                                # Use basic addition to fix lint
+                                sync_count = sync_count + 1
+                            else:
+                                # Edge exists, consider it synced
+                                sync_count = sync_count + 1
+                            
+                print(f"[OK] Graph Sync: Generated {sync_count} linkages for {log_node_label}")
             except Exception as graph_e:
                 print(f"[WARN] Graph synchronization failed: {graph_e}")
 
@@ -371,7 +439,11 @@ async def ingest_log(entry: IngestLogEntry, mode: str = "append"):
             message = "Saved to C Kernel only"
         else:
             status = "failed"
-            message = "Failed to save to both systems"
+            # If db_id contains the error string, we show it
+            if db_id and db_id.startswith("ERROR:"):
+                message = f"Failed to save: {db_id}"
+            else:
+                message = "Failed to save to both systems (Cloud and Local both unavailable)"
         
         return IngestResponse(
             status=status,

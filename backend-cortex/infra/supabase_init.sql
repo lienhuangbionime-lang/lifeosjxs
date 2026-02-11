@@ -91,7 +91,10 @@ create table public.edges (
   relation text default 'related',
   weight float default 1.0,
   
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  
+  -- [FIX] Unique constraint for upsert
+  constraint unique_edge unique (source_id, target_id, relation)
 );
 
 

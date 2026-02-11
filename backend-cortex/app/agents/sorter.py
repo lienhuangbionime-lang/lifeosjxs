@@ -133,7 +133,7 @@ class SorterAgent:
         
         # 3. Extract Tags
         if not tags_list:
-             tags_found = re.findall(r"#(\w+)", clean_content)
+             tags_found = re.findall(r"#([\w\u4e00-\u9fa5\._-]+)", clean_content)
              tags_list = list(set(tags_found))
 
         return LogEntry(
