@@ -270,11 +270,11 @@ async def ingest_log(http_request: Request, request: IngestRequest):
              
         if not request.skipAi:
             # 1. Structure text for LLM
-            # Explicitly instruct the model to use the target ingest_date in its markdown structure
+            # Explicitly instruct the model to use the target ingest_date and user's manual metrics
             user_context = (
                 f"[SYSTEM INSTRUCTION]\n"
-                f"The target date for this log is: {ingest_date}. "
-                f"You MUST replace [YYYY-MM-DD] in your output (both Header and Graph Seeds) with exactly {ingest_date}.\n\n"
+                f"1. DATE: The target date for this log is {ingest_date}. You MUST replace [YYYY-MM-DD] in your output (Header and Graph Seeds) with {ingest_date}.\n"
+                f"2. METRICS: Examine the user's log. IF it contains a '> Daily Metrics' block with 'Mood: X', 'Focus: Y', 'Energy: Z', you MUST EXPLICITLY use those exact numbers in the JSON output meta.metrics. Do not auto-calculate them if the user provided them (Manual).\n\n"
             )
             prompt = f"{LIFEOS_V7_PROMPT}\n\n{user_context}[USER LOG - {ingest_date}]:\n{request.content}\n\n[HABITS LOGGED]:\n{', '.join(habits_list) if habits_list else 'None'}"
             
@@ -333,11 +333,28 @@ async def ingest_log(http_request: Request, request: IngestRequest):
             else:
                 logger.warning(f"⚠️ AI returned non-standard date format: {detected_date}")
 
-        # 2. Metrics Extraction (Robust)
+        # 2. Metrics Extraction (Robust + Fallback)
         metrics = meta.get("metrics") or {}
         mood = metrics.get("mood", 5)
         focus = metrics.get("focus", 5)
         energy = metrics.get("energy", 5)
+        
+        # 2.5 Force Override with Manual User Input (Regex Fallback)
+        import re
+        mood_match = re.search(r'- Mood:\s*(\d+)', request.content, re.IGNORECASE)
+        if mood_match:
+            try: mood = int(mood_match.group(1))
+            except: pass
+            
+        focus_match = re.search(r'- Focus:\s*(\d+)', request.content, re.IGNORECASE)
+        if focus_match:
+            try: focus = int(focus_match.group(1))
+            except: pass
+            
+        energy_match = re.search(r'- Energy:\s*(\d+)', request.content, re.IGNORECASE)
+        if energy_match:
+            try: energy = int(energy_match.group(1))
+            except: pass
 
         # ---------------------------------------------------------------
         # [Phase D] Scoring Engine Validation — AI Bias Detection
