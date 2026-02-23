@@ -291,5 +291,12 @@ export const cortex = {
     return await fetchProxy(`/api/v1/tasks/${taskId}/complete`, {
       method: "POST",
     });
-  }
+  },
+
+  // [New] One-Click Supabase Schema Setup — runs full LifeOS schema on user's DB
+  async setupDb(): Promise<{ success: boolean; message: string; errors: string[] }> {
+    return await fetchProxy("/api/v1/system/setup-db", {
+      method: "POST",
+    });
+  },
 };

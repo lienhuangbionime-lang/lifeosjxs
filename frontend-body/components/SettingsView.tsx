@@ -1,7 +1,7 @@
 'use client';
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Trash2, Plus, RotateCcw, Save, Settings, CheckSquare, MessageSquare } from 'lucide-react';
+import { Trash2, Plus, RotateCcw, Save, Settings, CheckSquare, MessageSquare, Database, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { useSettings } from '@/lib/hooks/useSettings';
 
 interface SettingsProps {
@@ -15,6 +15,34 @@ export const SettingsView = ({ logs, onImport }: SettingsProps) => {
   // Local state for inputs
   const [newPrompt, setNewPrompt] = useState('');
   const [newHabit, setNewHabit] = useState('');
+
+  // DB Setup state
+  const [setupStatus, setSetupStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [setupMessage, setSetupMessage] = useState('');
+
+  const handleSetupDb = async () => {
+    if (!apiKeys['supabase_url'] || !apiKeys['supabase_key']) {
+      setSetupStatus('error');
+      setSetupMessage('Please fill in Supabase URL and Key first.');
+      return;
+    }
+    setSetupStatus('loading');
+    setSetupMessage('');
+    try {
+      const { cortex } = await import('@/lib/api/client');
+      const result = await cortex.setupDb();
+      if (result.success) {
+        setSetupStatus('success');
+        setSetupMessage(result.message || 'Database setup complete!');
+      } else {
+        setSetupStatus('error');
+        setSetupMessage('Setup failed. Please check your service_role key.');
+      }
+    } catch (e: any) {
+      setSetupStatus('error');
+      setSetupMessage(e.message || 'Connection failed');
+    }
+  };
 
   // Helper (Legacy inline input - consider removing if fully moving to modal, but keeping for now)
   const APIInput = ({ label, skey, placeholder }: { label: string, skey: string, placeholder: string }) => (
@@ -155,10 +183,44 @@ export const SettingsView = ({ logs, onImport }: SettingsProps) => {
           <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
             <Settings className="text-pink-500" size={20} /> API Connections
           </h3>
+          <p className="text-xs text-slate-500 mb-4">Fill in your own keys to use your own Supabase database and Gemini quota. Leave blank to use the shared server.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <APIInput label="Google Gemini API Key" skey="google_api_key" placeholder="AIza..." />
             <APIInput label="Supabase URL" skey="supabase_url" placeholder="https://..." />
-            <APIInput label="Supabase Key" skey="supabase_key" placeholder="eyJ..." />
+            <div className="md:col-span-2">
+              <APIInput label="Supabase Key (service_role or anon)" skey="supabase_key" placeholder="eyJ..." />
+            </div>
+          </div>
+
+          {/* One-Click DB Setup Button */}
+          <div className="mt-6 pt-5 border-t border-white/5">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-white flex items-center gap-2">
+                  <Database size={15} className="text-cyan-400" /> Initialize Database
+                </p>
+                <p className="text-xs text-slate-500 mt-0.5">Automatically create all LifeOS tables in your Supabase. Use <span className="text-yellow-400 font-mono">service_role</span> key for this.</p>
+              </div>
+              <button
+                onClick={handleSetupDb}
+                disabled={setupStatus === 'loading'}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20 border border-cyan-500/20 text-sm font-bold transition-all disabled:opacity-50 whitespace-nowrap"
+              >
+                {setupStatus === 'loading' ? <Loader2 size={14} className="animate-spin" /> :
+                  setupStatus === 'success' ? <CheckCircle size={14} className="text-emerald-400" /> :
+                    setupStatus === 'error' ? <AlertCircle size={14} className="text-red-400" /> :
+                      <Database size={14} />}
+                {setupStatus === 'loading' ? 'Setting up...' :
+                  setupStatus === 'success' ? 'Done!' :
+                    setupStatus === 'error' ? 'Retry' :
+                      'Setup DB'}
+              </button>
+            </div>
+            {setupMessage && (
+              <p className={`mt-2 text-xs px-3 py-2 rounded-lg ${setupStatus === 'success' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
+                {setupMessage}
+              </p>
+            )}
           </div>
         </section>
       </div>
