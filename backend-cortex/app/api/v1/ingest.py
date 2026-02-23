@@ -248,6 +248,24 @@ async def ingest_log(http_request: Request, request: IngestRequest):
     # Default date if missing
     ingest_date = request.date or get_today_str_taipei()
     habits_list = request.habits or []
+
+    # [FIX] Extract date from content FIRST using Python regex
+    # User may type "# 2026-02-01" or "2026-02-01" or "2/1" in the content
+    import re as _re_date
+    # Match YYYY-MM-DD in content (most explicit)
+    _date_explicit = _re_date.search(r'(\d{4}-\d{2}-\d{2})', request.content)
+    if _date_explicit:
+        ingest_date = _date_explicit.group(1)
+        logger.info(f"[OK] Date extracted from content: {ingest_date}")
+    else:
+        # Match M/D or MM/DD with current year (e.g. 2/1 → 2026-02-01)
+        _date_short = _re_date.search(r'\b(\d{1,2})/(\d{1,2})\b', request.content)
+        if _date_short:
+            year = get_today_str_taipei()[:4]  # e.g. "2026"
+            month = _date_short.group(1).zfill(2)
+            day = _date_short.group(2).zfill(2)
+            ingest_date = f"{year}-{month}-{day}"
+            logger.info(f"[OK] Short date extracted: {ingest_date}")
     
     db = get_request_client(http_request)
     req_gemini = get_request_gemini_client(http_request)
@@ -278,15 +296,13 @@ async def ingest_log(http_request: Request, request: IngestRequest):
             )
             prompt = f"{LIFEOS_V7_PROMPT}\n\n{user_context}[USER LOG - {ingest_date}]:\n{request.content}\n\n[HABITS LOGGED]:\n{', '.join(habits_list) if habits_list else 'None'}"
             
-            # 2. Call Gemini API using modern SDK via req_gemini
+            # 2. Call Gemini API — using synchronous generate_content (proven stable)
             try:
-                from google.genai import types
-                chat = await req_gemini.aio.chats.create(
+                response = req_gemini.models.generate_content(
                     model=model_name,
-                    config=types.GenerateContentConfig(temperature=0.7)
+                    contents=prompt
                 )
-                response = await chat.send_message(prompt)
-                # 2. 解析 JSON
+                # Parse JSON from response
                 response_text = response.text.strip()
                 import re
                 json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
@@ -295,6 +311,7 @@ async def ingest_log(http_request: Request, request: IngestRequest):
                 ai_data = json.loads(response_text)
                 if not isinstance(ai_data, dict):
                     ai_data = {}
+                logger.info(f"[OK] Gemini analysis complete.")
             except Exception as e:
                 logger.error(f"Gemini/JSON Error: {e}")
                 ai_data = {}
