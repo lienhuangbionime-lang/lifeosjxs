@@ -1,42 +1,43 @@
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from typing import List, Dict, Any, Optional
 import logging
 import re
-from app.core.database import supabase
+from app.core.database import supabase, get_request_client
 
 router = APIRouter()
 logger = logging.getLogger("cortex.brain")
 
 @router.get("/graph")
-async def get_brain_graph(limit: int = 500):
+async def get_brain_graph(http_request: Request, limit: int = 500):
     """
     Generate the Neural Graph from memories.
     Replicates the logic of CoreEngine.parseGraphSeeds (Frontend) but on the backend.
     """
-    if not supabase:
+    db = get_request_client(http_request)
+    if not db:
         raise HTTPException(status_code=503, detail="Database unavailable")
 
     try:
         # 1. Fetch recent memories
-        response = supabase.table("memories").select("id,date,content,ai_insights,tags,mood,focus,energy").order("date", desc=True).limit(limit).execute()
+        response = db.table("memories").select("id,date,content,ai_insights,tags,mood,focus,energy").order("date", desc=True).limit(limit).execute()
         memories = response.data or []
 
         # 1.5 Fetch Structural Entities
         try:
-            resp_proj = supabase.table("projects").select("id,name,status").in_("status", ["active", "on_hold"]).execute()
+            resp_proj = db.table("projects").select("id,name,status").in_("status", ["active", "on_hold"]).execute()
             projects = resp_proj.data or []
         except:
             projects = []
 
         try:
-            resp_nodes = supabase.table("nodes").select("id,label,type").execute()
+            resp_nodes = db.table("nodes").select("id,label,type").execute()
             db_nodes = resp_nodes.data or []
         except:
             db_nodes = []
 
         try:
-            resp_edges = supabase.table("edges").select("source_id,target_id,relation,weight").execute()
+            resp_edges = db.table("edges").select("source_id,target_id,relation,weight").execute()
             db_edges = resp_edges.data or []
         except:
             db_edges = []

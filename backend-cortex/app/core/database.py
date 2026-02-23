@@ -4,6 +4,11 @@ import os
 import logging
 
 try:
+    from fastapi import Request
+except ImportError:
+    Request = None  # type: ignore
+
+try:
     from supabase import create_client, Client
 except Exception:  # defensive: package might not be installed in some envs
     create_client = None
@@ -52,3 +57,21 @@ def get_supabase_client() -> Client:
         # In production this might be fatal, or we can handle it at call site
         raise Exception("Supabase client is not initialized. Check SUPABASE_URL and SUPABASE_KEY.")
     return supabase
+
+
+def get_request_client(request: "Request"):
+    """
+    FastAPI dependency: returns a per-request Supabase client.
+    If the caller provides X-Supabase-URL + X-Supabase-Key headers,
+    those are used (per-user isolation). Falls back to global client.
+    """
+    req_url = request.headers.get("X-Supabase-URL")
+    req_key = request.headers.get("X-Supabase-Key")
+
+    if req_url and req_key and create_client:
+        try:
+            return create_client(req_url, req_key)
+        except Exception as e:
+            logger.warning(f"[WARN] Could not create per-request Supabase client: {e}")
+
+    return supabase  # fallback to global client from env

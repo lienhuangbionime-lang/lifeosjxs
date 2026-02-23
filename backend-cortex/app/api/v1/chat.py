@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List, Dict, Optional
@@ -7,7 +7,7 @@ import logging
 import json
 import asyncio
 from pathlib import Path
-from app.core.gemini import get_model, gemini_client
+from app.core.gemini import get_model, gemini_client, get_request_gemini_client
 from google import genai
 
 router = APIRouter()
@@ -85,16 +85,15 @@ Your Role:
 Constraint: Zero boilerplate. Direct reference. No generic summaries.
 """
 
-@router.post("/message")
-async def chat_message(request: ChatRequest):
-    """
-    Streaming Chat Endpoint
-    """
-    logger.info(f"💬 Chat Request: {request.message}")
+@router.post("/chat")
+async def stream_chat(request: Request, payload: ChatRequest):
+    """Stream chat with Gemini, using per-user Gemini Key if provided via X-Gemini-Key header."""
+    req_gemini = get_request_gemini_client(request)
+    logger.info(f"💬 Chat Request: {payload.message}")
     
     try:
         model_config = get_model("smart")
-        if not model_config.get("configured") or not gemini_client:
+        if not model_config.get("configured") or not req_gemini:
              raise HTTPException(status_code=503, detail="Cortex AI not configured (API Key missing)")
 
         from app.core.gemini import sanitize_model_name
@@ -116,7 +115,7 @@ async def chat_message(request: ChatRequest):
              role = "user" if msg.role == "user" else "model"
              gemini_history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg.content)]))
              
-        chat = gemini_client.aio.chats.create(model=model_name, config=types.GenerateContentConfig(system_instruction=build_system_prompt()))
+        chat = req_gemini.aio.chats.create(model=model_name, config=types.GenerateContentConfig(system_instruction=build_system_prompt()))
         
         async def event_generator():
             try:

@@ -3,6 +3,11 @@ from typing import Literal, Dict, Any
 import os
 import logging
 
+try:
+    from fastapi import Request
+except ImportError:
+    Request = None  # type: ignore
+
 # genai is the modern google.genai wrapper used in the project; defensive import
 try:
     from google import genai
@@ -119,3 +124,18 @@ def get_embeddings(text: str) -> list[float]:
     except Exception as e:
         logger.error(f"Failed to generate embeddings: {e}")
         return []
+
+
+def get_request_gemini_client(request: "Request"):
+    """
+    FastAPI dependency: returns a per-request Gemini client.
+    If the caller provides X-Gemini-Key header, a dedicated client is created.
+    Falls back to the global gemini_client from env.
+    """
+    req_key = request.headers.get("X-Gemini-Key")
+    if req_key and genai:
+        try:
+            return genai.Client(api_key=req_key)
+        except Exception as e:
+            logger.warning(f"[WARN] Could not create per-request Gemini client: {e}")
+    return gemini_client  # fallback to global

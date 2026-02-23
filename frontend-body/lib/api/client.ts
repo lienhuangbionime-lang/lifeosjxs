@@ -72,6 +72,24 @@ export interface IngestResponse {
 }
 
 /* --- Private Helper (神經傳導物質) --- */
+// 讀取使用者在 SettingsView 設定的 API Keys
+function getUserApiHeaders(): Record<string, string> {
+  try {
+    if (typeof window === "undefined") return {};
+    const raw = localStorage.getItem("life-os-settings-storage");
+    if (!raw) return {};
+    const settings = JSON.parse(raw);
+    const apiKeys = settings?.state?.apiKeys || {};
+    const headers: Record<string, string> = {};
+    if (apiKeys.google_api_key) headers["X-Gemini-Key"] = apiKeys.google_api_key;
+    if (apiKeys.supabase_url) headers["X-Supabase-URL"] = apiKeys.supabase_url;
+    if (apiKeys.supabase_key) headers["X-Supabase-Key"] = apiKeys.supabase_key;
+    return headers;
+  } catch {
+    return {};
+  }
+}
+
 // 自動處理 Rewrite 路徑與錯誤拋出
 async function fetchProxy<T>(endpoint: string, options?: RequestInit): Promise<T> {
   // [Critical] Always use Next.js Rewrite to avoid CORS
@@ -82,22 +100,23 @@ async function fetchProxy<T>(endpoint: string, options?: RequestInit): Promise<T
       ...options,
       headers: {
         "Content-Type": "application/json",
+        ...getUserApiHeaders(), // 注入使用者自訂 API Keys
         ...options?.headers,
       },
     });
 
     if (!res.ok) {
-      // 嘗試讀取後端回傳的錯誤訊息
       const errorText = await res.text();
       throw new Error(`Cortex Error (${res.status}): ${errorText}`);
     }
 
     return await res.json();
   } catch (error: any) {
-    console.error(`🔌 Neural Link Broken [${endpoint}]:`, error);
-    throw error; // 讓 UI 層決定如何顯示錯誤
+    console.error(`[Cortex] Neural Link Broken [${endpoint}]:`, error);
+    throw error;
   }
 }
+
 
 /* --- Cortex API Client (大腦連線核心) --- */
 export const cortex = {
