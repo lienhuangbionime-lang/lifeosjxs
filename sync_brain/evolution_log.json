@@ -1,0 +1,91 @@
+[
+    {
+        "timestamp": "2026-02-14T01:55:00Z",
+        "event": "Protocol Alignment",
+        "type": "ARCH",
+        "description": "Aligned frontend CaptureView with backend ingest.py schema. Fixed content/text mismatch.",
+        "impact": "High - Restored Capture flow functionality."
+    },
+    {
+        "timestamp": "2026-02-14T02:05:00Z",
+        "event": "Schema Consolidation",
+        "type": "DB",
+        "description": "Unified all database schemas into lifeos_v3.5_full_schema.sql. Established single source of truth.",
+        "impact": "Critical - Established structural stability."
+    },
+    {
+        "timestamp": "2026-02-14T11:40:00Z",
+        "event": "Evolution Log Implementation",
+        "type": "PROTOCOL",
+        "description": "Implemented migrations/005_cortex_growth_logs.sql for Glass Box protocol transparency.",
+        "impact": "High - Auditable AI decision making."
+    },
+    {
+        "timestamp": "2026-02-14T13:50:00Z",
+        "event": "Growth Verification",
+        "type": "VERIFICATION",
+        "description": "Identified and resolved 38 critical defects across frontend client and backend API. Successfully verified build.",
+        "impact": "Critical - Proved system growth and resilience."
+    },
+    {
+        "timestamp": "2026-02-14T14:10:00Z",
+        "event": "Memory Unification",
+        "type": "API",
+        "description": "Synchronized memories.py and ingest.py to use 'memories' table. Updated Pydantic schemas for UUID and metrics.",
+        "impact": "High - Fixed data visibility across system."
+    },
+    {
+        "timestamp": "2026-02-14T14:20:00Z",
+        "event": "Codebase Purification",
+        "type": "CLEANUP",
+        "description": "Removed legacy kernel source, redundant routers, and transient test scripts. Achieved minimal production state.",
+        "impact": "Medium - Improved maintenance and handover efficiency."
+    },
+    {
+        "timestamp": "2026-02-14T15:45:00Z",
+        "event": "Intelligence Layer Activation",
+        "type": "EVOLUTION",
+        "description": "Implemented 'Glass Box' Decision Matrix (system_cortex.md) and enabled 3072-dim Semantic Search (VectorEngine + RPC)."
+    },
+    {
+        "timestamp": "2026-02-15T09:45:00Z",
+        "event": "Rate Limit Incident",
+        "type": "FIX",
+        "description": "System hit 429 errors on gemini-2.0-flash due to forced hotfix. Switched to gemini-1.5-flash (stable) and removed backend override.",
+        "impact": "High - Restored system availability."
+    },
+    {
+        "timestamp": "2026-02-23T23:20:00Z",
+        "event": "2026 Harness Engineering Upgrade",
+        "type": "ARCH",
+        "description": "Upgraded system to google.genai SDK (v1 API). Replaced conversational prompts with high-signal CodeSpeak protocols. Consolidated tools to root directory.",
+        "impact": "Critical - Eliminated 404 version errors and established minimalist AI command structure."
+    },
+    {
+        "timestamp": "2026-02-24T01:00:00Z",
+        "event": "Phase A: Sync Brain Alignment",
+        "type": "SYNC",
+        "description": "Synchronized sync_brain/SYSTEM_CONTEXT.md to v3.5.2. Fixed registry.json embedding VECTOR(768) → VECTOR(3072). Added drift_check() to soul_manager.py. Added STARTUP PROTOCOL requiring AI to read evolution_log last 5 entries before responding. Updated Phase roadmap: Phase 2 marked DONE, Phase 3 Self-Reflective AI now active target.",
+        "impact": "Critical - AI context restored to current reality. Drift detection prevents future stale-state errors."
+    },
+    {
+        "timestamp": "2026-02-24T01:19:00Z",
+        "event": "Dev AI Self-Reflection System Complete",
+        "type": "EVOLUTION",
+        "description": "Implemented complete AI self-reflection loop: Phase A (sync_brain v3.5.2 alignment, drift_check), Phase B (cortex_growth_logs endpoints + embedding), Phase C (evolution_log injected into chat system prompt), Phase D (scoring_engine validation in ingest.py), Vector search (match_growth_logs RPC, 006 migration applied to Supabase). Dev AI handoff docs: START_HERE.md, AI_MEMORY.md, task.md. Mission: give dev AI the capability to smoothly assist development.",
+        "impact": "Critical - AI self-reflection loop is now fully operational. Dev AI has semantic memory of its own decisions."
+    },
+    {
+        "timestamp": "2026-02-24T03:00:00Z",
+        "event": "AI Self-Correction: Premature Documentation",
+        "type": "REFLECTION",
+        "description": "Critical failure: AI documented a 'fix' for date/metrics extraction in SYSTEM_CONTEXT.md and pushed to remote without verifying it worked on the client. Root cause was that the async Gemini API call pattern failed silently, rendering the python regex fix useless. Post-mortem: NEVER document a fix as a system truth until it is VERIFIED working on the actual application flow.",
+    },
+    {
+        "timestamp": "2026-02-24T04:20:00Z",
+        "event": "AI Self-Correction: CJK Regex & Quota Exhaustion",
+        "type": "REFLECTION",
+        "description": "Resolved elusive date ingestion bug. Root causes: 1) Python regex '\\b' fails on CJK text (e.g. '2/1日記'), causing fallback to current date. Replaced with '(?<!\\d)'/'(?!\\d)'. 2) AI outputs are non-deterministic; LLM frequently omitted brackets in Markdown headers ('# 2026-02-24' vs '# [2026-02-24]'), breaking extraction. Regex rules must be ultra-permissive when parsing LLM outputs. 3) Encountered gemini-2.5-flash-lite 429 rate limit (20 req/day). Post-mortem: Always anticipate silent LLM formatting deviations and strict vendor quotas.",
+        "impact": "High - Ingestion pipeline is now resilient to Chinese character boundaries and sloppy AI formatting."
+    }
+]
