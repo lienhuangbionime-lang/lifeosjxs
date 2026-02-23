@@ -55,13 +55,17 @@
 - 檔案 I/O 必須加 `encoding="utf-8"`
 - `&&` 在 PowerShell 不能用，改用 `;`
 
-### Supabase
+###Supabase
 - RPC `match_memories` 需要先執行 `migrations/006_match_memories_rpc.sql`
 - `memories.date` 是 UNIQUE KEY（同一天只有一筆，用 upsert）
 
 ### Model Names
 - `sync_brain/SYSTEM_CONTEXT.md` 和 `SYSTEM_CONTEXT.md` 必須版本一致
 - `soul_manager.py` 的 `drift_check()` 會比對版本號，不一致會 HALT
+
+### 🚫 FATAL ERROR: Premature Documentation
+- **NEVER** write a rule in `SYSTEM_CONTEXT` or commit a "fix" claiming it resolves an issue before actually testing it in the real application flow.
+- A previous AI wrote a Regex fix for `ingest.py` and claimed success in Docs, but failed to realize the async Gemini call was broken, leading to silent failures and loss of user trust. **Verify first, Document second.**
 
 ---
 
