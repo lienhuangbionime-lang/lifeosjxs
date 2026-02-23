@@ -6,8 +6,8 @@ Usage: Called by ingest.py and rag.py for semantic search
 
 import logging
 from typing import List, Optional
-from app.core.gemini import get_model
-import google.generativeai as genai
+from app.core.gemini import gemini_client
+from google.genai import types
 
 logger = logging.getLogger("cortex.embedder")
 
@@ -28,30 +28,33 @@ async def generate_embedding(text: str, task_type: str = "retrieval_document") -
         return None
     
     try:
-        # Check if Gemini is configured
-        model_config = get_model("fast")
-        if not model_config.get("configured"):
-            logger.error("[ERROR] Gemini API not configured")
+        if not gemini_client:
+            logger.error("[ERROR] gemini_client not configured")
             return None
-        
-        # Generate embedding using stable high-dimension model
-        result = genai.embed_content(
-            model="models/text-embedding-004",
-            content=text,
-            task_type=task_type,
-            title="Cortex Memory" if task_type == "retrieval_document" else None,
-            output_dimensionality=3072
+
+        # Generate embedding using google.genai SDK (v1)
+        result = gemini_client.models.embed_content(
+            model="text-embedding-004",
+            contents=text,
+            config=types.EmbedContentConfig(
+                task_type="RETRIEVAL_DOCUMENT" if task_type == "retrieval_document" else "RETRIEVAL_QUERY",
+                title="Cortex Memory" if task_type == "retrieval_document" else None,
+                output_dimensionality=3072
+            )
         )
-        
-        embedding = result['embedding']
-        
-        # Verify dimension
+
+        if not result.embeddings or len(result.embeddings) == 0:
+            logger.error("[ERROR] No embeddings returned")
+            return None
+
+        embedding = result.embeddings[0].values
+
         if len(embedding) != 3072:
             logger.warning(f"[WARN] Unexpected embedding dimension: {len(embedding)} (expected 3072)")
-        
-        logger.info(f"[OK] Generated embedding for text (length: {len(text)}, dims: {len(embedding)})")
-        return embedding
-        
+
+        logger.info(f"[OK] Generated embedding (len={len(text)}, dims={len(embedding)})")
+        return list(embedding)
+
     except Exception as e:
         logger.error(f"[ERROR] Failed to generate embedding: {e}")
         return None

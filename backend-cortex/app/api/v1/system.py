@@ -24,9 +24,9 @@ async def get_system_status():
     Return system status including current model and available versions.
     """
     try:
-        import google.generativeai as genai
-        
+        from app.core.gemini import gemini_client
         fast = get_model("fast")
+
         smart = get_model("smart")
         # choose current model based on env preference or default to fast
         current_choice = "smart" if smart.get("configured") else "fast"
