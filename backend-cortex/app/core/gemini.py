@@ -63,10 +63,10 @@ def sanitize_model_name(name: str) -> str:
         "gemini-2.5": "gemini-2.5-flash",
         "gemini-1.5-pro": "gemini-pro-latest",         # 1.5 not available, mapped to pro-latest
         "gemini-1.5-flash-latest": "gemini-flash-latest", # mapped to flash-latest
-        "gemini-1.5-flash": "gemini-1.5-flash",
-        "gemini-flash-lite-latest": "gemini-1.5-flash", 
-        "gemini-flash-lite": "gemini-1.5-flash",
-        "gemini-lite": "gemini-1.5-flash",
+        "gemini-1.5-flash": "gemini-flash-latest",
+        "gemini-flash-lite-latest": "gemini-flash-latest", 
+        "gemini-flash-lite": "gemini-flash-latest",
+        "gemini-lite": "gemini-flash-latest",
         "gemini-pro-latest": "gemini-pro-latest",
         "gemini-pro": "gemini-pro-latest", 
     }
