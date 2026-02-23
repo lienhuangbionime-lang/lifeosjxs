@@ -1,8 +1,9 @@
 'use client';
 import React from 'react';
-import { AlertCircle, Network, MapPin } from 'lucide-react';
+import { AlertCircle, Network, MapPin, Loader2, Trash2, Sparkles, Hash, Calendar, Link as LinkIcon } from 'lucide-react';
 import { CoreEngine } from '@/lib/ai/core';
 import { Modal } from '@/components/ui/Modal';
+import { cortex } from '@/lib/api/client';
 
 export const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }: any) => {
     return (
@@ -22,86 +23,165 @@ export const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }: an
     );
 };
 
-export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: any) => {
-    const [copied, setCopied] = React.useState(false);
+export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: { mainNode: any, logs: any[], onClose: () => void, onOpenEntry?: (entry: any) => void }) => {
+    const [dynamicLogs, setDynamicLogs] = React.useState<any[]>([]);
+    const [insight, setInsight] = React.useState<string>('');
+    const [isLoading, setIsLoading] = React.useState(false);
+    const [isInsightLoading, setIsInsightLoading] = React.useState(false);
+    const [isDeleting, setIsDeleting] = React.useState(false);
 
-    const connections = React.useMemo(() => {
-        if (!mainNode) return [];
-
-        const mainId = mainNode.id;
-        const mainSeeds = CoreEngine.parseNoteSeeds((mainNode.note || '') + (mainNode.graphSeeds?.content || ''));
-        // If mainNode is a tag, the tag itself is the key constraint
-        const mainTags = mainSeeds.tags.length > 0 ? mainSeeds.tags : (mainNode.group === 'tag' ? [mainId] : []);
-        const mainLinks = mainSeeds.links || [];
-
-        let mainLog = logs.find((l: any) => l.date === mainId);
-
-        if (!mainLog) {
-            // Stub
-            mainLog = { date: mainId, note: '', connectionReason: 'Current Focus' };
-        } else {
-            mainLog = { ...mainLog, connectionReason: 'Current Focus' };
+    React.useEffect(() => {
+        if (!mainNode) {
+            setDynamicLogs([]);
+            setInsight('');
+            return;
         }
 
-        const related = logs.filter((l: any) => {
-            if (l.date === mainId) return false;
-            const logSeeds = CoreEngine.parseNoteSeeds((l.note || '') + (l.graphSeeds?.content || ''));
-            const logTags = logSeeds.tags || [];
-            const logLinks = logSeeds.links || [];
+        const label = mainNode.id || mainNode.label;
 
-            const sharedTags = logTags.filter((t: string) => mainTags.includes(t));
-            const isLinked = logLinks.includes(mainId) || mainLinks.includes(l.date);
-            const isTaggedWithMain = (mainNode.group === 'tag') && logTags.includes(mainId);
-
-            if (sharedTags.length > 0 || isLinked || isTaggedWithMain) {
-                if (isLinked) l.connectionReason = 'Direct Link';
-                else if (isTaggedWithMain) l.connectionReason = 'Tagged';
-                else l.connectionReason = `#${sharedTags[0]}`;
-                return true;
+        const fetchContext = async () => {
+            setIsLoading(true);
+            try {
+                const results = await cortex.brain.getNodeContext(label);
+                const mapped = results.map(r => ({
+                    ...r,
+                    note: r.content || '',
+                    matchReason: r.matchReason || { type: 'semantic', label: 'Semantic Match' }
+                }));
+                setDynamicLogs(mapped);
+            } catch (e) {
+                console.error("Failed to fetch node context", e);
+                setDynamicLogs([]);
+            } finally {
+                setIsLoading(false);
             }
-            return false;
-        }).slice(0, 10);
+        };
 
-        return [mainLog, ...related];
-    }, [mainNode, logs]);
+        const fetchInsight = async () => {
+            setIsInsightLoading(true);
+            try {
+                const res = await cortex.brain.getNodeInsight(label);
+                setInsight(res.insight);
+            } catch (e) {
+                console.error("Failed to fetch node insight", e);
+                setInsight('');
+            } finally {
+                setIsInsightLoading(false);
+            }
+        };
 
-    const handleCopy = () => {
-        const text = connections.map((c: any) => `[${c.date}] (${c.connectionReason})\n${c.note || ''}`).join('\n\n---\n\n');
-        navigator.clipboard.writeText(text).then(() => {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        });
+        fetchContext();
+        fetchInsight();
+    }, [mainNode]);
+
+    if (!mainNode) return null;
+
+    const handleDelete = async () => {
+        const nodeLabel = mainNode.id || mainNode.label;
+        if (!confirm(`確定要從大腦中刪除「${nodeLabel}」及其所有關聯嗎？`)) return;
+
+        setIsDeleting(true);
+        try {
+            await cortex.deleteNode(nodeLabel);
+            alert('節點已從大腦中移除。');
+            onClose();
+            window.location.reload();
+        } catch (e) {
+            console.error(e);
+            alert('刪除失敗，請檢查權限或後端連線。');
+        } finally {
+            setIsDeleting(false);
+        }
     };
 
+    const displayLogs = dynamicLogs;
+
     return (
-        <Modal isOpen={!!mainNode} onClose={onClose} className="max-w-2xl max-h-[85vh] h-full flex flex-col bg-slate-900/95 border-slate-700 text-white" title={`Context Cluster: ${mainNode?.id}`}>
-            <div className="relative h-full flex flex-col">
-                <div className="absolute top-[-3.5rem] right-12 z-20">
+        <Modal
+            isOpen={!!mainNode}
+            onClose={onClose}
+            className="max-w-xl bg-slate-100"
+            title={mainNode.id || mainNode.label}
+        >
+            <div className="flex-1 flex flex-col max-h-[75vh]">
+                <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-white shadow-sm">
+                    <div className="flex items-center gap-2">
+                        <span className="text-xs text-slate-400 uppercase font-mono font-bold tracking-wider">
+                            {isLoading ? 'Scanning Synapses...' : `Neural Context (${displayLogs.length})`}
+                        </span>
+                    </div>
                     <button
-                        onClick={handleCopy}
-                        className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-black transition-all ${copied ? 'bg-green-500 text-white' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 border border-slate-600'}`}
+                        onClick={handleDelete}
+                        disabled={isDeleting}
+                        className="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors"
+                        title="Delete from Brain"
                     >
-                        {copied ? 'COPIED!' : 'COPY CONTEXT'}
+                        {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                     </button>
                 </div>
 
-                <div className="overflow-y-auto custom-scrollbar p-4 h-full">
-                    {connections.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            {connections.map((conn: any, idx: number) => (
-                                <div key={conn.date} onClick={() => onOpenEntry(conn)}
-                                    className={`rounded-xl p-4 cursor-pointer hover:scale-[1.01] transition-all shadow-lg border-l-4 group relative overflow-hidden ${idx === 0 ? 'bg-indigo-900/40 border-indigo-500' : 'bg-slate-800/80 hover:bg-slate-800 border-slate-600'}`}>
-                                    <div className="flex justify-between items-center mb-1">
-                                        <span className="font-bold text-slate-200 text-sm flex items-center gap-2">{conn.date} {idx === 0 && <MapPin size={12} className="text-indigo-400" />}</span>
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${idx === 0 ? 'bg-indigo-900 text-indigo-300 border-indigo-700' : 'bg-slate-700 text-slate-400 border-slate-600'}`}>{conn.connectionReason}</span>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                    {/* AI Insight Section */}
+                    {(isInsightLoading || insight) && (
+                        <div className="bg-gradient-to-br from-indigo-500 to-purple-600 p-[1px] rounded-2xl shadow-lg shadow-indigo-200/50">
+                            <div className="bg-white/95 backdrop-blur-sm p-4 rounded-[15px]">
+                                <div className="flex items-center gap-2 mb-2">
+                                    <div className="p-1 bg-indigo-100 rounded-lg text-indigo-600">
+                                        <Sparkles size={14} />
                                     </div>
-                                    <p className="text-xs text-slate-400 line-clamp-2">{conn.note || 'No content'}</p>
+                                    <span className="text-xs font-bold text-indigo-600 tracking-wide uppercase">Brain Insight</span>
                                 </div>
-                            ))}
+                                {isInsightLoading ? (
+                                    <div className="flex items-center gap-3 py-2">
+                                        <Loader2 size={14} className="animate-spin text-indigo-500" />
+                                        <div className="h-4 w-full bg-slate-100 rounded animate-pulse" />
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-slate-700 leading-relaxed italic font-medium">
+                                        「{insight}」
+                                    </p>
+                                )}
+                            </div>
                         </div>
-                    ) : (
-                        <div className="text-white/50 text-center py-10 italic">No direct connections found.</div>
                     )}
+
+                    <div className="space-y-3">
+                        {isLoading ? (
+                            <div className="flex flex-col items-center justify-center py-20 text-slate-400 gap-3">
+                                <Loader2 className="animate-spin text-indigo-500" size={32} />
+                                <p className="text-sm italic font-mono animate-pulse">Relinking memories...</p>
+                            </div>
+                        ) : displayLogs.length > 0 ? (
+                            displayLogs.map((log: any, i) => (
+                                <div
+                                    key={i}
+                                    onClick={() => onOpenEntry && onOpenEntry(log)}
+                                    className="bg-white p-4 rounded-2xl border border-slate-200 hover:border-indigo-300 hover:shadow-lg transition-all group cursor-pointer active:scale-[0.98]"
+                                >
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100">{log.date}</span>
+
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 font-bold border ${log.matchReason?.type === 'semantic' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                                                log.matchReason?.type === 'tag' ? 'bg-pink-50 text-pink-600 border-pink-100' :
+                                                    log.matchReason?.type === 'date' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
+                                                        'bg-blue-50 text-blue-600 border-blue-100'
+                                            }`}>
+                                            {log.matchReason?.type === 'semantic' && <Sparkles size={10} />}
+                                            {log.matchReason?.type === 'tag' && <Hash size={10} />}
+                                            {log.matchReason?.type === 'date' && <Calendar size={10} />}
+                                            {log.matchReason?.type === 'link' && <LinkIcon size={10} />}
+                                            {log.matchReason?.label || 'Linked'}
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">{log.note || log.content}</p>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-center py-10 text-slate-400 italic">
+                                此節點目前沒有可用的語意關聯。
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </Modal>

@@ -1,6 +1,4 @@
-# 檔案位置: backend-cortex/app/api/v1/ingest.py
-
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 import logging
@@ -11,6 +9,7 @@ import datetime
 from app.core.gemini import get_model, get_embeddings, gemini_client, get_request_gemini_client
 from app.core.database import supabase, get_request_client
 from app.core.time_utils import get_today_str_taipei, get_current_iso_taipei
+from app.services.crystallizer import crystallizer
 
 router = APIRouter()
 logger = logging.getLogger("cortex.ingest")
@@ -244,7 +243,7 @@ class IngestRequest(BaseModel):
 
 @router.post("")
 @router.post("/")
-async def ingest_log(http_request: Request, request: IngestRequest):
+async def ingest_log(http_request: Request, request: IngestRequest, background_tasks: BackgroundTasks):
     # Default date if missing
     ingest_date = request.date or get_today_str_taipei()
     habits_list = request.habits or []
@@ -667,6 +666,16 @@ async def ingest_log(http_request: Request, request: IngestRequest):
                         logger.info(f"✅ Successfully created {inserted_tasks} tasks in DB.")
                     else:
                         logger.info("No new tasks were inserted.")
+
+                # --- 6. Trigger Crystallization (Background) ---
+                if not request.skipAi and memory_id_db:
+                    logger.info(f"✨ Queueing crystallization for memory {memory_id_db}...")
+                    background_tasks.add_task(
+                        crystallizer.crystallize_memory, 
+                        memory_id_db, 
+                        ai_data.get("markdown_body", request.content), 
+                        ingest_date
+                    )
 
             except Exception as db_e:
                 logger.error(f"❌ Database Operation Failed: {db_e}")

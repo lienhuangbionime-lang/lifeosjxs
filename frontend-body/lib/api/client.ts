@@ -216,6 +216,12 @@ export const cortex = {
         return await fetchProxy(`/api/v1/brain/growth/lessons?limit=${limit}`);
       },
     },
+    getNodeContext: async (label: string): Promise<any[]> => {
+      return await fetchProxy(`/api/v1/brain/node/${encodeURIComponent(label)}/context`);
+    },
+    getNodeInsight: async (label: string): Promise<{ insight: string }> => {
+      return await fetchProxy(`/api/v1/brain/node/${encodeURIComponent(label)}/insight`);
+    },
   },
 
 

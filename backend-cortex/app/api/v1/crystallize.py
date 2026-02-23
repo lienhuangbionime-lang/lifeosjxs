@@ -70,13 +70,13 @@ For example, if they worked on "Supabase", ask "Supabase 資料表今天有什�
 Output JSON: {"prompts": ["Q1", "Q2", "Q3"]}'''
 
         # 3. Call fast model
-        model_name = "gemini-2.5-flash"
+        model_conf = get_model("fast")
         
         if not gemini_client:
              return {"prompts": ["今天過得好嗎？", "有什麼值得記錄的嗎？", "最近忙碌嗎？"]}
              
         ai_res = gemini_client.models.generate_content(
-            model=model_name,
+            model=model_conf["model"],
             contents=context_text,
             config=types.GenerateContentConfig(
                 system_instruction=sys_prompt,

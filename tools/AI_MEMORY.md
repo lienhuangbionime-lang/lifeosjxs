@@ -16,8 +16,8 @@
 | 模型 | 用途 |
 |---|---|
 | `gemini-3-pro-preview` | 深度思考、潛意識反思 |
-| `gemini-flash-lite-latest` | Ingest、基本 Chat |
-| `gemini-2.5-flash` | 情境感知 Capture Prompts |
+| `gemini-flash-lite-latest` | Ingest、Crystallize、基本 Chat |
+| `gemini-2.5-flash` | 情境感知 Capture Prompts (deprecated: switch to Flash Lite) |
 | `text-embedding-004` | 向量嵌入 (3072 dim) |
 
 ---
@@ -41,6 +41,12 @@
 - 端點: `GET /api/v1/brain/growth/lessons`
 - 表: `cortex_growth_logs`（AI 在 Glass Box 決策後必須呼叫）
 - 前端: `cortex.brain.growth.logDecision()` / `.getLessons()`
+
+### Phase 15: 知識結晶引擎 (Knowledge Crystallization)
+- 端點: `GET /api/v1/brain/node/{label}/insight`
+- 服務: `app/services/crystallizer.py`
+- 腳本: `tools/bulk_crystallize.py`
+- 功能: 自動從日記提取 Node (Entity) 與 Edge (Relationship) 並存入 `nodes`, `edges` 表。提供 AI 總結該節點在使用者生命中的意義。
 
 ### Phase C: 短期記憶注入
 - `chat.py` 中 `build_system_prompt()` 每次 Chat 注入 `evolution_log.json` 最後 5 筆
@@ -67,9 +73,10 @@
 - RPC `match_memories` 需要先執行 `migrations/006_match_memories_rpc.sql`
 - `memories.date` 是 UNIQUE KEY（同一天只有一筆，用 upsert）
 
-### Model Names
-- `sync_brain/SYSTEM_CONTEXT.md` 和 `SYSTEM_CONTEXT.md` 必須版本一致
-- `soul_manager.py` 的 `drift_check()` 會比對版本號，不一致會 HALT
+### Model Names & 404 Traps
+- **Trap**: 直接在程式碼寫 `gemini-1.5-flash` 可能導致 404，因為 SDK v1beta 可能不支援。
+- **Fix**: 必須使用 `app.core.gemini.get_model("fast")` 或 `get_model("smart")` 來獲取已經經過 `sanitize_model_name()` 處理過的正確 ID。
+- 模型版本號必須與 `soul_manager.py` 的 `drift_check()` 保持同步。
 
 ### 🚫 FATAL ERROR: Premature Documentation
 - **NEVER** write a rule in `SYSTEM_CONTEXT` or commit a "fix" claiming it resolves an issue before actually testing it in the real application flow.
@@ -98,4 +105,4 @@
 ---
 
 **最後更新**: 2026-02-24  
-**狀態**: Phase B+C 完成 | Phase D (scoring_engine) 待實作
+**狀態**: Phase 15 (Crystallization) 完成 | Phase E (autonomous scheduler) 待實作

@@ -136,3 +136,83 @@ async def get_brain_graph(http_request: Request, limit: int = 500):
     except Exception as e:
         logger.error(f"Graph Generation Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/node/{label}/context")
+async def get_node_context(http_request: Request, label: str):
+    """
+    Find semantically related memories for a given brain node.
+    Uses vector search to find context beyond strict keyword matches.
+    """
+    db = get_request_client(http_request)
+    if not db:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+
+    try:
+        from app.services.embedder import generate_embedding
+        
+        # 1. Generate embedding for the label
+        query_vector = await generate_embedding(label)
+
+        # 2. Call match_memories RPC for semantic similarity
+        rpc_params = {
+            "query_embedding": query_vector,
+            "match_threshold": 0.3,
+            "match_count": 10
+        }
+        
+        response = db.rpc("match_memories", rpc_params).execute()
+        related_memories = response.data or []
+
+        # 3. Add match reason (Semantic)
+        for mem in related_memories:
+            mem["matchReason"] = {"type": "semantic", "label": "Semantic Match"}
+
+        return related_memories
+
+    except Exception as e:
+        logger.error(f"Node Context Error ({label}): {e}")
+        # Fallback to keyword search if embedding fails
+        try:
+            resp = db.table("memories").select("*").ilike("content", f"%{label}%").limit(10).execute()
+            return resp.data or []
+        except:
+            return []
+
+@router.get("/node/{label}/insight")
+async def get_node_insight(http_request: Request, label: str):
+    """
+    Generate an AI-driven observation based on the context of a node.
+    Synthesizes why this label is significant across different memories.
+    """
+    db = get_request_client(http_request)
+    if not db:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+
+    try:
+        # 1. Fetch related context first
+        memories = await get_node_context(http_request, label)
+        if not memories or isinstance(memories, dict): # Check for error dict
+             return {"insight": "此節點尚無足夠的上下文供分析。"}
+
+        # 2. Prepare context for Gemini
+        context_snippets = "\n".join([f"- [{m.get('date')}] {m.get('content')[:150]}..." for m in memories[:5]])
+        
+        sys_prompt = f"You are the LifeOS Insights Engine. Review the provided context about the concept '{label}'. Generate exactly one short, insightful sentence (in Traditional Chinese) that describes the pattern or significance of this concept in the user's life. Do not be generic. Be observational."
+        
+        from app.core.gemini import gemini_client, get_model, types
+        
+        model_conf = get_model("fast")
+        response = gemini_client.models.generate_content(
+            model=model_conf["model"],
+            contents=f"CONTEXT FOR '{label}':\n{context_snippets}",
+            config=types.GenerateContentConfig(
+                system_instruction=sys_prompt,
+                temperature=0.7
+            )
+        )
+        
+        return {"insight": response.text.strip()}
+
+    except Exception as e:
+        logger.error(f"Insight Generation Error ({label}): {e}")
+        return {"insight": "無法產生語意分析。"}

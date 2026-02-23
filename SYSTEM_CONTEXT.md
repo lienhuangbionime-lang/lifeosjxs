@@ -426,7 +426,13 @@ Code is considered **production-ready** when:
 - ✅ Context-Aware UI prompts (`api/v1/crystallize.py`)
 - 🔄 Project-memory linking
 
-### Phase 3 (Future): Autonomous System
+### Phase 3 (Current): Knowledge Crystallization
+- ✅ Knowledge Crystallization Engine (`services/crystallizer.py`)
+- ✅ Bulk historical processing script (`tools/bulk_crystallize.py`)
+- ✅ AI-generated Brain Insights in ContextModal
+- ✅ Standardized Gemini model registry via `get_model()`
+
+### Phase 4 (Future): Autonomous System
 - 📋 Self-optimizing schema
 - 📋 Predictive task generation
 - 📋 Cross-memory pattern detection
@@ -443,8 +449,8 @@ Code is considered **production-ready** when:
 
 ---
 
-**Last Updated**: 2026-02-24T00:50:00+08:00  
-**Version**: 3.5.2 (Intelligence Layer Integration - Subconscious & Crystallize)  
+**Last Updated**: 2026-02-24T05:25:00+08:00  
+**Version**: 3.5.6 (Crystallize logic + Import Fixes)  
 **Maintained By**: AI + Human Collaboration
 
 ---
@@ -455,6 +461,9 @@ Code is considered **production-ready** when:
 The system is sensitive to Gemini model versioning. **Always use `app.core.gemini.sanitize_model_name()`** before initializing models to prevent 404 errors. Verified IDs:
 - `models/gemini-3-pro-preview` (Smart)
 - `models/gemini-flash-lite-latest` (Fast/Reliable)
+
+### 4. Service Imports
+Always import functions like `generate_embedding` individually from `app.services.embedder`. Do NOT attempt to import an `embedder` object as it does not exist in the current service architecture.
 
 ### 2. Multi-tier Quota Fallback
 If the Smart model reaches quota (429), `chat.py` automatically chain-falls back to `Flash Lite` to ensure continuity.

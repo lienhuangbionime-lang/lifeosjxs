@@ -62,30 +62,10 @@
         "impact": "Critical - Eliminated 404 version errors and established minimalist AI command structure."
     },
     {
-        "timestamp": "2026-02-24T01:00:00Z",
-        "event": "Phase A: Sync Brain Alignment",
-        "type": "SYNC",
-        "description": "Synchronized sync_brain/SYSTEM_CONTEXT.md to v3.5.2. Fixed registry.json embedding VECTOR(768) → VECTOR(3072). Added drift_check() to soul_manager.py. Added STARTUP PROTOCOL requiring AI to read evolution_log last 5 entries before responding. Updated Phase roadmap: Phase 2 marked DONE, Phase 3 Self-Reflective AI now active target.",
-        "impact": "Critical - AI context restored to current reality. Drift detection prevents future stale-state errors."
-    },
-    {
-        "timestamp": "2026-02-24T01:19:00Z",
-        "event": "Dev AI Self-Reflection System Complete",
-        "type": "EVOLUTION",
-        "description": "Implemented complete AI self-reflection loop: Phase A (sync_brain v3.5.2 alignment, drift_check), Phase B (cortex_growth_logs endpoints + embedding), Phase C (evolution_log injected into chat system prompt), Phase D (scoring_engine validation in ingest.py), Vector search (match_growth_logs RPC, 006 migration applied to Supabase). Dev AI handoff docs: START_HERE.md, AI_MEMORY.md, task.md. Mission: give dev AI the capability to smoothly assist development.",
-        "impact": "Critical - AI self-reflection loop is now fully operational. Dev AI has semantic memory of its own decisions."
-    },
-    {
-        "timestamp": "2026-02-24T03:00:00Z",
-        "event": "AI Self-Correction: Premature Documentation",
-        "type": "REFLECTION",
-        "description": "Critical failure: AI documented a 'fix' for date/metrics extraction in SYSTEM_CONTEXT.md and pushed to remote without verifying it worked on the client. Root cause was that the async Gemini API call pattern failed silently, rendering the python regex fix useless. Post-mortem: NEVER document a fix as a system truth until it is VERIFIED working on the actual application flow."
-    },
-    {
-        "timestamp": "2026-02-24T04:20:00Z",
-        "event": "AI Self-Correction: CJK Regex & Quota Exhaustion",
-        "type": "REFLECTION",
-        "description": "Resolved elusive date ingestion bug. Root causes: 1) Python regex '\\b' fails on CJK text (e.g. '2/1日記'), causing fallback to current date. Replaced with '(?<!\\d)'/'(?!\\d)'. 2) AI outputs are non-deterministic; LLM frequently omitted brackets in Markdown headers ('# 2026-02-24' vs '# [2026-02-24]'), breaking extraction. Regex rules must be ultra-permissive when parsing LLM outputs. 3) Encountered gemini-2.5-flash-lite 429 rate limit (20 req/day). Post-mortem: Always anticipate silent LLM formatting deviations and strict vendor quotas.",
-        "impact": "High - Ingestion pipeline is now resilient to Chinese character boundaries and sloppy AI formatting."
+        "timestamp": "2026-02-24T05:25:00Z",
+        "event": "Brain API Hotfix",
+        "type": "FIX",
+        "description": "Fixed 'embedder' name import error in brain.py. Resolved Gemini 404 version errors in crystallizer/brain by standardizing on get_model() factory. Updated SYSTEM_CONTEXT to v3.5.6.",
+        "impact": "High - Restored semantic search and AI insight generation stability."
     }
 ]
