@@ -142,6 +142,11 @@ export const cortex = {
     }
   },
 
+  // [Fix] Alias for brain.generateGraph to support NeuralGraph.tsx
+  async getBrainGraph(limit: number = 500): Promise<any> {
+    return await this.brain.generateGraph(limit);
+  },
+
   // 3. 記憶提取 (Memory Recall)
   async getRecentMemories(limit: number = 20, query?: string): Promise<LogEntry[]> {
     try {
