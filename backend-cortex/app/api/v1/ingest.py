@@ -8,7 +8,7 @@ import json
 import datetime
 
 # 引入核心模組
-from app.core.gemini import get_model, get_embeddings
+from app.core.gemini import get_model, get_embeddings, gemini_client
 from app.core.database import supabase
 from app.core.time_utils import get_today_str_taipei, get_current_iso_taipei
 
@@ -251,18 +251,13 @@ async def ingest_log(request: IngestRequest):
     logger.info(f"🧠 Cortex receiving input for {ingest_date} (Skip AI: {request.skipAi})...")
     
     try:
-        # 1. 呼叫 Gemini with v7.1 Prompt (Unless skipped)
-        import google.generativeai as genai
-        
-        model_config = get_model("fast") # Use FAST model for ingest speed
+        # 1. 呼叫 Gemini with v7.1 Prompt — [SDK v1] google.genai (not google.generativeai)
+        model_config = get_model("fast")  # FAST model for ingest speed
         ai_data: Dict[str, Any] = {}
         model_name = model_config.get("model")
 
         # Skip AI if requested
-        if not request.skipAi and model_config.get("configured"):
-            # 初始化模型物件
-            model = genai.GenerativeModel(model_name)
-            
+        if not request.skipAi and model_config.get("configured") and gemini_client:
             # 構建使用者輸入 (注入 Today 作為基準日期)
             user_content = f"""
 [Reference] Today is: {get_today_str_taipei()}
@@ -272,16 +267,17 @@ Habits Tracked: {', '.join(habits_list) if habits_list else 'None'}
 User's Daily Log:
 {request.content}
 """
-            
             # 使用 v7.1 System Prompt
             full_prompt = f"{LIFEOS_V7_PROMPT}\n\n{user_content}\n\n請嚴格按照上述格式輸出 JSON。"
-            
+
             try:
-                response = model.generate_content(full_prompt)
-                
+                # gemini_client.models.generate_content = google.genai synchronous API
+                response = gemini_client.models.generate_content(
+                    model=model_name,
+                    contents=full_prompt
+                )
                 # 2. 解析 JSON
                 response_text = response.text.strip()
-                # Robust JSON extraction
                 import re
                 json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
                 if json_match:
@@ -293,9 +289,10 @@ User's Daily Log:
                 logger.error(f"Gemini/JSON Error: {e}")
                 ai_data = {}
         elif request.skipAi:
-            logger.info("⏩ AI Generation skipped by user request.")
+            logger.info("[OK] AI Generation skipped by user request.")
         else:
-             logger.warning("Gemini API Key not set, using mock response")
+            logger.warning("[WARN] gemini_client not configured, using fallback.")
+
 
         if not ai_data:
             # Fallback to basic structure
