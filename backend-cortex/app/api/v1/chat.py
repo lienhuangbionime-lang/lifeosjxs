@@ -6,6 +6,7 @@ from typing import List, Dict, Optional
 import logging
 import json
 import asyncio
+from pathlib import Path
 from app.core.gemini import get_model, gemini_client
 from google import genai
 
@@ -22,7 +23,10 @@ class ChatRequest(BaseModel):
     model: Optional[str] = None
     url_context: Optional[Dict] = None  # {url, type, title, content} from url_fetch
 
-SYSTEM_PROMPT = """
+# ---------------------------------------------------------------------------
+# [Phase C] Short-Term Memory: inject last 5 evolution_log entries
+# ---------------------------------------------------------------------------
+_BASE_SYSTEM_PROMPT = """
 [SYSTEM PROTOCOL: CodeSpeak Paradigm Active]
 You are Cortex, the digital extension of the user's mind (LifeOS).
 Your goal is to help the user manage their projects, clarify their thoughts, and retrieve memories with zero boilerplate.
@@ -33,6 +37,40 @@ Your goal is to help the user manage their projects, clarify their thoughts, and
 - HALLUCINATION CONTROL: If the context is empty or says "NO MEMORIES FOUND", state exactly: "No relevant records found. Ask to create one."
 - GLASS BOX: Expose your reasoning layer implicitly in your output structure.
 """
+
+def build_system_prompt() -> str:
+    """Builds the system prompt with recent evolution_log entries injected as short-term memory."""
+    recent_events = ""
+    try:
+        # Try both relative path and absolute fallback
+        for evo_path in [
+            Path("sync_brain/evolution_log.json"),
+            Path(r"c:\Users\lien.huang\AppData\lifeosjxs\sync_brain\evolution_log.json")
+        ]:
+            if evo_path.exists():
+                with open(evo_path, encoding="utf-8") as f:
+                    logs = json.load(f)
+                last5 = logs[-5:]
+                recent_events = "\n".join(
+                    f"- [{e.get('timestamp', '')[:10]}] [{e.get('type', '')}] {e.get('event', '')}: {e.get('description', '')[:120]}"
+                    for e in last5
+                )
+                break
+    except Exception as e:
+        logger.warning(f"[WARN] Could not load evolution_log: {e}")
+
+    if recent_events:
+        return f"""{_BASE_SYSTEM_PROMPT}
+---
+## System Short-Term Memory (Last 5 Events)
+{recent_events}
+---
+"""
+    return _BASE_SYSTEM_PROMPT
+
+# Keep for backward compat (URL mode)
+SYSTEM_PROMPT = _BASE_SYSTEM_PROMPT
+
 
 URL_DISCUSSION_PROMPT = """
 [SYSTEM PROTOCOL: URL CodeSpeak Extraction Active]
@@ -78,7 +116,7 @@ async def chat_message(request: ChatRequest):
              role = "user" if msg.role == "user" else "model"
              gemini_history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg.content)]))
              
-        chat = gemini_client.aio.chats.create(model=model_name, config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT))
+        chat = gemini_client.aio.chats.create(model=model_name, config=types.GenerateContentConfig(system_instruction=build_system_prompt()))
         
         async def event_generator():
             try:
@@ -95,7 +133,8 @@ async def chat_message(request: ChatRequest):
                 # Format memories for context
                 memory_context = format_memories_for_context(relevant_memories)
                 
-                # Construct full prompt
+                # Construct full prompt — use fresh system prompt with short-term memory
+                dynamic_prompt = build_system_prompt()
                 if request.url_context:
                     # URL Discussion Mode
                     url_data = request.url_context
@@ -108,22 +147,13 @@ Type: {url_data.get('type')}
 ### Content:
 {url_data.get('content')}
 """
-                    # Use a specialized prompt
-                    base_prompt = URL_DISCUSSION_PROMPT
-                    
-                    # Enhanced RAG: Search for memories related to the URL title AND the user message
-                    if request.message:
-                         search_query = f"{request.message} {url_data.get('title')}"
-                    else:
-                         search_query = url_data.get('title')
-                         
-                    full_input = f"{base_prompt}\n{url_content_block}\n\n"
+                    full_input = f"{URL_DISCUSSION_PROMPT}\n{url_content_block}\n\n"
                     
                     if memory_context:
                         full_input += f"## User Context (Memories)\n{memory_context}\n\n"
                         
                     full_input += f"User: {request.message}"
-                    logger.info(f"[OK] specific URL Discussion Mode triggered for: {url_data.get('title')}")
+                    logger.info(f"[OK] URL Discussion Mode: {url_data.get('title')}")
 
                 else:
                     # Standard Chat Mode

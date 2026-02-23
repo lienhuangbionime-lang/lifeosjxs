@@ -168,8 +168,32 @@ export const cortex = {
     },
     getContextualPrompts: async (): Promise<{ prompts: string[] }> => {
       return await fetchProxy<{ prompts: string[] }>("/api/v1/brain/contextual-prompts");
-    }
+    },
+
+    // [Phase B] AI Self-Reflection — Decision Logging
+    growth: {
+      logDecision: async (payload: {
+        context: string;
+        options: Record<string, string>;
+        user_choice: string;
+        ai_prediction: string;
+        lessons?: string;
+      }): Promise<{ status: string; prediction_match: boolean }> => {
+        return await fetchProxy("/api/v1/brain/growth/log-decision", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      },
+      getLessons: async (limit: number = 10): Promise<{
+        lessons: any[];
+        total: number;
+        mismatch_rate_pct: number;
+      }> => {
+        return await fetchProxy(`/api/v1/brain/growth/lessons?limit=${limit}`);
+      },
+    },
   },
+
 
   async deleteNode(label: string): Promise<any> {
     return await fetchProxy(`/api/v1/brain/node/${encodeURIComponent(label)}`, {
