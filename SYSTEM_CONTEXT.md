@@ -116,14 +116,15 @@ Raw Input → Gemini Analysis → Structured Output → Storage
 
 ## 📁 Project Structure
 
-```
 lifeosjxs/
 ├── backend-cortex/          # FastAPI backend
 │   ├── app/
-│   │   ├── agents/          # AI agents (SorterAgent, ThinkerAgent)
-│   │   ├── api/v1/          # API routes
-│   │   ├── core/            # Core services (database, gemini)
-│   │   └── models/          # Pydantic schemas
+│   │   ├── agents/          # AI agents (SorterAgent)
+│   │   ├── api/v1/          # API routes (crystallize, subconscious, etc)
+│   │   ├── core/            # Core services (database, gemini, vector)
+│   │   ├── models/          # Pydantic schemas
+│   │   ├── services/        # Service logic (rag, subconscious, embedder)
+│   │   └── subconscious/    # APScheduler Background Workers
 │   ├── routers/             # FastAPI routers
 │   ├── schemas/             # Schema registry (AI-readable)
 │   ├── tools/               # Schema evolution tools
@@ -236,9 +237,13 @@ except Exception as e:
 - Extracts date from text if present
 - Defaults to current date if not found
 
-### ThinkerAgent (Deep Analysis)
-**Status**: Planned (not yet implemented)  
-**Purpose**: Long-form reflection and insight generation
+### ThinkerAgent / Subconscious Engine
+**Status**: Partially Implemented (`services/subconscious.py`)  
+**Purpose**: Long-form reflection and insight generation. Runs via APScheduler every 12 hours or via manual API trigger to synthesize recent memories.
+
+### Crystallize Engine
+**Status**: Implemented (`api/v1/crystallize.py`)
+**Purpose**: Context-Aware generation. Reads the last 48h of memory logs and feeds them into Gemini Flash to provide dynamic Capture UI prompts.
 
 ---
 
@@ -415,9 +420,10 @@ Code is considered **production-ready** when:
 - ✅ AI-driven analysis
 - ✅ Schema evolution protocol
 
-### Phase 2 (Next): Intelligence Layer
-- 🔄 Semantic search with embeddings
-- 🔄 Automated insights generation
+### Phase 2 (Current): Intelligence Layer
+- ✅ Semantic search with embeddings (`services/rag.py` and `vector.py`)
+- ✅ Automated insights generation (`services/subconscious.py`)
+- ✅ Context-Aware UI prompts (`api/v1/crystallize.py`)
 - 🔄 Project-memory linking
 
 ### Phase 3 (Future): Autonomous System
@@ -437,8 +443,8 @@ Code is considered **production-ready** when:
 
 ---
 
-**Last Updated**: 2026-02-23T22:15:00+08:00  
-**Version**: 3.5.1 (Stability Patch applied)  
+**Last Updated**: 2026-02-24T00:50:00+08:00  
+**Version**: 3.5.2 (Intelligence Layer Integration - Subconscious & Crystallize)  
 **Maintained By**: AI + Human Collaboration
 
 ---
