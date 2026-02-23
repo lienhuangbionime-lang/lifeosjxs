@@ -89,15 +89,15 @@ Raw Input → Gemini Analysis → Structured Output → Storage
 - ❌ **NEVER** expose internal errors to frontend
 - ❌ **NEVER** skip input validation
 
----
-
-## ✅ Required Practices
-
 ### Code Style
 - ✅ **ALWAYS** use `[OK]`, `[WARN]`, `[ERROR]` instead of emojis in logs
 - ✅ **ALWAYS** use Pydantic models for data validation
 - ✅ **ALWAYS** use async/await for I/O operations
 - ✅ **ALWAYS** include type hints in Python
+
+### AI Input Processing
+- ✅ **ALWAYS** treat LLM JSON output as untrustworthy for exact values (e.g. Dates, User Manual Scores).
+- ✅ **ALWAYS** use Python regex post-processing to force-inject user-supplied exact values into the LLM's generated markdown or metadata. Never rely solely on system prompt instructions for data exactness.
 - ✅ **ALWAYS** use strict TypeScript
 
 ### Database
