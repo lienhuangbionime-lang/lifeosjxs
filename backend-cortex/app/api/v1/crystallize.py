@@ -103,27 +103,43 @@ Output JSON: {"prompts": ["Q1", "Q2", "Q3"]}'''
 async def log_decision(payload: DecisionLog):
     """
     Called by AI after every Glass Box Decision Matrix.
-    Writes decision context, prediction vs actual choice, and lessons to cortex_growth_logs.
+    Writes decision context, prediction vs actual choice, lessons, and embedding to cortex_growth_logs.
+    Embedding enables semantic search across AI decision history.
     """
     try:
         prediction_match = payload.user_choice.strip().upper() == payload.ai_prediction.strip().upper()
+        lesson_text = payload.lessons or (
+            "Prediction matched." if prediction_match
+            else f"Mismatch: AI predicted {payload.ai_prediction}, user chose {payload.user_choice}."
+        )
+
+        # Generate embedding from context + lesson (makes it semantically searchable)
+        embed_text = f"{payload.context}\n{lesson_text}"
+        embedding = None
+        try:
+            from app.services.embedder import generate_embedding
+            embedding = await generate_embedding(embed_text)
+        except Exception as _ee:
+            logger.warning(f"[WARN] Embedding generation skipped: {_ee}")
+
         data = {
             "decision_context": payload.context,
             "options_provided": payload.options,
             "user_choice": payload.user_choice,
             "ai_prediction": payload.ai_prediction,
             "prediction_match": prediction_match,
-            "lessons_learned": payload.lessons or (
-                "Prediction matched." if prediction_match
-                else f"Mismatch: AI predicted {payload.ai_prediction}, user chose {payload.user_choice}."
-            )
+            "lessons_learned": lesson_text,
         }
+        if embedding:
+            data["embedding"] = embedding
+
         supabase.table("cortex_growth_logs").insert(data).execute()
-        logger.info(f"[OK] Decision logged. Match={prediction_match}")
+        logger.info(f"[OK] Decision logged. Match={prediction_match}, Embedding={'yes' if embedding else 'no'}")
         return {"status": "logged", "prediction_match": prediction_match}
     except Exception as e:
         logger.error(f"[ERROR] log_decision failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @router.get("/growth/lessons")
@@ -152,4 +168,33 @@ async def get_lessons(limit: int = 10):
     except Exception as e:
         logger.error(f"[ERROR] get_lessons failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/growth/search")
+async def search_growth_logs(q: str, limit: int = 5):
+    """
+    Semantic search over AI decision history using match_growth_logs RPC.
+    Used by AI to recall similar past decisions before making new ones.
+    """
+    try:
+        from app.services.embedder import generate_embedding
+        query_embedding = await generate_embedding(q)
+        if not query_embedding:
+            raise HTTPException(status_code=400, detail="Embedding generation failed")
+
+        res = supabase.rpc("match_growth_logs", {
+            "query_embedding": query_embedding,
+            "match_threshold": 0.5,
+            "match_count": limit
+        }).execute()
+
+        return {
+            "query": q,
+            "results": res.data or [],
+            "total": len(res.data or [])
+        }
+    except Exception as e:
+        logger.error(f"[ERROR] search_growth_logs failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
