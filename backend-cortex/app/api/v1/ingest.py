@@ -250,16 +250,16 @@ async def ingest_log(http_request: Request, request: IngestRequest):
     habits_list = request.habits or []
 
     # [FIX] Extract date from content FIRST using Python regex
-    # User may type "# 2026-02-01" or "2026-02-01" or "2/1" in the content
+    # Use (?<!\d) and (?!\d) instead of \b to avoid Unicode word boundary issues (e.g. "2/1日記")
     import re as _re_date
-    # Match YYYY-MM-DD in content (most explicit)
-    _date_explicit = _re_date.search(r'(\d{4}-\d{2}-\d{2})', request.content)
+    # Match YYYY-MM-DD in content
+    _date_explicit = _re_date.search(r'(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)', request.content)
     if _date_explicit:
         ingest_date = _date_explicit.group(1)
         logger.info(f"[OK] Date extracted from content: {ingest_date}")
     else:
         # Match M/D or MM/DD with current year (e.g. 2/1 → 2026-02-01)
-        _date_short = _re_date.search(r'\b(\d{1,2})/(\d{1,2})\b', request.content)
+        _date_short = _re_date.search(r'(?<!\d)(\d{1,2})/(\d{1,2})(?!\d)', request.content)
         if _date_short:
             year = get_today_str_taipei()[:4]  # e.g. "2026"
             month = _date_short.group(1).zfill(2)
@@ -382,9 +382,9 @@ async def ingest_log(http_request: Request, request: IngestRequest):
         markdown_body_raw = ai_data.get("markdown_body", "")
         if markdown_body_raw:
             import re as _re
-            # Fix date in header: replace any "# [YYYY-MM-DD]" pattern with the correct date
+            # Fix date in header: replace any "# [YYYY-MM-DD]" or "# YYYY-MM-DD" pattern with the correct date
             markdown_body_raw = _re.sub(
-                r'#\s*\[\d{4}-\d{2}-\d{2}\]',
+                r'#\s*\[?\d{4}-\d{2}-\d{2}\]?',
                 f'# [{ingest_date}]',
                 markdown_body_raw
             )
