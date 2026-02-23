@@ -7,11 +7,9 @@
 ALTER TABLE public.cortex_growth_logs
 ADD COLUMN IF NOT EXISTS embedding vector(3072);
 
--- 2. Add HNSW index for fast similarity search
-CREATE INDEX IF NOT EXISTS idx_growth_logs_embedding
-ON public.cortex_growth_logs
-USING hnsw (embedding vector_cosine_ops)
-WITH (m = 16, ef_construction = 64);
+-- Note: No HNSW/IVFFlat index — pgvector HNSW limit is 2000 dims.
+-- 3072-dim vectors use exact cosine search (same approach as memories table).
+-- cortex_growth_logs will stay small (~hundreds of rows), so exact search is fine.
 
 -- 3. Create match_growth_logs RPC function (mirrors match_memories)
 CREATE OR REPLACE FUNCTION match_growth_logs (
