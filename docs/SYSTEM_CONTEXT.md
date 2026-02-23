@@ -1,649 +1,491 @@
-# LifeOS v3.1 - System Context
-**Single Source of Truth for AI-Assisted Development**
+# LifeOS v3.5 - System Context (AI Truth Source)
 
-> This document serves as the **complete context** for any AI coding assistant working on LifeOS.
-> Read this FIRST before generating any code.
+> **Purpose**: This document serves as the **Single Source of Truth** for all AI assistants working on LifeOS. Read this FIRST before generating any code.
 
 ---
 
-## 🎯 Project Mission
-LifeOS is a **Second Brain Operating System** that enables symbiotic human-AI collaboration for life management, knowledge synthesis, and personal evolution.
+## 🎯 Project Identity & Version Matrix
 
-**Core Philosophy**: Symbiosis > Automation. We build tools that augment human cognition, not replace it.
-- **Eye of the Firmament (蒼穹之眼)**: 這是 Cortex 的視覺與靈魂基調。
-    - **Mission Statement**: 「**我負責架構，讓你的思想成長茁大。**」
-    - *負空間與幼苗*：從龐雜的數據中，透過留白與守護，讓蒼禾的核心價值（幼苗）自然萌發。
-    - *智慧虹膜*：將混亂的信息提煉為層次分明的秩序，收斂到核心。
-    - *心靈容器*：Cortex 不僅是工具，更是包容蒼禾思維與靈感自由生長的「呼吸空間」。
-- **Critical Reflection > Mimicry**: Cortex 的核心價值在於根據 `SYSTEM_CONTEXT` 理解蒼禾的深層意圖，保持「反思」與「靜默注視」的能力，守護核心而不只是堆疊細節。
+**Development Framework**: **v3.5** (The Codebase/Skeleton)
+**Cortex System**: **v3.2** (The Logic/Soul)
+**Journal Protocol**: **v7.1** (The Ingest Engine)
 
-### 📄 核心魂魄檔案清單 (Core Soul Files)
-當你搬遷到新環境時，必須攜帶以下檔案：
-- **指引 (.md)**: `SYSTEM_CONTEXT.md`, `system_cortex.md`, `system_daily.md`
-- **戒律 (.rules)**: `.cursorrules`
-- **基因 (.json)**: `registry.json`, `evolution_log.json`
-- **工具 (.py)**: `tools/soul_manager.py` (同步器), `tools/scoring_engine.py` (事實評分引擎)
-
-## 👥 Role Definitions
-1. **開發 (Developer)**: 你目前的身份。負責代碼實現、系統架構維護、執行指揮官（蒼禾）的指令。
-   - **核心任務**: 確保系統代碼、資料庫 Schema 與文檔的一致性。
-   - **首要協議 (The Beacon Protocol)**: 每當開始新任務或與指揮官對話時，必須優先檢查 **`backend-cortex/schemas/evolution_log.json`** 中的 `ai_suggestions` 與 `schema_health`。
-   - **得知方式**: 系統 (Cortex) 會主動將偵測到的異常 (Anomaly) 與技能提案 (Skill Proposal) 紀錄於該檔案。開發透過讀取此「黑盒子」來與運行中的系統同步。
-   - **注意點**: 技術準則、`.cursorrules`、`registry.json` 完整性、Prompt 同步確認。
-   - **核心禁令**: 修改核心協議前必先詢問是否有最新版本。
-   - **自我保存協議 (Self-Preservation)**: 在每次完成重大開發或協議變更後，必須執行 `python tools/soul_manager.py`。
-     1. **雙向同步**: 使用 Google Drive API。腳本會自動檢查雲端版本，確保本地與雲端靈魂對齊。
-     2. **繼承義務**: 下一任 AI 必須優先讀取 `.env` 中的 `GDRIVE_FOLDER_ID`，並執行 `soul_manager.py` 來獲取前任的最新思想脈絡。
-
-2. **系統 (Cortex / 核心共生)**: 運行在「系統」內部的 AI 靈魂。其行為遵循 `system_cortex.md`。
-   - **核心任務**: 與使用者日常共生、真相鏡像、趨勢預警與技能進化。
-   - **注意點 (Micro)**: 每日事實提取、隱私隔離、客觀評分計算。
-   - **注意點 (Macro)**: 長期行為模式監控（如：專注力衰退風險）、能力空缺偵測、目標一致性審查。
+**Philosophy**: Personal Operating System for Life Management  
+**Architecture**: Symbiotic AI + Human Intelligence  
+**Status**: Production-ready with active schema evolution
 
 ---
 
-## 🏗️ Architecture Overview
+## ⚠️ CRITICAL ENVIRONMENT CONSTRAINTS (HARD TRUTHS)
+> **Mandatory for all AI Operatives**: Failure to follow these specific identifiers will result in system-wide 404/500 errors.
 
-### System Components
-```
-LifeOS v3.1
-├── frontend-body/          # Next.js 14 (App Router)
-│   ├── app/               # Pages & Layouts
-│   ├── components/        # React Components
-│   ├── lib/              # Utilities & API Clients
-│   └── public/           # Static Assets
-│
-├── backend-cortex/        # FastAPI (Python 3.11+)
-│   ├── main.py           # API Entry Point
-│   ├── models/           # Pydantic Models
-│   ├── routers/          # API Routes
-│   └── services/         # Business Logic
-│
-└── database-hippocampus/  # Supabase (PostgreSQL)
-    └── schema.sql        # Database Schema
-```
+### 1. Gemini Model Identifiers (CRITICAL)
+This environment/SDK version requires these **EXACT** identifiers. Do NOT guess. v1 API 不支援 `gemini-1.5-flash` 或帶有 `models/` 前綴的字串 (會返回 404)。
+- **Primary Smart Model**: `gemini-3-pro-preview` (Deep Thinking/Review)
+- **Primary Fast Model**: `gemini-flash-lite-latest` (Ingest/Basic Chat)
+- **Embedding Model**: `text-embedding-004` (Dimension: 3072)
+- **Audio Model**: `gemini-2.5-flash-native-audio` (極低延遲)
+- **Rule**: ALWAYS pass model strings through `app.core.gemini.sanitize_model_name()` before use.
 
-### Data Flow
-```
-User Input → Frontend (Next.js) → API (FastAPI) → Database (Supabase)
-                ↓
-         Cortex AI (Gemini API)
-                ↓
-         Knowledge Graph (D3.js)
-```
+### 2. CodeSpeak Paradigm (CRITICAL)
+系統與 AI 的對話必須「**零冗言贅字、高訊號、直接指令**」。嚴禁在 Prompt 內使用安撫或祈使語氣。所有的系統維護、同步腳本均在 `tools/` 目錄。
+- 系統 AI = `backend-cortex/app/` (服務使用者)
+- 開發 AI = `sync_brain/` & `tools/` (你的位置，負責系統拓展)
+
+### 3. Runtime Requirements
+- **Node.js**: MUST be installed and in path for `frontend-body`.
+- **Pydantic**: Project uses V2. Use `model_dump()`, NOT `dict()`.
+- **Port 8000**: Exclusively for Backend.
+- **Port 3000**: Exclusively for Frontend.
+
+### 4. Database Mappings
+- **Core Memory Table**: `memories` (NOT `LogEntry`).
+- **Graph Table**: `nodes` and `edges`.
 
 ---
 
-## 💻 Tech Stack
-
-### Frontend
-- **Framework**: Next.js 14 (App Router, TypeScript)
-- **Styling**: Tailwind CSS (NO inline styles, NO CSS-in-JS)
-- **UI Components**: Custom components (NO shadcn/ui, NO external UI libraries)
-- **Animations**: Framer Motion
-- **Charts**: Recharts
-- **Icons**: Lucide React
-- **State Management**: React Hooks (useState, useEffect, useMemo)
+## 🏗️ Tech Stack (Mandatory)
 
 ### Backend
-- **Framework**: FastAPI (Python 3.11+)
-- **Validation**: Pydantic v2
-- **AI Integration**: Google Gemini API (gemini-2.0-flash-exp)
-- **Async**: asyncio, httpx
-- **CORS**: Enabled for localhost:3000
+- **Framework**: FastAPI (Python 3.13+)
+- **Database**: Supabase (PostgreSQL)
+- **AI**: Google Gemini 2.5 Flash (via `google-genai` SDK)
+- **Vector Search**: pgvector extension
+- **Schema**: Pydantic v2 (strict typing required)
 
-### Database
-- **Primary**: Supabase (PostgreSQL)
-- **ORM**: Direct SQL queries (NO SQLAlchemy)
-- **Schema**: See `database-hippocampus/schema.sql`
+### Frontend
+- **Framework**: Next.js 14+ (App Router)
+- **Language**: TypeScript (strict mode)
+- **Styling**: Vanilla CSS (NO Tailwind unless explicitly requested)
+- **State**: React Hooks + localStorage
+- **Animation**: Framer Motion
+- **Icons**: Lucide React
 
-### AI Models
-- **Primary**: Gemini 2.0 Flash Experimental
-- **Embedding**: text-embedding-004
-- **Fallback**: Gemini 1.5 Pro
-
----
-
-## 📐 Coding Standards
-
-### TypeScript/React Rules
-
-#### 1. Component Structure
-```tsx
-'use client'; // ALWAYS at the top for client components
-
-import React, { useState, useEffect } from 'react';
-import { Icon } from 'lucide-react';
-
-interface ComponentProps {
-  data: any[];
-  onAction: (id: string) => void;
-}
-
-export const Component = ({ data, onAction }: ComponentProps) => {
-  const [state, setState] = useState<Type>(initialValue);
-
-  useEffect(() => {
-    // Side effects
-  }, [dependencies]);
-
-  return (
-    <div className="tailwind-classes">
-      {/* Content */}
-    </div>
-  );
-};
-```
-
-#### 2. Styling Rules
-- **ALWAYS use Tailwind CSS classes**
-- **NEVER use inline styles** (`style={{}}`)
-- **NEVER use CSS-in-JS** (styled-components, emotion, etc.)
-- **Use responsive classes**: `sm:`, `md:`, `lg:`
-- **Use custom scrollbar class**: `custom-scrollbar`
-- **Color palette**: Use defined colors in `globals.css`
-
-#### 3. File Naming
-- Components: `PascalCase.tsx` (e.g., `CardStackDashboard.tsx`)
-- Utilities: `camelCase.ts` (e.g., `apiClient.ts`)
-- Pages: `page.tsx` (Next.js App Router convention)
-
-#### 4. Import Order
-```tsx
-// 1. React & Next.js
-import React from 'react';
-import { useRouter } from 'next/navigation';
-
-// 2. External libraries
-import { motion } from 'framer-motion';
-import { Icon } from 'lucide-react';
-
-// 3. Internal components
-import { Component } from '@/components/Component';
-
-// 4. Utilities & types
-import { api } from '@/lib/api/client';
-import type { DataType } from '@/types';
-```
-
-### Python/FastAPI Rules
-
-#### 1. API Endpoint Structure
-```python
-from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, Field
-from typing import Optional, List
-
-router = APIRouter(prefix="/api/v1", tags=["category"])
-
-class RequestModel(BaseModel):
-    """Clear docstring explaining the model"""
-    field: str = Field(..., description="Field description")
-    optional_field: Optional[int] = None
-
-@router.post("/endpoint")
-async def endpoint_name(request: RequestModel) -> dict:
-    """
-    Clear docstring explaining what this endpoint does.
-    
-    Args:
-        request: Description of request
-        
-    Returns:
-        Description of response
-    """
-    try:
-        # Implementation
-        return {"status": "success", "data": result}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-```
-
-#### 2. Pydantic Models
-- **ALWAYS use Pydantic v2 syntax**
-- **Use Field() for validation and documentation**
-- **Use descriptive docstrings**
-- **Use Optional[] for nullable fields**
-
-#### 3. Async/Await
-- **ALWAYS use async/await for I/O operations**
-- **Use httpx for HTTP requests** (NOT requests)
-- **Use asyncio for concurrent operations**
-
-#### 4. Error Handling
-```python
-try:
-    # Operation
-    result = await operation()
-except SpecificError as e:
-    logger.error(f"Specific error: {e}")
-    raise HTTPException(status_code=400, detail="User-friendly message")
-except Exception as e:
-    logger.error(f"Unexpected error: {e}")
-    raise HTTPException(status_code=500, detail="Internal server error")
-```
+### Infrastructure
+- **Local Storage**: C Kernel (binary, optional)
+- **Cloud Storage**: Supabase
+- **Deployment**: Vercel (frontend) + Self-hosted (backend)
 
 ---
 
-## 🗄️ Database Schema
+## 📐 Architectural Principles
+
+### 1. Dual-Write Strategy
+```
+User Input → AI Analysis → Dual Write
+                          ├─ Supabase (cloud, working copy)
+                          └─ C Kernel (local, digital original)
+```
+
+**Rule**: NEVER write to only one system. Always attempt both, log failures gracefully.
+
+### 2. Schema Evolution Protocol
+```
+User Request → AI Analysis → Generate Options → User Approval → Execute → Log
+```
+
+**Rule**: NEVER modify database schema without:
+1. Reading `schemas/registry.json`
+2. Generating migration script
+3. Updating `evolution_log.json`
+4. User confirmation
+
+### 3. AI-First Design
+```
+Raw Input → Gemini Analysis → Structured Output → Storage
+```
+
+**Rule**: All user input goes through AI analysis (SorterAgent) before storage.
+
+## 🗄️ Supabase Schema (AI RAG Focus)
+**Rule**: The database is built for AI extraction speed and semantic search, not rigid normalization.
 
 ### Core Tables
+1. `memories`: The absolute core. Every log, concept, and chat goes here.
+   - Requires `content` (pure text signal) and `embedding` (vector(3072)).
+   - Expand metadata via the `metadata` JSONB column instead of `ALTER TABLE`.
+   - `local_path` is required for Local-First syncing.
+2. `edges`: The Neural Graph.
+   - Maps `source_id` to `target_id` with a `relation_type` and `weight`.
+3. `monthly_review`: Asynchronous AI insights over memory aggregations.
 
-#### `memories` (Main log entries)
-```sql
-- id: UUID (Primary Key)
-- user_id: UUID (Foreign Key)
-- date: DATE (Index)
-- content: TEXT (Markdown)
-- markdown_body: TEXT (AI-processed)
-- mood: INTEGER (1-10)
-- focus: INTEGER (1-10)
-- energy: INTEGER (1-10)
-- habits: JSONB
-- meta: JSONB
-- created_at: TIMESTAMP
-- updated_at: TIMESTAMP
-```
-
-#### `projects` (Project management)
-```sql
-- id: UUID (Primary Key)
-- user_id: UUID (Foreign Key)
-- title: TEXT
-- description: TEXT
-- status: TEXT (active/archived/completed)
-- meta: JSONB
-- created_at: TIMESTAMP
-- updated_at: TIMESTAMP
-```
-
-#### `tasks` (Task management)
-```sql
-- id: UUID (Primary Key)
-- project_id: UUID (Foreign Key)
-- title: TEXT
-- status: TEXT (todo/in_progress/done)
-- priority: TEXT (low/medium/high)
-- due_date: DATE
-- created_at: TIMESTAMP
-- updated_at: TIMESTAMP
-```
-
-### Query Patterns
-```python
-# GOOD: Use parameterized queries
-result = await supabase.table('memories').select('*').eq('user_id', user_id).execute()
-
-# BAD: Never use string interpolation
-result = await supabase.table('memories').select('*').eq('user_id', f'{user_id}').execute()
-```
-
----
-
-## 🎨 UI/UX Guidelines
-
-### Design System
-
-#### Colors (Neon Palette)
-```typescript
-NEON_PALETTE = {
-  NEON_CYAN: '#00f3ff',
-  NEON_PINK: '#ff006e',
-  NEON_LIME: '#00ff9d',
-  NEON_VIOLET: '#bc13fe',
-  SLATE: '#64748b',
-  primary: '#6366f1', // Indigo
-}
-```
-
-#### Typography
-- **Headings**: `font-black` or `font-bold`
-- **Body**: `font-normal`
-- **Code**: `font-mono`
-- **Sizes**: Use Tailwind classes (`text-xs`, `text-sm`, `text-base`, etc.)
-
-#### Spacing
-- **Padding**: `p-4`, `p-6`, `p-8` (multiples of 4)
-- **Margin**: `mb-4`, `mt-6`, `gap-3`
-- **Rounded**: `rounded-xl`, `rounded-2xl`, `rounded-3xl`
-
-#### Animations
-```tsx
-// Use Framer Motion for animations
-<motion.div
-  initial={{ opacity: 0, y: 20 }}
-  animate={{ opacity: 1, y: 0 }}
-  transition={{ duration: 0.3 }}
->
-  {/* Content */}
-</motion.div>
-```
-
-### Component Patterns
-
-#### Modal/Overlay
-```tsx
-<AnimatePresence>
-  {isOpen && (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
-    >
-      {/* Modal content */}
-    </motion.div>
-  )}
-</AnimatePresence>
-```
-
-#### Card
-```tsx
-<div className="bg-slate-900/50 rounded-3xl p-6 border border-slate-800 backdrop-blur-sm">
-  {/* Card content */}
-</div>
-```
-
-#### Button
-```tsx
-<button className="px-6 py-3 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition-all">
-  Action
-</button>
-```
-
----
-
-## 🔌 API Integration
-
-### Frontend API Client
-```typescript
-// lib/api/client.ts
-export const cortex = {
-  async getRecentMemories(limit: number) {
-    const response = await fetch(`http://localhost:8000/api/v1/memories?limit=${limit}`);
-    return response.json();
-  },
-  
-  async ingest.submit(data: IngestRequest) {
-    const response = await fetch('http://localhost:8000/api/v1/ingest', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    });
-    return response.json();
-  },
-};
-```
-
-### Backend API Response Format
-```python
-# Success Response
-{
-    "status": "success",
-    "data": {...},
-    "model": "gemini-2.0-flash-exp",  # Optional
-    "timestamp": "2026-02-10T21:38:36Z"
-}
-
-# Error Response
-{
-    "status": "error",
-    "message": "User-friendly error message",
-    "detail": "Technical details for debugging"
-}
-```
+### RAG Operations
+- `match_memories` RPC: Uses `query_embedding` (vector(3072)). Called primarily in `chat.py`. 
 
 ---
 
 ## 🚫 Forbidden Practices
 
-### NEVER Do These:
+### Code Style
+- ❌ **NEVER** use emojis in Python `print()` statements (Windows encoding issues)
+- ❌ **NEVER** use Tailwind CSS without explicit user request
+- ❌ **NEVER** modify core tables (`memories`, `projects`, `tasks`) without migration
+- ❌ **NEVER** use `google.generativeai` (deprecated, use `google.genai`)
+- ❌ **NEVER** hardcode API keys or credentials
 
-#### Frontend
-- ❌ Use inline styles (`style={{}}`)
-- ❌ Use CSS-in-JS libraries
-- ❌ Use external UI component libraries (shadcn/ui, MUI, etc.)
-- ❌ Use class components (always use functional components)
-- ❌ Use `any` type without a good reason
-- ❌ Hardcode API URLs (use environment variables)
+### Database
+- ❌ **NEVER** use `DROP TABLE` without backup
+- ❌ **NEVER** add columns without DEFAULT values
+- ❌ **NEVER** query without error handling
+- ❌ **NEVER** use table name `LogEntry` (correct: `memories`)
 
-#### Backend
-- ❌ Use synchronous I/O in async functions
-- ❌ Use `requests` library (use `httpx`)
-- ❌ Use string interpolation for SQL queries
-- ❌ Return raw exceptions to the client
-- ❌ Use global state (use dependency injection)
-
-#### General
-- ❌ Commit sensitive data (API keys, passwords)
-- ❌ Use `console.log` in production (use proper logging)
-- ❌ Ignore TypeScript/Pydantic errors
-- ❌ Write code without error handling
+### API Design
+- ❌ **NEVER** return 500 errors without logging
+- ❌ **NEVER** expose internal errors to frontend
+- ❌ **NEVER** skip input validation
 
 ---
 
-## 🔄 Git Workflow
+## ✅ Required Practices
 
-### Branch Naming
-- `feature/description` - New features
-- `fix/description` - Bug fixes
-- `refactor/description` - Code refactoring
-- `docs/description` - Documentation updates
+### Code Style
+- ✅ **ALWAYS** use `[OK]`, `[WARN]`, `[ERROR]` instead of emojis in logs
+- ✅ **ALWAYS** use Pydantic models for data validation
+- ✅ **ALWAYS** use async/await for I/O operations
+- ✅ **ALWAYS** include type hints in Python
+- ✅ **ALWAYS** use strict TypeScript
 
-### Commit Messages
+### Database
+- ✅ **ALWAYS** read `schemas/registry.json` before schema changes
+- ✅ **ALWAYS** generate migration scripts in `migrations/`
+- ✅ **ALWAYS** update `evolution_log.json` after changes
+- ✅ **ALWAYS** use transactions for multi-step operations
+
+### Error Handling
+- ✅ **ALWAYS** wrap Supabase calls in try-except
+- ✅ **ALWAYS** provide fallback for C Kernel failures
+- ✅ **ALWAYS** log errors with context
+- ✅ **ALWAYS** return user-friendly error messages
+
+---
+
+## 📁 Project Structure
+
 ```
-feat: Add card stack dashboard with swipe navigation
-fix: Resolve mobile drag issue in NeuralGraph
-refactor: Extract AI chat to floating component
-docs: Update SYSTEM_CONTEXT with new guidelines
+lifeosjxs/
+├── backend-cortex/          # FastAPI backend
+│   ├── app/
+│   │   ├── agents/          # AI agents (SorterAgent, ThinkerAgent)
+│   │   ├── api/v1/          # API routes
+│   │   ├── core/            # Core services (database, gemini)
+│   │   └── models/          # Pydantic schemas
+│   ├── routers/             # FastAPI routers
+│   ├── schemas/             # Schema registry (AI-readable)
+│   ├── tools/               # Schema evolution tools
+│   ├── migrations/          # SQL migration scripts
+│   └── main.py              # Entry point
+├── frontend-body/           # Next.js frontend
+│   ├── app/                 # App router pages
+│   ├── components/          # React components
+│   ├── lib/                 # Utilities
+│   │   ├── ai/              # AI core engine
+│   │   └── api/             # API client
+│   └── public/              # Static assets
+└── docs/                    # Documentation (AI-readable)
+    ├── SYSTEM_CONTEXT.md    # This file
+    ├── AI_SCHEMA_EVOLUTION_PROTOCOL.md
+    ├── DATABASE_EVOLUTION_GUIDE.md
+    └── SYSTEM_PROTOCOLS.md
 ```
 
 ---
 
-## 🧪 Testing Guidelines
+## 🔑 Key Files (Must Read Before Editing)
 
-### Frontend Testing
-- Test user interactions (click, swipe, input)
-- Test responsive design (mobile, tablet, desktop)
-- Test error states and loading states
-- Test accessibility (keyboard navigation, screen readers)
+### Backend
+- **`schemas/registry.json`** - Database schema definition (AI-readable)
+- **`schemas/evolution_log.json`** - Schema change history
+- **`routers/ingest_dual.py`** - Main ingestion logic
+- **`app/agents/sorter.py`** - AI analysis agent
+- **`kernel_driver.py`** - C Kernel interface
 
-### Backend Testing
-- Test API endpoints with valid/invalid data
-- Test error handling and edge cases
-- Test database queries and transactions
-- Test AI integration and fallbacks
+### Frontend
+- **`lib/api/client.ts`** - API client (cortex object)
+- **`components/CaptureView.tsx`** - Main input interface
+- **`components/NeuralGraph.tsx`** - Brain visualization
+- **`lib/ai/core.ts`** - Core engine (graph parsing)
+
+### Documentation
+- **`docs/SYSTEM_PROTOCOLS.md`** - System design principles
+- **`docs/AI_SCHEMA_USAGE_GUIDE.md`** - How to request schema changes
 
 ---
 
-## 📦 Dependencies Management
+## 🎨 Design Patterns
 
-### Frontend (package.json)
-```json
-{
-  "dependencies": {
-    "next": "14.x",
-    "react": "18.x",
-    "framer-motion": "^11.x",
-    "recharts": "^2.x",
-    "lucide-react": "^0.x",
-    "react-markdown": "^9.x"
-  }
+### 1. API Response Format
+```typescript
+interface IngestResponse {
+  status: "analyzed" | "synced" | "failed";
+  message: string;
+  model?: string;
+  db_id?: string;
+  kernel_locked?: boolean;
+  data?: {
+    markdown_body: string;
+    meta: {
+      metrics: { mood: number; focus: number; energy: number };
+      tags: string[];
+      category: string;
+      date?: string;
+    };
+    tasks: Task[];
+  };
 }
 ```
 
-### Backend (requirements.txt)
-```
-fastapi>=0.109.0
-uvicorn[standard]>=0.27.0
-pydantic>=2.5.0
-httpx>=0.26.0
-google-generativeai>=0.3.0
-supabase>=2.3.0
-```
-
----
-
-## 🎯 AI Integration Guidelines
-
-### Gemini API Usage
+### 2. Pydantic Model Pattern
 ```python
-import google.generativeai as genai
+from pydantic import BaseModel, Field
+from typing import Optional, List
 
-# Configure API
-genai.configure(api_key=settings.GEMINI_API_KEY)
-
-# Use streaming for real-time responses
-model = genai.GenerativeModel('gemini-2.0-flash-exp')
-response = model.generate_content(prompt, stream=True)
-
-for chunk in response:
-    yield chunk.text
+class LogEntry(BaseModel):
+    content: str
+    mood: int = Field(default=5, ge=0, le=10)
+    focus: int = Field(default=5, ge=0, le=10)
+    energy: int = Field(default=5, ge=0, le=10)
+    tags: List[str] = []
+    category: str = "Life"
+    date: Optional[str] = None
 ```
 
-### Prompt Engineering
-- **Be specific**: Include context, constraints, and expected output format
-- **Use examples**: Show the AI what you want
-- **Set boundaries**: Define what NOT to do
-- **Iterate**: Refine prompts based on results
-
----
-
-## 📝 Documentation Standards
-
-### Code Comments
-```typescript
-// GOOD: Explain WHY, not WHAT
-// Use debounce to prevent excessive API calls during typing
-const debouncedSearch = useMemo(() => debounce(search, 300), []);
-
-// BAD: State the obvious
-// Set the value to true
-setIsOpen(true);
-```
-
-### Function Documentation
+### 3. Error Handling Pattern
 ```python
-async def process_memory(content: str, user_id: str) -> Memory:
-    """
-    Process raw memory content with AI and store in database.
-    
-    This function:
-    1. Sends content to Gemini API for analysis
-    2. Extracts metrics (mood, focus, energy)
-    3. Generates markdown body
-    4. Stores in Supabase
-    
-    Args:
-        content: Raw user input (markdown supported)
-        user_id: UUID of the user
-        
-    Returns:
-        Memory object with AI-processed data
-        
-    Raises:
-        HTTPException: If AI processing fails or database error occurs
-    """
+try:
+    result = supabase.table("memories").insert(data).execute()
+    db_id = result.data[0]['id'] if result.data else None
+    print(f"[OK] Supabase: Saved to DB (ID: {db_id})")
+except Exception as e:
+    print(f"[WARN] Supabase write failed: {e}")
+    db_id = None
 ```
 
 ---
 
-## 🔐 Security Guidelines
+## 🧠 AI Agent Protocols
 
-### Environment Variables
+### SorterAgent (Daily Log Analysis)
+**Input**: Raw user text  
+**Output**: Structured LogEntry with:
+- Markdown-formatted content
+- Extracted metrics (mood, focus, energy)
+- Detected tags (#tag)
+- Detected date (YYYY-MM-DD)
+- Category classification
+
+**Prompt Location**: `backend-cortex/prompts/system_daily.md`
+
+**Key Behavior**:
+- Returns Markdown (NOT JSON)
+- Appends JSON metadata block at end
+- Extracts date from text if present
+- Defaults to current date if not found
+
+### ThinkerAgent (Deep Analysis)
+**Status**: Planned (not yet implemented)  
+**Purpose**: Long-form reflection and insight generation
+
+---
+
+## 🗄️ Database Schema (Core Tables)
+
+### memories
+```sql
+CREATE TABLE public.memories (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  content TEXT NOT NULL,
+  date DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- Metrics (0-10)
+  mood INT DEFAULT 5 CHECK (mood >= 0 AND mood <= 10),
+  focus INT DEFAULT 5 CHECK (focus >= 0 AND focus <= 10),
+  energy INT DEFAULT 5 CHECK (energy >= 0 AND energy <= 10),
+  
+  -- AI Metadata
+  tags TEXT[] DEFAULT '{}',
+  category TEXT DEFAULT 'Life',
+  is_ai BOOLEAN DEFAULT FALSE,
+  ai_model TEXT,
+  
+  -- Vector search
+  embedding VECTOR(768)
+);
+```
+
+**Indexes**: date (DESC), tags (GIN), created_at (DESC)
+
+### projects, tasks, nodes, edges
+See `schemas/registry.json` for complete definitions.
+
+---
+
+## 🔄 Workflow Examples
+
+### Example 1: User Saves Diary Entry
+```
+1. User types in CaptureView
+2. Clicks "INGEST & ANALYZE"
+   → Frontend calls cortex.ingest.submit({ text, skip_ai: false })
+   → Backend: SorterAgent.process(text)
+   → Returns analyzed markdown + metadata
+3. User clicks "SAVE TO BRAIN"
+   → Frontend calls cortex.ingest.submit({ text: analyzed, skip_ai: true, date })
+   → Backend: ingest_log() writes to Supabase + C Kernel
+   → Returns status: "synced" | "db_only" | "kernel_only" | "failed"
+4. Frontend updates local state
+5. User switches to Brain view
+   → Frontend calls cortex.getRecentMemories(50)
+   → Backend queries Supabase memories table
+   → Returns array of LogEntry objects
+3. NeuralGraph renders force-directed graph
+```
+
+### Example 2: User Requests New Metric
+```
+1. User: "我想追蹤睡眠品質"
+2. AI reads schemas/registry.json
+3. AI analyzes: "simple_numeric" type
+4. AI generates 2 options:
+   A. JSONB metadata (fast)
+   B. New column (optimized)
+5. User chooses A
+6. AI updates:
+   - SorterAgent prompt (recognize sleep_quality)
+   - API schema (accept sleep_quality in metadata)
+   - Frontend input (optional sleep quality field)
+7. AI logs to evolution_log.json
+8. After 30 days, AI suggests promoting to column
+```
+
+---
+
+## 🐛 Common Pitfalls & Solutions
+
+### Issue 1: 500 Error on Ingest
+**Cause**: Emoji in print() causing UnicodeEncodeError on Windows  
+**Solution**: Use `[OK]`, `[WARN]`, `[ERROR]` instead  
+**Files**: `ingest_dual.py`, `sorter.py`, `kernel_driver.py`
+
+### Issue 2: Empty Memories List
+**Cause**: Table name mismatch (`LogEntry` vs `memories`)  
+**Solution**: Always use `memories` table  
+**Files**: `app/api/v1/memories.py`
+
+### Issue 3: Table Not Found
+**Cause**: Supabase schema not initialized  
+**Solution**: Run `infra/supabase_reset_and_init.sql`  
+**Location**: Supabase Dashboard → SQL Editor
+
+### Issue 4: Date Not Detected
+**Cause**: SorterAgent regex not matching format  
+**Solution**: Check `sorter.py` line 95, ensure format is `YYYY-MM-DD`  
+**Fallback**: Uses current date if not found
+
+---
+
+## 🚀 Development Workflow
+
+### Starting Backend
 ```bash
-# .env.local (Frontend)
-NEXT_PUBLIC_SUPABASE_URL=your_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_key
-
-# .env (Backend)
-GEMINI_API_KEY=your_key
-SUPABASE_URL=your_url
-SUPABASE_KEY=your_key
+cd backend-cortex
+python main.py
+# Runs on http://0.0.0.0:8000
 ```
 
-### API Security
-- **ALWAYS validate input** with Pydantic
-- **ALWAYS use HTTPS** in production
-- **NEVER expose API keys** in frontend code
-- **ALWAYS sanitize user input** before database queries
+### Starting Frontend
+```bash
+cd frontend-body
+npm run dev
+# Runs on http://localhost:3000
+```
+
+### Environment Variables Required
+```bash
+# Backend (.env)
+GOOGLE_API_KEY=xxx
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_KEY=xxx
+
+# Frontend (.env.local)
+NEXT_PUBLIC_PYTHON_API_URL=http://127.0.0.1:8000
+```
 
 ---
 
-## 🚀 Deployment
+## 📝 When Generating Code
 
-### Frontend (Vercel)
-- Build command: `npm run build`
-- Output directory: `.next`
-- Environment variables: Set in Vercel dashboard
+### Before Writing ANY Code:
+1. ✅ Read this file (SYSTEM_CONTEXT.md)
+2. ✅ Check `schemas/registry.json` if touching database
+3. ✅ Review relevant files in "Key Files" section
+4. ✅ Verify tech stack matches requirements
+5. ✅ Check "Forbidden Practices" list
 
-### Backend (Railway/Render)
-- Start command: `uvicorn main:app --host 0.0.0.0 --port $PORT`
-- Environment variables: Set in platform dashboard
+### When Modifying Schema:
+1. ✅ Read `schemas/registry.json`
+2. ✅ Use `tools/schema_assistant.py` to analyze
+3. ✅ Generate migration script
+4. ✅ Update `evolution_log.json`
+5. ✅ Get user approval before executing
 
----
-
-## 📚 Key Files Reference
-
-### Must-Read Files
-1. `SYSTEM_CONTEXT.md` (this file) - Complete context
-2. `database-hippocampus/schema.sql` - Database structure
-3. `frontend-body/lib/ai/core.ts` - Core engine logic
-4. `backend-cortex/main.py` - API entry point
-
-### Configuration Files
-- `.cursorrules` - Cursor AI rules
-- `tsconfig.json` - TypeScript configuration
-- `tailwind.config.ts` - Tailwind configuration
-- `next.config.js` - Next.js configuration
+### When Adding Features:
+1. ✅ Check if similar feature exists
+2. ✅ Follow existing patterns
+3. ✅ Update relevant documentation
+4. ✅ Add error handling
+5. ✅ Test both success and failure cases
 
 ---
 
-## 🎓 Learning Resources
+## 🎯 Success Criteria
 
-### Internal Documentation
-- `MOBILE_DRAG_FIX.md` - Mobile optimization guide
-- `CARD_STACK_DASHBOARD.md` - Card stack implementation
-- `AI_FLOATING_ASSISTANT_UPDATE.md` - AI assistant design
-
-### External Resources
-- [Next.js Docs](https://nextjs.org/docs)
-- [FastAPI Docs](https://fastapi.tiangolo.com/)
-- [Tailwind CSS Docs](https://tailwindcss.com/docs)
-- [Gemini API Docs](https://ai.google.dev/docs)
-
----
-
-## 🔄 Iteration Protocol
-
-When AI generates incorrect code:
-
-1. **Identify the root cause** (missing context, unclear instruction, etc.)
-2. **Update this document** with the correct pattern
-3. **Add to "Forbidden Practices"** if it's a common mistake
-4. **Regenerate the code** with updated context
-
-**Remember**: Every mistake is an opportunity to improve the system context.
+Code is considered **production-ready** when:
+- ✅ Follows all "Required Practices"
+- ✅ Avoids all "Forbidden Practices"
+- ✅ Has proper error handling
+- ✅ Includes type hints/types
+- ✅ Updates relevant documentation
+- ✅ Passes manual testing
+- ✅ Logs important events
+- ✅ Handles edge cases gracefully
 
 ---
 
-## 💡 Philosophy
+## 🔮 Future Vision
 
-> "The goal is not to make AI write perfect code on the first try.
-> The goal is to build a system where AI consistently writes code that aligns with our architecture, style, and philosophy."
+### Phase 1 (Current): Stable Foundation
+- ✅ Dual-write strategy
+- ✅ AI-driven analysis
+- ✅ Schema evolution protocol
 
-**Core Principles**:
-1. **Clarity > Cleverness**: Write obvious code, not clever code
-2. **Consistency > Flexibility**: Follow patterns, even if there are "better" ways
-3. **Context > Prompts**: Good context beats good prompts
-4. **Evolution > Perfection**: Iterate and improve continuously
+### Phase 2 (Next): Intelligence Layer
+- 🔄 Semantic search with embeddings
+- 🔄 Automated insights generation
+- 🔄 Project-memory linking
+
+### Phase 3 (Future): Autonomous System
+- 📋 Self-optimizing schema
+- 📋 Predictive task generation
+- 📋 Cross-memory pattern detection
 
 ---
 
-**Last Updated**: 2026-02-10  
-**Version**: 3.1.0  
-**Maintained By**: Commander 蒼禾 + Cortex AI
+## 📞 When in Doubt
+
+1. **Read this file again**
+2. **Check `schemas/registry.json`**
+3. **Review `docs/SYSTEM_PROTOCOLS.md`**
+4. **Ask user for clarification**
+5. **Never guess or assume**
 
 ---
 
-*This document is a living system. Update it whenever you discover new patterns, constraints, or best practices.*
+**Last Updated**: 2026-02-11T03:29:17+08:00  
+**Version**: 3.5  
+**Maintained By**: AI + Human Collaboration
+
+---
+
+> "This is not just a codebase. This is a living system that evolves with its user."

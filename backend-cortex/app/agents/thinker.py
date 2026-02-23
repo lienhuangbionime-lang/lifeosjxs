@@ -17,7 +17,7 @@ class ThinkerAgent:
         if not api_key:
             raise ValueError("GOOGLE_API_KEY or GEMINI_API_KEY not found in environment variables")
         self.client = genai.Client(api_key=api_key)
-        self.model_name = "gemini-2.5-flash" 
+        self.model_name = "models/gemini-flash-lite-latest" 
 
     def process(self, user_input: str) -> ThinkingResult:
         prompt = f"""

@@ -1,54 +1,64 @@
-{
-    "version": "1.0",
-    "last_updated": "2026-02-11T03:16:19+08:00",
-    "migrations": [
-        {
-            "id": "001",
-            "timestamp": "2026-02-11T03:00:00+08:00",
-            "description": "Initial schema creation",
-            "type": "create",
-            "status": "completed",
-            "tables_affected": [
-                "memories",
-                "projects",
-                "tasks",
-                "nodes",
-                "edges"
-            ],
-            "sql_file": "migrations/001_initial_schema.sql",
-            "ai_generated": false,
-            "user_approved": true,
-            "rollback_available": false,
-            "notes": "Base schema for LifeOS v3.5"
-        },
-        {
-            "id": "002",
-            "timestamp": "2026-02-11T04:27:00+08:00",
-            "description": "Add system usage tracking",
-            "type": "create",
-            "status": "completed",
-            "tables_affected": [
-                "system_usage"
-            ],
-            "ai_generated": true,
-            "user_approved": true,
-            "notes": "Tracks daily API usage"
-        }
-    ],
-    "pending_migrations": [],
-    "experimental_features": {
-        "memories_metadata_fields": {
-            "description": "Experimental fields being tested in JSONB metadata",
-            "fields": [],
-            "usage_count": {},
-            "promotion_candidates": []
-        }
+[
+    {
+        "timestamp": "2026-02-14T01:55:00Z",
+        "event": "Protocol Alignment",
+        "type": "ARCH",
+        "description": "Aligned frontend CaptureView with backend ingest.py schema. Fixed content/text mismatch.",
+        "impact": "High - Restored Capture flow functionality."
     },
-    "ai_suggestions": [],
-    "schema_health": {
-        "last_check": "2026-02-11T03:16:19+08:00",
-        "issues": [],
-        "warnings": [],
-        "optimization_opportunities": []
+    {
+        "timestamp": "2026-02-14T02:05:00Z",
+        "event": "Schema Consolidation",
+        "type": "DB",
+        "description": "Unified all database schemas into lifeos_v3.5_full_schema.sql. Established single source of truth.",
+        "impact": "Critical - Established structural stability."
+    },
+    {
+        "timestamp": "2026-02-14T11:40:00Z",
+        "event": "Evolution Log Implementation",
+        "type": "PROTOCOL",
+        "description": "Implemented migrations/005_cortex_growth_logs.sql for Glass Box protocol transparency.",
+        "impact": "High - Auditable AI decision making."
+    },
+    {
+        "timestamp": "2026-02-14T13:50:00Z",
+        "event": "Growth Verification",
+        "type": "VERIFICATION",
+        "description": "Identified and resolved 38 critical defects across frontend client and backend API. Successfully verified build.",
+        "impact": "Critical - Proved system growth and resilience."
+    },
+    {
+        "timestamp": "2026-02-14T14:10:00Z",
+        "event": "Memory Unification",
+        "type": "API",
+        "description": "Synchronized memories.py and ingest.py to use 'memories' table. Updated Pydantic schemas for UUID and metrics.",
+        "impact": "High - Fixed data visibility across system."
+    },
+    {
+        "timestamp": "2026-02-14T14:20:00Z",
+        "event": "Codebase Purification",
+        "type": "CLEANUP",
+        "description": "Removed legacy kernel source, redundant routers, and transient test scripts. Achieved minimal production state.",
+        "impact": "Medium - Improved maintenance and handover efficiency."
+    },
+    {
+        "timestamp": "2026-02-14T15:45:00Z",
+        "event": "Intelligence Layer Activation",
+        "type": "EVOLUTION",
+        "description": "Implemented 'Glass Box' Decision Matrix (system_cortex.md) and enabled 3072-dim Semantic Search (VectorEngine + RPC)."
+    },
+    {
+        "timestamp": "2026-02-15T09:45:00Z",
+        "event": "Rate Limit Incident",
+        "type": "FIX",
+        "description": "System hit 429 errors on gemini-2.0-flash due to forced hotfix. Switched to gemini-1.5-flash (stable) and removed backend override.",
+        "impact": "High - Restored system availability."
+    },
+    {
+        "timestamp": "2026-02-23T23:20:00Z",
+        "event": "2026 Harness Engineering Upgrade",
+        "type": "ARCH",
+        "description": "Upgraded system to google.genai SDK (v1 API). Replaced conversational prompts with high-signal CodeSpeak protocols. Consolidated tools to root directory.",
+        "impact": "Critical - Eliminated 404 version errors and established minimalist AI command structure."
     }
-}
+]

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, MessageSquare, X, Bot, User, Loader2, Maximize2, Minimize2, Trash2, Settings, Terminal, Sparkles } from 'lucide-react';
+import { Send, Paperclip, MessageSquare, X, Bot, User, Loader2, Maximize2, Minimize2, Trash2, Settings, Terminal, Sparkles, Link2 } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cortex, EvolutionStatus } from '@/lib/api/client';
 
@@ -21,7 +21,9 @@ export const CortexChat = () => {
     const [isUploading, setIsUploading] = useState(false);
     const [systemStatus, setSystemStatus] = useState<EvolutionStatus | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-    const [selectedModel, setSelectedModel] = useState('gemini-3.0-pro-preview');
+    const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string }>>([]);
+    const [selectedModel, setSelectedModel] = useState('models/gemini-flash-lite-latest');
+    const [isRefreshingModels, setIsRefreshingModels] = useState(false);
     const [apiKey, setApiKey] = useState('');
     const [activeTab, setActiveTab] = useState<'chat' | 'logic'>('chat');
     const [prompts, setPrompts] = useState<Record<string, string>>({});
@@ -36,7 +38,20 @@ export const CortexChat = () => {
         const savedKey = localStorage.getItem('CORTEX_API_KEY');
         const savedModel = localStorage.getItem('CORTEX_MODEL');
         if (savedKey) setApiKey(savedKey);
-        if (savedModel) setSelectedModel(savedModel);
+        if (savedModel) {
+            // [Hotfix] Reset if model is deprecated or corrupted
+            if (savedModel.includes('pro-exp-02-05') || savedModel.includes('2.5') || savedModel.includes('-33')) {
+                setSelectedModel('models/gemini-flash-lite-latest');
+                localStorage.setItem('CORTEX_MODEL', 'models/gemini-flash-lite-latest');
+            } else if (savedModel.includes('gemini-3.0')) {
+                // [Hotfix] Fix incorrect 3.0 version appearing in cache
+                const fixed = savedModel.replace('gemini-3.0', 'gemini-3');
+                setSelectedModel(fixed);
+                localStorage.setItem('CORTEX_MODEL', fixed);
+            } else {
+                setSelectedModel(savedModel);
+            }
+        }
 
         const fetchStatus = async () => {
             try {
@@ -47,7 +62,30 @@ export const CortexChat = () => {
             }
         };
         fetchStatus();
+
+        // Load cached models
+        const cachedModels = localStorage.getItem('CORTEX_AVAILABLE_MODELS');
+        if (cachedModels) {
+            try {
+                setAvailableModels(JSON.parse(cachedModels));
+            } catch (e) { console.error(e); }
+        }
     }, []);
+
+    const refreshModels = async () => {
+        setIsRefreshingModels(true);
+        try {
+            const data = await cortex.getAvailableModels();
+            if (data.models && data.models.length > 0) {
+                setAvailableModels(data.models);
+                localStorage.setItem('CORTEX_AVAILABLE_MODELS', JSON.stringify(data.models));
+            }
+        } catch (e) {
+            console.error("Failed to refresh", e);
+        } finally {
+            setIsRefreshingModels(false);
+        }
+    };
 
     // Fetch prompt content when activeTab or selectedPrompt changes
     useEffect(() => {
@@ -78,24 +116,61 @@ export const CortexChat = () => {
         }
     };
 
+    const [urlContext, setUrlContext] = useState<{ url: string; type: string; title: string; content: string; summary: string } | null>(null);
+    const [isAnalyzingUrl, setIsAnalyzingUrl] = useState(false);
+
     useEffect(() => {
         if (scrollRef.current && activeTab === 'chat') {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
-    }, [messages, isOpen, activeTab]);
+    }, [messages, isOpen, activeTab, urlContext]);
+
+    const checkUrlInInput = async (text: string) => {
+        const urlRegex = /(https?:\/\/[^\s]+)/g;
+        const match = text.match(urlRegex);
+
+        if (match && !urlContext && !isAnalyzingUrl) {
+            const url = match[0];
+            setIsAnalyzingUrl(true);
+            try {
+                const apiUrl = process.env.NEXT_PUBLIC_PYTHON_API_URL || 'http://localhost:8000';
+                const res = await fetch(`${apiUrl}/api/v1/url/fetch`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    setUrlContext(data);
+                }
+            } catch (e) {
+                console.error("Failed to fetch URL context", e);
+            } finally {
+                setIsAnalyzingUrl(false);
+            }
+        }
+    };
 
     const handleSend = async () => {
-        if (!input.trim() || isLoading) return;
+        if ((!input.trim() && !urlContext) || isLoading) return;
 
         const userMsg = input;
+        const currentUrlContext = urlContext;
+
         setInput('');
+        setUrlContext(null);
 
         const currentHistory = messages.map(m => ({
             role: m.role,
             content: m.content
         }));
 
-        setMessages(prev => [...prev, { role: 'user', content: userMsg }]);
+        const displayMsg = currentUrlContext
+            ? `[Discussing: ${currentUrlContext.title}](${currentUrlContext.url})\n\n${userMsg}`
+            : userMsg;
+
+        setMessages(prev => [...prev, { role: 'user', content: displayMsg }]);
         setIsLoading(true);
 
         try {
@@ -105,7 +180,9 @@ export const CortexChat = () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     message: userMsg,
-                    history: currentHistory
+                    history: currentHistory,
+                    model: selectedModel,
+                    url_context: currentUrlContext
                 })
             });
 
@@ -245,16 +322,35 @@ export const CortexChat = () => {
 
                     <div className="space-y-4">
                         <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1.5">Model</label>
+                            <div className="flex justify-between items-center mb-1.5">
+                                <label className="block text-[10px] font-bold text-slate-500 uppercase">Model</label>
+                                <button
+                                    onClick={refreshModels}
+                                    disabled={isRefreshingModels}
+                                    className="text-[10px] text-indigo-500 hover:text-indigo-700 font-bold uppercase flex items-center gap-1 disabled:opacity-50"
+                                >
+                                    {isRefreshingModels ? <Loader2 size={10} className="animate-spin" /> : <Sparkles size={10} />}
+                                    {isRefreshingModels ? 'Refreshing...' : 'Refresh List'}
+                                </button>
+                            </div>
                             <select
                                 value={selectedModel}
                                 onChange={(e) => setSelectedModel(e.target.value)}
                                 className="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-indigo-100"
                             >
-                                <option value="gemini-pro-latest">Gemini Pro Latest</option>
-                                <option value="gemini-2.5-flash">Gemini 2.5 Flash</option>
-                                <option value="gemini-3.0-pro-preview">Gemini 3.0 pro preview
-                                </option>
+                                {availableModels.length > 0 ? (
+                                    availableModels.map(model => (
+                                        <option key={model.id} value={model.id}>
+                                            {model.name}
+                                        </option>
+                                    ))
+                                ) : (
+                                    <>
+                                        <option value="models/gemini-flash-lite-latest">Gemini Flash Lite (Fast)</option>
+                                        <option value="models/gemini-3-pro-preview">Gemini 3 Pro (Smart)</option>
+                                        <option value="models/gemini-1.5-flash">Gemini 1.5 Flash (Reliability)</option>
+                                    </>
+                                )}
                             </select>
                         </div>
 
@@ -307,12 +403,6 @@ export const CortexChat = () => {
                         className="flex-1 w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-700 outline-none resize-none focus:ring-2 focus:ring-indigo-100"
                         placeholder="Customize Cortex's thinking..."
                     />
-                    <div className="mt-3 p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-                        <h5 className="text-[10px] font-black text-indigo-600 uppercase mb-1 tracking-wider">Warning</h5>
-                        <p className="text-[10px] text-indigo-500 leading-normal font-medium">
-                            Modifying the brain files will change how Cortex perceives and analyzes your reality.
-                        </p>
-                    </div>
                 </div>
             )}
 
@@ -344,10 +434,10 @@ export const CortexChat = () => {
                                                     ul: ({ ...props }) => <ul className="list-disc list-inside mb-2 space-y-1 text-slate-600 font-sans" {...props} />,
                                                     li: ({ ...props }) => <li className="text-slate-700" {...props} />,
                                                     strong: ({ ...props }) => <strong className="text-slate-900 font-bold" {...props} />,
-                                                    code: ({ node, ...props }) => (
+                                                    code: ({ ...props }) => (
                                                         <code className="bg-slate-200/50 text-indigo-700 rounded px-1 py-0.5 font-mono text-xs" {...props} />
                                                     ),
-                                                    pre: ({ node, ...props }) => (
+                                                    pre: ({ ...props }) => (
                                                         <pre className="bg-slate-800 text-slate-100 p-3 rounded-xl my-3 overflow-x-auto text-[11px] font-mono shadow-inner" {...props} />
                                                     )
                                                 }}
@@ -389,26 +479,56 @@ export const CortexChat = () => {
 
                             <textarea
                                 value={input}
-                                onChange={e => setInput(e.target.value)}
+                                onChange={e => {
+                                    setInput(e.target.value);
+                                    checkUrlInInput(e.target.value);
+                                }}
                                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                                placeholder="Ask anything..."
+                                placeholder={isAnalyzingUrl ? "Analyzing Link..." : "Ask anything or paste a URL..."}
                                 className="flex-1 bg-transparent border-0 px-2 py-2 text-sm text-slate-700 outline-none resize-none h-10 max-h-32 font-sans"
                                 rows={1}
                             />
 
                             <button
                                 onClick={handleSend}
-                                disabled={!input.trim() || isLoading}
+                                disabled={(!input.trim() && !urlContext) || isLoading}
                                 className="h-10 w-10 flex items-center justify-center bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-30 disabled:hover:bg-indigo-600 transition-all shadow-md shadow-indigo-100"
                             >
                                 {isLoading ? <Loader2 className="animate-spin" size={18} /> : <Send size={18} />}
                             </button>
                         </div>
 
+                        {/* URL Preview Card */}
+                        {(urlContext || isAnalyzingUrl) && (
+                            <div className="mt-2 mx-1 p-2 bg-indigo-50 border border-indigo-100 rounded-lg flex items-center justify-between animate-in slide-in-from-bottom-2 fade-in duration-300">
+                                <div className="flex items-center gap-2 overflow-hidden">
+                                    <div className="w-6 h-6 bg-indigo-100 text-indigo-600 rounded flex items-center justify-center shrink-0">
+                                        {isAnalyzingUrl ? <Loader2 className="animate-spin w-3 h-3" /> : <Link2 size={14} />}
+                                    </div>
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="text-[10px] text-indigo-400 font-bold uppercase tracking-wider">
+                                            {isAnalyzingUrl ? 'ANALYZING URL...' : 'CONTEXT LOADED'}
+                                        </span>
+                                        <span className="text-xs text-indigo-900 font-medium truncate w-full">
+                                            {urlContext?.title || 'Fetching content...'}
+                                        </span>
+                                    </div>
+                                </div>
+                                {!isAnalyzingUrl && (
+                                    <button
+                                        onClick={() => setUrlContext(null)}
+                                        className="p-1 text-indigo-400 hover:text-indigo-700 hover:bg-indigo-100 rounded transition-colors"
+                                    >
+                                        <X size={14} />
+                                    </button>
+                                )}
+                            </div>
+                        )}
+
                         {/* Stats */}
                         <div className="flex justify-between items-center px-2 mt-2">
                             <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
-                                {systemStatus?.model_versions?.[1]?.replace('models/', '') || 'GEMINI-PRO'}
+                                {systemStatus?.current_model?.replace('models/', '') || 'GEMINI-PRO'}
                             </div>
                             <div className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest">
                                 {systemStatus?.remaining_requests || '0'} REQUESTS LEFT

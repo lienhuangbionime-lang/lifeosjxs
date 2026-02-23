@@ -37,7 +37,7 @@ else:
             except Exception:
                 # fallback: attempt a generic select with no assumptions
                 try:
-                    _ = supabase.table("LogEntry").select("id").limit(1).execute()
+                    _ = supabase.table("memories").select("id").limit(1).execute()
                     logger.info("Supabase client created and basic query executed.")
                 except Exception:
                     # Not fatal: leave client available, just warn

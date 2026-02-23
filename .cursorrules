@@ -1,87 +1,28 @@
-# LifeOS v3.5 - Cursor AI Rules
+# LifeOS AI Constraints & Best Practices
 
-## 🎯 Primary Directive
-Read `SYSTEM_CONTEXT.md` FIRST before generating any code.
+## 🤖 Gemini Model Handling (CRITICAL)
+- **Primary Smart Model**: `models/gemini-3-pro-preview`
+- **Primary Fast/Fallback Model**: `models/gemini-flash-lite-latest`
+- **Identifier Protocol**:
+    - ALWAYS pass model strings through `app.core.gemini.sanitize_model_name()` before use.
+    - NEVER use identifiers like `gemini-1.5`, `gemini-2.0`, or `gemini-3.0` directly.
+    - ALWAYS ensure the `models/` prefix is present when calling the SDK.
 
-## 🚫 Absolute Prohibitions
-- NEVER use emojis in Python print() statements
-- NEVER use Tailwind CSS without explicit request
-- NEVER modify database schema without reading schemas/registry.json
-- NEVER use deprecated google.generativeai (use google.genai)
-- NEVER hardcode credentials
-- NEVER modify `prompts/system_daily.md` without verifying the latest version with the user.
+## 🔍 Retrieval & RAG
+- **Embedding Model**: `text-embedding-004` (Dimension: 3072).
+- **Fallback Logic**: If vector search fails, `rag.py` triggers a keyword/date search. Support both.
+- **Hallucination Prevention**: If RAG context contains `[NO RELEVANT MEMORIES FOUND]`, ADMIT ignorance. Do not simulate memories.
 
-## ✅ Mandatory Practices
-- ALWAYS use [OK], [WARN], [ERROR] for logs
-- ALWAYS use Pydantic models for validation
-- ALWAYS include type hints
-- ALWAYS handle errors gracefully
-- ALWAYS update documentation when changing code
+## 🛠️ Python Style (Windows Stability)
+- **NO Emojis in Prints**: Use labels like `[OK]`, `[WARN]`, `[ERROR]`. Emojis crash Windows shells with certain encodings.
+- **Strict Typing**: Use Pydantic v2 and type hints everywhere.
+- **Async First**: Use `async/await` for all I/O, including database and AI calls.
 
-## 📐 Tech Stack
-Backend: FastAPI + Supabase + Gemini 2.5 Flash
-Frontend: Next.js 14 + TypeScript + Vanilla CSS
-Database: PostgreSQL (via Supabase)
-AI: google-genai SDK
+## 🎨 UI & Frontend
+- **Vanilla CSS**: NO Tailwind CSS unless explicitly requested.
+- **LocalStorage**: Be careful with cached model names. Use the `CHECK_AND_CLEAN_MODELS` logic in `CortexChat.tsx`.
 
-## 🗄️ Core Tables
-- memories (日記核心表)
-- projects (專案管理)
-- tasks (任務清單)
-- nodes (知識圖譜節點)
-- edges (知識圖譜連線)
-
-## 🔑 Key Files to Check
-Before editing:
-- schemas/registry.json (database schema)
-- schemas/evolution_log.json (change history)
-- SYSTEM_CONTEXT.md (complete context)
-
-## 🎨 Code Style
-Python:
-- Use async/await for I/O
-- Pydantic v2 strict mode
-- Type hints required
-- No emojis in logs
-
-TypeScript:
-- Strict mode enabled
-- Functional components
-- Hooks over classes
-
-CSS:
-- Vanilla CSS preferred
-- NO Tailwind unless requested
-- Modern design (glassmorphism, animations)
-
-## 🔄 Schema Evolution Protocol
-1. Read schemas/registry.json
-2. Use tools/schema_assistant.py
-3. Generate migration script
-4. Update evolution_log.json
-5. Get user approval
-6. Execute migration
-
-## 🐛 Common Issues
-- 500 Error → Check for emoji in logs
-- Empty memories → Use table name "memories" not "LogEntry"
-- Table not found → Run supabase_reset_and_init.sql
-
-## 📝 Before Every Code Generation
-1. ✅ Read SYSTEM_CONTEXT.md
-2. ✅ Check schemas/registry.json if touching DB
-3. ✅ Verify tech stack
-4. ✅ Review forbidden practices
-5. ✅ Add error handling
-
-## 🎯 Success Criteria
-Code must:
-- Follow required practices
-- Avoid forbidden practices
-- Include error handling
-- Have type hints/types
-- Update docs
-- Handle edge cases
-
----
-For complete context, see: SYSTEM_CONTEXT.md
+## 🧠 CodeSpeak Developer Onboarding (START HERE)
+- **系統架構分離**: `backend-cortex/app/` = 服務使用者的系統 AI。`tools/` = 開發系統的開發 AI (你現在的位置)。
+- **開發守則**: 本地優先 + Append Mode。資料庫是給 AI 用的 (高訊號、非正規化)，簡潔、清晰、馬上理解！
+- **開發工具箱**: 所有開發/同步腳本 (`soul_manager.py` 等) 均統一在 `tools/`。

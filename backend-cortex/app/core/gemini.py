@@ -3,9 +3,10 @@ from typing import Literal, Dict, Any
 import os
 import logging
 
-# genai is the google-generativeai wrapper used in the project; defensive import
+# genai is the modern google.genai wrapper used in the project; defensive import
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
 except ImportError:
     genai = None
 
@@ -16,19 +17,62 @@ DEFAULT_FAST = os.getenv("GEMINI_FAST_MODEL", "gemini-flash-lite-latest")
 DEFAULT_SMART = os.getenv("GEMINI_SMART_MODEL", "gemini-pro-latest")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# perform genai.configure if possible
+gemini_client = None
+
+# instantiate genai Client if possible
 if genai and GEMINI_API_KEY:
     try:
-        genai.configure(api_key=GEMINI_API_KEY)
-        logger.info("genai configured.")
+        gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+        logger.info("gemini_client configured.")
     except Exception as e:
         logger.exception("Failed to configure genai: %s", e)
 else:
     if not genai:
-        logger.warning("google.generativeai library not available; gemini client factory will be limited.")
+        logger.warning("google.genai library not available; gemini client factory will be limited.")
     if not GEMINI_API_KEY:
         logger.warning("GEMINI_API_KEY not set; genai won't be configured (offline/degraded mode).")
 
+
+
+def sanitize_model_name(name: str) -> str:
+    """
+    Ensures model names follow the exact identifiers required by the SDK.
+    Prevents common mismatches and ensures IDs are in 'models/...' format.
+    """
+    if not name:
+        return name
+        
+    s = name.strip().lower()
+    
+    # Remove prefix if exists for easier matching
+    if s.startswith("models/"):
+        s = s.replace("models/", "", 1)
+    
+    # Strict mapping dictionary (Aligned with LifeOSvs-main quality proven models)
+    # Strict mapping dictionary for SDK v1 available models
+    mapping = {
+        "gemini-3.1": "gemini-3.1-pro-preview",
+        "gemini-3.0": "gemini-3-pro-preview",
+        "gemini-33": "gemini-3-pro-preview", 
+        "gemini-3": "gemini-3-pro-preview",
+        "gemini-2.5": "gemini-2.5-flash",
+        "gemini-1.5-pro": "gemini-pro-latest",         # 1.5 not available, mapped to pro-latest
+        "gemini-1.5-flash-latest": "gemini-flash-latest", # mapped to flash-latest
+        "gemini-1.5-flash": "gemini-flash-latest",
+        "gemini-flash-lite": "gemini-flash-lite-latest",
+        "gemini-lite": "gemini-flash-lite-latest",
+        "gemini-pro-latest": "gemini-pro-latest",
+        "gemini-pro": "gemini-pro-latest", 
+    }
+    
+    # Check if the name starts with any of our known prefixes (sorted by length descending to match 3.1 before 3)
+    sorted_prefixes = sorted(mapping.keys(), key=len, reverse=True)
+    for prefix in sorted_prefixes:
+        if s.startswith(prefix):
+            return f"models/{mapping[prefix]}"
+            
+    # Default: Ensure models/ prefix
+    return f"models/{s}"
 
 def get_model(mode: Literal["fast", "smart"] = "fast") -> Dict[str, Any]:
     """
@@ -45,7 +89,8 @@ def get_model(mode: Literal["fast", "smart"] = "fast") -> Dict[str, Any]:
             logger.warning("Unknown mode '%s' requested, defaulting to fast", mode)
             model = DEFAULT_FAST
 
-        return {"model": model, "configured": bool(GEMINI_API_KEY)}
+        from app.core.gemini import sanitize_model_name
+        return {"model": sanitize_model_name(model), "configured": bool(GEMINI_API_KEY)}
     except Exception as e:
         logger.exception("Error in get_model: %s", e)
         return {"model": DEFAULT_FAST, "configured": False}
@@ -55,17 +100,22 @@ def get_embeddings(text: str) -> list[float]:
     Generate vector embeddings for given text using Gemini.
     Dimension: 3072 (Full Precision Protocol)
     """
-    if not genai or not GEMINI_API_KEY:
+    if not gemini_client:
         return []
         
     try:
-        result = genai.embed_content(
-            model="models/gemini-embedding-001",
-            content=text,
-            task_type="retrieval_document",
-            title="Cortex Memory"
+        result = gemini_client.models.embed_content(
+            model="text-embedding-004",
+            contents=text,
+            config=types.EmbedContentConfig(
+                task_type="RETRIEVAL_DOCUMENT",
+                title="Cortex Memory",
+                output_dimensionality=3072
+            )
         )
-        return result['embedding']
+        if result.embeddings and len(result.embeddings) > 0:
+            return result.embeddings[0].values
+        return []
     except Exception as e:
         logger.error(f"Failed to generate embeddings: {e}")
         return []

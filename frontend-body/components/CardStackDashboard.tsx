@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import {
     Activity, Rocket, Hash, TrendingUp,
-    Calendar, ChevronLeft, ChevronRight, Sparkles
+    Calendar, ChevronLeft, ChevronRight, Sparkles, Brain
 } from 'lucide-react';
 import {
     ComposedChart, Area, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
@@ -12,12 +12,15 @@ import {
 import { NEON_PALETTE } from '@/lib/ai/core';
 import { CortexChat } from './CortexChat';
 
+import { ReviewCard } from './ReviewCard';
+
 interface CardStackDashboardProps {
     logs?: any[];
+    onNavigate?: (tab: string, param?: string) => void;
 }
 
 // 定義卡片類型
-type CardType = 'overview' | 'mood' | 'productivity' | 'tags';
+type CardType = 'overview' | 'tags' | 'reflection' | 'review';
 
 interface DashboardCard {
     id: CardType;
@@ -36,31 +39,77 @@ const CARDS: DashboardCard[] = [
         gradient: 'from-indigo-500/20 to-purple-500/20'
     },
     {
-        id: 'mood',
-        title: 'Flow State',
-        icon: Activity,
-        color: 'emerald',
-        gradient: 'from-emerald-500/20 to-teal-500/20'
-    },
-    {
-        id: 'productivity',
-        title: 'Deep Work',
-        icon: Rocket,
-        color: 'pink',
-        gradient: 'from-pink-500/20 to-rose-500/20'
-    },
-    {
         id: 'tags',
         title: 'Neural Tags',
         icon: Hash,
         color: 'violet',
         gradient: 'from-violet-500/20 to-fuchsia-500/20'
     },
+    {
+        id: 'reflection',
+        title: 'Subconscious Insights',
+        icon: Sparkles,
+        color: 'teal',
+        gradient: 'from-teal-500/20 to-emerald-500/20'
+    },
+    {
+        id: 'review',
+        title: 'Monthly Review',
+        icon: Sparkles,
+        color: 'amber',
+        gradient: 'from-amber-500/20 to-orange-500/20'
+    },
 ];
 
-export const CardStackDashboard = ({ logs = [] }: CardStackDashboardProps) => {
+export const CardStackDashboard = ({ logs = [], onNavigate }: CardStackDashboardProps) => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [dashboardMonth, setDashboardMonth] = useState(new Date().toISOString().slice(0, 7));
+
+    // Smart Default: If current month has no data, jump to last active month
+    React.useEffect(() => {
+        if (logs.length > 0) {
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            const hasDataForCurrent = logs.some(l => l.date && l.date.startsWith(currentMonth));
+
+            if (!hasDataForCurrent) {
+                // Find latest valid date
+                const latestLog = logs.reduce((latest: any, current: any) => {
+                    if (!latest || (current.date && current.date > latest.date)) return current;
+                    return latest;
+                }, null);
+
+                if (latestLog && latestLog.date) {
+                    const latestMonth = latestLog.date.slice(0, 7);
+                    if (latestMonth !== dashboardMonth) {
+                        setDashboardMonth(latestMonth);
+                    }
+                }
+            }
+        }
+    }, [logs]);
+
+    // [New] State for Reflection API call
+    const [isReflecting, setIsReflecting] = useState(false);
+    const [insightText, setInsightText] = useState<string | null>(null);
+
+    const triggerReflection = async () => {
+        setIsReflecting(true);
+        try {
+            const res = await fetch("/api/v1/subconscious/reflect", { method: "POST" });
+            const data = await res.json();
+            if (data.success && data.data) {
+                setInsightText(data.data.content);
+                alert("New Insight Generated!");
+            } else {
+                alert(data.message || "Failed to generate insight.");
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Error triggering subconscious reflection.");
+        } finally {
+            setIsReflecting(false);
+        }
+    };
 
     // 處理數據
     const processedData = React.useMemo(() => {
@@ -137,135 +186,49 @@ export const CardStackDashboard = ({ logs = [] }: CardStackDashboardProps) => {
                             />
                         </div>
 
-                        <div className="bg-slate-800/30 rounded-2xl p-4 border border-slate-700/50">
-                            <h4 className="text-sm font-bold text-slate-300 mb-3 flex items-center gap-2">
-                                <TrendingUp className="w-4 h-4 text-indigo-400" />
-                                Monthly Trend
+                        <div className="bg-slate-800/30 rounded-2xl p-6 border border-slate-700/50 flex flex-col items-center justify-center text-center h-48">
+                            <Activity className="w-12 h-12 text-indigo-500/50 mb-4" />
+                            <h4 className="text-sm font-bold text-slate-400">System Logs Active</h4>
+                            <p className="text-xs text-slate-500 mt-2">Data is flowing into your cortex.</p>
+                        </div>
+                    </div>
+                );
+
+            case 'reflection':
+                // Find latest reflection in memory for this month if exists
+                const latestReflection = [...logs]
+                    .filter(l => l.type === 'reflection')
+                    .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+
+                const displayIdea = insightText || (latestReflection ? latestReflection.content : "The subconscious is quiet. Awaiting enough experiences to form a profound insight.");
+
+                return (
+                    <div className="h-full flex flex-col">
+                        <div className="flex justify-between items-center mb-6">
+                            <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-teal-400" />
+                                Subconscious Synthesis
                             </h4>
-                            <div className="h-48">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <ComposedChart data={processedData.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                                        <defs>
-                                            <linearGradient id="overviewGradient" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor={NEON_PALETTE.NEON_CYAN} stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor={NEON_PALETTE.NEON_CYAN} stopOpacity={0} />
-                                            </linearGradient>
-                                        </defs>
-                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
-                                        <XAxis
-                                            dataKey="date"
-                                            tick={{ fontSize: 10, fill: '#64748b' }}
-                                            tickFormatter={(v: string) => v.slice(8)}
-                                            axisLine={false}
-                                            tickLine={false}
-                                        />
-                                        <YAxis stroke="#64748b" tick={{ fontSize: 10, fill: '#64748b' }} domain={[0, 10]} />
-                                        <Tooltip
-                                            contentStyle={{
-                                                borderRadius: '12px',
-                                                border: '1px solid #334155',
-                                                background: '#0f172a',
-                                                color: '#fff'
-                                            }}
-                                        />
-                                        <Area
-                                            type="monotone"
-                                            dataKey="metrics.mood"
-                                            stroke={NEON_PALETTE.NEON_CYAN}
-                                            fill="url(#overviewGradient)"
-                                            strokeWidth={2}
-                                        />
-                                    </ComposedChart>
-                                </ResponsiveContainer>
-                            </div>
+                            <button
+                                onClick={triggerReflection}
+                                disabled={isReflecting}
+                                className="px-3 py-1 bg-teal-500/10 hover:bg-teal-500/20 text-teal-300 border border-teal-500/20 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                            >
+                                {isReflecting ? "Reflecting..." : "Force Reflection"}
+                            </button>
                         </div>
-                    </div>
-                );
 
-            case 'mood':
-                return (
-                    <div className="h-full flex flex-col">
-                        <h4 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                            <Activity className="w-4 h-4 text-emerald-400" />
-                            Flow State Analysis
-                        </h4>
-                        <div className="flex-1">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={processedData.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-                                    <defs>
-                                        <linearGradient id="colorMood" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor={NEON_PALETTE.NEON_LIME} stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor={NEON_PALETTE.NEON_LIME} stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
-                                    <XAxis
-                                        dataKey="date"
-                                        tick={{ fontSize: 10, fill: '#64748b' }}
-                                        tickFormatter={(v: string) => v.slice(8)}
-                                        axisLine={false}
-                                        tickLine={false}
-                                    />
-                                    <YAxis stroke="#64748b" tick={{ fontSize: 10, fill: '#64748b' }} domain={[0, 10]} />
-                                    <Tooltip
-                                        contentStyle={{
-                                            borderRadius: '12px',
-                                            border: '1px solid #334155',
-                                            background: '#0f172a',
-                                            color: '#fff'
-                                        }}
-                                    />
-                                    <Area
-                                        type="monotone"
-                                        dataKey="metrics.mood"
-                                        stroke={NEON_PALETTE.NEON_LIME}
-                                        fill="url(#colorMood)"
-                                        strokeWidth={3}
-                                        activeDot={{ r: 6, fill: "#fff" }}
-                                    />
-                                </ComposedChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-                );
-
-            case 'productivity':
-                return (
-                    <div className="h-full flex flex-col">
-                        <h4 className="text-sm font-bold text-slate-300 mb-4 flex items-center gap-2">
-                            <Rocket className="w-4 h-4 text-pink-400" />
-                            Deep Work Output
-                        </h4>
-                        <div className="flex-1">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <ComposedChart data={processedData.chartData} margin={{ top: 10, right: 10, left: -20, bottom: 20 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#1e293b" />
-                                    <XAxis
-                                        dataKey="date"
-                                        tick={{ fontSize: 10, fill: '#64748b' }}
-                                        tickFormatter={(v: string) => v.slice(8)}
-                                        axisLine={false}
-                                        tickLine={false}
-                                    />
-                                    <YAxis stroke="#64748b" tick={{ fontSize: 10, fill: '#64748b' }} />
-                                    <Tooltip
-                                        contentStyle={{
-                                            borderRadius: '12px',
-                                            border: '1px solid #334155',
-                                            background: '#0f172a',
-                                            color: '#fff'
-                                        }}
-                                    />
-                                    <Bar dataKey="metrics.deepWork" fill={NEON_PALETTE.NEON_PINK} radius={[4, 4, 0, 0]} barSize={12}>
-                                        {processedData.chartData.map((entry, index) => (
-                                            <Cell
-                                                key={`cell-${index}`}
-                                                fill={entry.metrics?.deepWork > 180 ? NEON_PALETTE.NEON_CYAN : NEON_PALETTE.NEON_PINK}
-                                            />
-                                        ))}
-                                    </Bar>
-                                </ComposedChart>
-                            </ResponsiveContainer>
+                        <div className={`flex-1 bg-slate-900/60 rounded-3xl p-8 border border-slate-700/50 overflow-y-auto custom-scrollbar ${isReflecting ? 'animate-pulse' : ''}`}>
+                            {isReflecting ? (
+                                <div className="h-full flex flex-col items-center justify-center text-slate-500 space-y-4">
+                                    <Brain className="w-12 h-12 text-teal-500/50 animate-bounce" />
+                                    <p className="font-mono text-sm">Processing recent memories into deep insights...</p>
+                                </div>
+                            ) : (
+                                <div className="prose prose-invert prose-teal max-w-none text-slate-200 leading-relaxed text-lg"
+                                    dangerouslySetInnerHTML={{ __html: displayIdea.replace(/\n/g, '<br/>') }}
+                                />
+                            )}
                         </div>
                     </div>
                 );
@@ -285,7 +248,8 @@ export const CardStackDashboard = ({ logs = [] }: CardStackDashboardProps) => {
                                         initial={{ opacity: 0, scale: 0.8 }}
                                         animate={{ opacity: 1, scale: 1 }}
                                         transition={{ delay: i * 0.05 }}
-                                        className="flex items-center gap-1.5 bg-slate-800/80 px-3 py-2 rounded-xl border border-violet-500/30 hover:border-violet-400/50 transition-colors"
+                                        onClick={() => onNavigate && onNavigate('graph', tag.name)}
+                                        className="flex items-center gap-1.5 bg-slate-800/80 px-3 py-2 rounded-xl border border-violet-500/30 hover:border-violet-400/50 transition-colors cursor-pointer hover:bg-violet-500/10"
                                     >
                                         <span className="text-sm font-mono text-violet-300">#{tag.name}</span>
                                         <span className="text-xs font-bold text-slate-400 bg-slate-900 px-2 py-0.5 rounded-full">
@@ -299,6 +263,13 @@ export const CardStackDashboard = ({ logs = [] }: CardStackDashboardProps) => {
                         </div>
                     </div>
                 )
+
+            case 'review':
+                return (
+                    <div className="h-full">
+                        <ReviewCard month={dashboardMonth} />
+                    </div>
+                );
 
             default:
                 return null;

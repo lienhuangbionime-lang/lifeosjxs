@@ -1,12 +1,14 @@
 // frontend-body/lib/api/client.ts
 
-export const API_BASE =
-  process.env.NODE_ENV === "development"
-    ? "http://localhost:8000"
-    : (process.env.NEXT_PUBLIC_API_URL || "https://lifeosjxs.onrender.com").replace(/\/+$/, "");
+// [Fix] Always use Next.js Proxy (Rewrite) to avoid CORS
+export const API_BASE = "";
 
 async function fetchJSON<T>(input: string, init?: RequestInit): Promise<T> {
-  const url = `${API_BASE}${input}`;
+  // Direct call through proxy
+  const url = input.startsWith("/api/v1")
+    ? input.replace(/^\/api\/v1/, "/api/py")
+    : input;
+
   const headers = {
     "Content-Type": "application/json",
     ...(init && (init.headers as Record<string, string>)),
@@ -72,10 +74,8 @@ export interface IngestResponse {
 /* --- Private Helper (神經傳導物質) --- */
 // 自動處理 Rewrite 路徑與錯誤拋出
 async function fetchProxy<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  // [Critical] 在開發模式下，直接連往本地後端以避開可能失效的 Next.js Rewrite 緩存
-  const finalUrl = process.env.NODE_ENV === "development"
-    ? `${API_BASE}${endpoint}`
-    : endpoint.replace(/^\/api\/v1/, "/api/py");
+  // [Critical] Always use Next.js Rewrite to avoid CORS
+  const finalUrl = endpoint.replace(/^\/api\/v1/, "/api/py");
 
   try {
     const res = await fetch(finalUrl, {
@@ -103,7 +103,6 @@ async function fetchProxy<T>(endpoint: string, options?: RequestInit): Promise<T
 export const cortex = {
 
   // [New] System Evolution (進化協定)
-  // 對應後端: POST /api/v1/system/upgrade (需確認後端路由是否一致，假設為 upgrade)
   async evolve(targetModel: string): Promise<{ success: boolean; message?: string }> {
     return await fetchProxy("/api/v1/system/upgrade", {
       method: "POST",
@@ -112,13 +111,10 @@ export const cortex = {
   },
 
   // 1. 檢查進化狀態 (System Status)
-  // 對應後端: GET /api/v1/system/status
   async checkEvolution(): Promise<EvolutionStatus> {
     try {
-      // 使用 fetchProxy 自動處理路徑轉換
       return await fetchProxy<EvolutionStatus>("/api/v1/system/status");
     } catch (e) {
-      // 如果連不上大腦，回傳預設的離線狀態 (防禦性編程)
       return {
         status: "offline",
         current_model: "Unknown",
@@ -129,7 +125,6 @@ export const cortex = {
   },
 
   // 2. 發送確認升級指令 (Evolution Protocol)
-  // 對應後端: POST /api/v1/system/upgrade
   async confirmUpgrade(targetModel: string): Promise<{ success: boolean }> {
     return await fetchProxy("/api/v1/system/upgrade", {
       method: "POST",
@@ -137,11 +132,21 @@ export const cortex = {
     });
   },
 
-  // 3. 記憶提取 (Memory Recall)
-  // 對應後端: GET /api/v1/memories?limit=20
-  async getRecentMemories(limit: number = 20): Promise<LogEntry[]> {
+  // 2.5 獲取可用模型清單 (Dynamic Model List)
+  async getAvailableModels(): Promise<{ models: Array<{ id: string; name: string; provider: string; is_free: boolean }> }> {
     try {
-      return await fetchProxy<LogEntry[]>(`/api/v1/memories?limit=${limit}`);
+      return await fetchProxy("/api/v1/system/models");
+    } catch (e) {
+      console.warn("Model fetch failed, returning empty list.");
+      return { models: [] };
+    }
+  },
+
+  // 3. 記憶提取 (Memory Recall)
+  async getRecentMemories(limit: number = 20, query?: string): Promise<LogEntry[]> {
+    try {
+      const qParam = query ? `&q=${encodeURIComponent(query)}` : "";
+      return await fetchProxy<LogEntry[]>(`/api/v1/memories?limit=${limit}${qParam}`);
     } catch (e) {
       console.warn("Memory access failed, returning empty list.");
       return [];
@@ -149,7 +154,6 @@ export const cortex = {
   },
 
   // 4. 感知輸入 (Sensory Ingest)
-  // 對應後端: POST /api/v1/ingest
   async ingestLog(date: string, text: string): Promise<IngestResponse> {
     return await fetchProxy<IngestResponse>("/api/v1/ingest", {
       method: "POST",
@@ -158,8 +162,13 @@ export const cortex = {
   },
 
   // [New] Knowledge Graph Support
-  async getBrainGraph(limit: number = 500): Promise<any> {
-    return await fetchProxy(`/api/v1/brain/graph?limit=${limit}`);
+  brain: {
+    generateGraph: async (limit: number = 500): Promise<any> => {
+      return await fetchProxy(`/api/v1/brain/graph?limit=${limit}`);
+    },
+    getContextualPrompts: async (): Promise<{ prompts: string[] }> => {
+      return await fetchProxy<{ prompts: string[] }>("/api/v1/brain/contextual-prompts");
+    }
   },
 
   async deleteNode(label: string): Promise<any> {
@@ -174,10 +183,10 @@ export const cortex = {
       return await fetchProxy<IngestResponse>("/api/v1/ingest", {
         method: "POST",
         body: JSON.stringify({
-          date: data.date || new Date().toLocaleDateString('en-CA'), // Use custom date if provided, else local date
-          text: data.content,
+          date: data.date || new Date().toLocaleDateString('en-CA'),
+          content: data.content,
           habits: data.habits,
-          skip_ai: data.skipAi,
+          skipAi: data.skipAi,
           mode: data.mode || 'append'
         }),
       });
@@ -221,6 +230,18 @@ export const cortex = {
     return await fetchProxy(`/api/v1/system/prompts/${name}`, {
       method: "POST",
       body: JSON.stringify({ content }),
+    });
+  },
+
+  // 7. 任務管理 (Task Management)
+  async getTasks(projectId?: string): Promise<any[]> {
+    const query = projectId ? `?project_id=${projectId}` : "";
+    return await fetchProxy(`/api/v1/tasks/${query}`);
+  },
+
+  async completeTask(taskId: string): Promise<any> {
+    return await fetchProxy(`/api/v1/tasks/${taskId}/complete`, {
+      method: "POST",
     });
   }
 };

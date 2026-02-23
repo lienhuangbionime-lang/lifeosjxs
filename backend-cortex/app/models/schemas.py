@@ -1,59 +1,93 @@
-# app/models/schemas.py
+# backend-cortex/app/models/schemas.py
 from pydantic import BaseModel, Field
-from typing import Optional, Literal, List, Dict, Any
-from datetime import datetime
+from typing import Optional, List, Dict, Any
 
+# --- Request Models ---
+class IngestRequest(BaseModel):
+    content: str = Field(..., description="Raw text or transcript from CaptureView")
+    source: str = Field("web_terminal", description="Source of the input")
+    client_timestamp: Optional[str] = None
+    anchor_date: Optional[str] = Field(None, description="Override date for historical ingest (YYYY-MM-DD)")
+    habits: Optional[List[str]] = []
+    skipAi: bool = False
+    mode: str = "append"
 
-class LogEntrySchema(BaseModel):
-    id: Optional[int] = Field(None, description="Primary key (may be set by DB)")
-    date: datetime = Field(..., description="Timestamp of the log entry")
-    content: Optional[str] = Field(None, description="Free-text content of the memory / diary")
-    mood: Optional[int] = Field(None, ge=0, le=10, description="Mood 0-10")
-    focus: Optional[int] = Field(None, ge=0, le=10, description="Focus 0-10")
-    energy: Optional[int] = Field(None, ge=0, le=10, description="Energy 0-10")
-    
-    # New Fields for LifeOS v7
-    isAi: Optional[bool] = False
-    aiModel: Optional[str] = None
-    habits: Optional[Dict[str, Any]] = {}
-    tags: Optional[List[str]] = []
-    meta: Optional[Dict[str, Any]] = {}
+# --- Response Models ---
+class AISortedResult(BaseModel):
+    markdown_body: Optional[str] = Field(None, description="Refinement in Markdown")
+    meta: Optional[Dict[str, Any]] = Field(None, description="Metadata including metrics")
+    tasks: Optional[List[Dict[str, Any]]] = Field(None, description="Extracted tasks")
+    tags: List[str] = []
+    graph_seeds: List[str] = []
 
-    class Config:
-        orm_mode = True
-
-
-class ProjectSchema(BaseModel):
-    id: Optional[int] = Field(None, description="Primary Key")
-    created_at: Optional[datetime] = None
-    name: str
-    status: Literal["active", "archived", "completed", "idea"] = "active"
-    progress: int = Field(0, ge=0, le=100)
-    meta: Dict[str, Any] = Field(default_factory=dict, description="UI Metadata: vibe, emoji, cover_image")
-    tags: List[str] = Field(default_factory=list)
-
-    class Config:
-        orm_mode = True
-
+class IngestResponse(BaseModel):
+    success: bool
+    model: str
+    data: Optional[AISortedResult] = None
 
 class SystemStatusResponse(BaseModel):
-    status: Literal["ok", "degraded", "offline"] = "ok"
+    status: str
     current_model: str
     model_versions: List[str]
+    api_usage: Optional[Dict[str, int]] = Field(None, description="API usage statistics")
     remaining_requests: Optional[str] = None
     note: Optional[str] = None
 
-
 class UpgradeResponse(BaseModel):
     success: bool
-    message: Optional[str] = None
-
+    message: str
 
 class PromptRequest(BaseModel):
     content: str
-
 
 class PromptResponse(BaseModel):
     name: str
     content: str
     last_modified: str
+
+class ModelInfo(BaseModel):
+    id: str
+    name: str
+    provider: str = "google"
+    is_free: bool = True
+
+class ModelListResponse(BaseModel):
+    models: List[ModelInfo]
+
+class LogEntrySchema(BaseModel):
+    id: Optional[str] = None
+    content: str
+    date: str
+    mood: int = 5
+    focus: int = 5
+    energy: int = 5
+    tags: List[str] = []
+    category: str = "Life"
+    is_ai: bool = False
+    ai_model: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    
+    class Config:
+        extra = "ignore"
+        from_attributes = True
+
+# --- Project Schemas ---
+
+class ProjectCreate(BaseModel):
+    name: str
+    description: Optional[str] = None
+    status: Optional[str] = 'active'
+    tags: List[str] = []
+    meta: Optional[Dict[str, Any]] = {}
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[str] = None
+    progress: Optional[int] = None
+    tags: Optional[List[str]] = None
+    meta: Optional[Dict[str, Any]] = None
+
+class ProjectMergeRequest(BaseModel):
+    target_project_id: str

@@ -16,17 +16,17 @@ import uvicorn
 from contextlib import asynccontextmanager
 
 # Routers
-# New Routers (v3.2)
-from routers import ingest_dual as ingest_router_mod
-from routers import media as media_router_mod
-from routers import brain as brain_router_mod  # [New] Brain Logic
-
-# Legacy Routers (Keep until refactored)
+from app.api.v1 import ingest as ingest_router_mod
+from app.api.v1 import chat as chat_router_mod
+from app.api.v1 import brain as brain_router_mod
 from app.api.v1 import memories as memories_router_mod
 from app.api.v1 import system as system_router_mod
 from app.api.v1 import analyze as analyze_router_mod
 from app.api.v1.endpoints import projects as projects_router_mod
-from app.api.v1.endpoints import chat as chat_router_mod
+from app.api.v1 import url_fetch as url_fetch_router_mod
+from app.api.v1 import crystallize as crystallize_router_mod
+from app.api.v1 import tasks as tasks_router_mod
+from app.api.v1 import subconscious as subconscious_router_mod
 from app.core.scheduler import subconscious_scheduler
 
 # Logging
@@ -71,19 +71,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include Routers (v3.2 first)
-app.include_router(ingest_router_mod.router) # Prefix /api/v1/ingest defined in router
-app.include_router(media_router_mod.router)
-app.include_router(brain_router_mod.router)  # Prefix /api/v1/brain defined in router
-
-# Include Legacy Routers
+# Include Routers
+app.include_router(ingest_router_mod.router, prefix="/api/v1/ingest", tags=["Ingest"])
+app.include_router(chat_router_mod.router, prefix="/api/v1/chat", tags=["Chat"])
+app.include_router(brain_router_mod.router, prefix="/api/v1/brain", tags=["Brain"])
 app.include_router(memories_router_mod.router, prefix="/api/v1/memories", tags=["Memories"])
 app.include_router(system_router_mod.router, prefix="/api/v1/system", tags=["System"])
-# Removed old brain router inclusion
-
 app.include_router(analyze_router_mod.router, prefix="/api/v1/analyze", tags=["Analyze"])
-app.include_router(chat_router_mod.router, prefix="/api/v1/chat", tags=["Chat"])
 app.include_router(projects_router_mod.router, prefix="/api/v1/projects", tags=["Projects"])
+app.include_router(url_fetch_router_mod.router, prefix="/api/v1/url", tags=["Tool"])
+app.include_router(crystallize_router_mod.router, prefix="/api/v1/brain", tags=["Brain"]) # Same prefix as brain for now or specialized
+app.include_router(tasks_router_mod.router, prefix="/api/v1/tasks", tags=["Tasks"])
+app.include_router(subconscious_router_mod.router, prefix="/api/v1/subconscious", tags=["Subconscious"])
 
 
 # 根路徑檢查

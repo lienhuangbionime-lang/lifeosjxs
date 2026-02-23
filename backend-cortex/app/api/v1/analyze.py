@@ -14,7 +14,7 @@ class AnalyzeRequest(BaseModel):
 async def analyze_monthly(request: AnalyzeRequest):
     # 1. 初始化模型
     model_config = get_model("smart")
-    model_name = model_config.get("model", "gemini-3.0-pro-preview")
+    model_name = model_config.get("model", "models/gemini-3-pro-preview")
     model = genai.GenerativeModel(model_name)
 
     # 2. 模擬或是從 Supabase 讀取資料 (這裡先簡化，直接生成策略)

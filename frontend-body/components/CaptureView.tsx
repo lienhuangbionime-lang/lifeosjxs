@@ -6,6 +6,8 @@ import { CoreEngine } from '@/lib/ai/core';
 import { useSettings, Habit } from '@/lib/hooks/useSettings';
 import { cortex, EvolutionStatus } from '@/lib/api/client'; // Import cortex and EvolutionStatus
 
+import { TaskList } from './TaskList';
+
 interface CaptureViewProps {
   onSave: (entry: any) => void;
 }
@@ -15,6 +17,10 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
   const [isRecording, setIsRecording] = useState(false); // Mock
   const { habits } = useSettings();
   const [systemStatus, setSystemStatus] = useState<EvolutionStatus | null>(null); // State for system status
+
+  // [New] Phase 14: Contextual Prompts
+  const [contextualPrompts, setContextualPrompts] = useState<string[]>([]);
+  const [isLoadingPrompts, setIsLoadingPrompts] = useState(true);
 
   // Fetch system status on mount
   useEffect(() => {
@@ -27,6 +33,22 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
       }
     };
     fetchStatus();
+
+    // Fetch contextual prompts
+    const fetchPrompts = async () => {
+      try {
+        setIsLoadingPrompts(true);
+        const data = await cortex.brain.getContextualPrompts();
+        if (data && data.prompts) {
+          setContextualPrompts(data.prompts);
+        }
+      } catch (e) {
+        console.error("Failed to fetch contextual prompts", e);
+      } finally {
+        setIsLoadingPrompts(false);
+      }
+    };
+    fetchPrompts();
   }, []);
 
   // Local state for the current entry being crafted
@@ -225,6 +247,27 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
         </p>
 
       </div>
+
+      {/* --- Phase 14: Dynamic Contextual Prompts --- */}
+      {isLoadingPrompts ? (
+        <div className="flex gap-2 mb-4 animate-pulse">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-8 bg-slate-800/50 rounded-full w-48 border border-slate-700/30"></div>
+          ))}
+        </div>
+      ) : contextualPrompts.length > 0 ? (
+        <div className="flex flex-wrap gap-2 mb-4">
+          {contextualPrompts.map((prompt, idx) => (
+            <button
+              key={idx}
+              onClick={() => setText(prev => prev ? prev + '\n' + prompt : prompt)}
+              className="px-4 py-1.5 text-sm bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 hover:border-indigo-500/40 rounded-full transition-all active:scale-95 text-left"
+            >
+              ✨ {prompt}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       {/* --- Input Area --- */}
       <div className="relative group mb-8 min-h-[200px]">
@@ -437,6 +480,11 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
         </button>
       </div>
 
+      {/* Task List */}
+      <div className="mt-4 mb-20 px-2">
+        <TaskList />
+      </div>
+
       {/* Success Toast */}
       <AnimatePresence>
         {showToast && (
@@ -451,6 +499,6 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
+    </div >
   );
 };

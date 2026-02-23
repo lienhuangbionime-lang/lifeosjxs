@@ -8,9 +8,9 @@ import json
 import datetime
 
 # 引入核心模組
-from app.core.gemini import get_model
+from app.core.gemini import get_model, get_embeddings
 from app.core.database import supabase
-from app.models.schemas import LogEntrySchema 
+from app.core.time_utils import get_today_str_taipei, get_current_iso_taipei
 
 router = APIRouter()
 logger = logging.getLogger("cortex.ingest")
@@ -158,6 +158,10 @@ E. 實作核取（Action Check）
 • 行為實作 > 10 分鐘 → ✅
 • 僅規劃 / 調整工具 → ⚠️
 
+F. 嚴格一致性（Strict Consistency）【CRITICAL】
+• Markdown 中的 > Daily Metrics 分數必須與 JSON 中的 meta.metrics 完全一致。
+• 【日期權重第一優先級】：若使用者在日誌內容（content）中明確提到了一個特定的日期（例如「2/1」或「二月一號」），則 JSON 的 meta.date 必須反映該日期（YYYY-02-01），而不是系統傳入的 Date 變數。
+
 ⸻
 
 輸出格式（不可破壞）
@@ -213,7 +217,7 @@ Markdown 結構固定如下，不可增減欄位：
 最重要的 1-3 件事
 
 ## 5. Action Tip
-一句話行動建議
+句話行動建議
 
 ## 6. Cognitive Lens Reframing
 - Model/Concept: 使用的思維模型
@@ -232,35 +236,41 @@ Markdown 結構固定如下，不可增減欄位：
 
 # 定義請求格式
 class IngestRequest(BaseModel):
-    text: str
-    date: str  # YYYY-MM-DD
+    content: str
+    date: Optional[str] = None  # YYYY-MM-DD
     habits: Optional[List[str]] = []
-    skip_ai: Optional[bool] = False
+    skipAi: bool = False
+    mode: str = "append"
 
 @router.post("/ingest") 
 async def ingest_log(request: IngestRequest):
-    logger.info(f"🧠 Cortex receiving input for {request.date} (Skip AI: {request.skip_ai})...")
+    # Default date if missing
+    ingest_date = request.date or get_today_str_taipei()
+    habits_list = request.habits or []
+    
+    logger.info(f"🧠 Cortex receiving input for {ingest_date} (Skip AI: {request.skipAi})...")
     
     try:
         # 1. 呼叫 Gemini with v7.1 Prompt (Unless skipped)
         import google.generativeai as genai
         
-        model_config = get_model("smart")
-        ai_data = None
-        model_name = model_config.get("model", "gemini-2.5-flash")
+        model_config = get_model("fast") # Use FAST model for ingest speed
+        ai_data: Dict[str, Any] = {}
+        model_name = model_config.get("model")
 
         # Skip AI if requested
-        if not request.skip_ai and model_config.get("configured"):
+        if not request.skipAi and model_config.get("configured"):
             # 初始化模型物件
             model = genai.GenerativeModel(model_name)
             
-            # 構建使用者輸入
+            # 構建使用者輸入 (注入 Today 作為基準日期)
             user_content = f"""
-Date: {request.date}
-Habits Tracked: {', '.join(request.habits) if request.habits else 'None'}
+[Reference] Today is: {get_today_str_taipei()}
+Target Date: {ingest_date}
+Habits Tracked: {', '.join(habits_list) if habits_list else 'None'}
 
 User's Daily Log:
-{request.text}
+{request.content}
 """
             
             # 使用 v7.1 System Prompt
@@ -270,38 +280,29 @@ User's Daily Log:
                 response = model.generate_content(full_prompt)
                 
                 # 2. 解析 JSON
-                text = response.text.strip()
+                response_text = response.text.strip()
                 # Robust JSON extraction
                 import re
-                json_match = re.search(r'\{.*\}', text, re.DOTALL)
+                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
                 if json_match:
-                    text = json_match.group(0)
-                ai_data = json.loads(text)
+                    response_text = json_match.group(0)
+                ai_data = json.loads(response_text)
                 if not isinstance(ai_data, dict):
-                    raise ValueError("AI response is not a valid JSON object")
+                    ai_data = {}
             except Exception as e:
                 logger.error(f"Gemini/JSON Error: {e}")
-                # Safe checking of response text
-                try: 
-                    if 'response' in locals():
-                         # Check if response was blocked or has no text
-                         if response.parts:
-                             logger.error(f"Raw response text (first 500 chars): {response.text[:500]}")
-                         else:
-                             logger.error(f"Response blocked or empty: {response.prompt_feedback}")
-                except Exception as log_err:
-                    logger.error(f"Could not retrieve response details: {log_err}")
-        elif request.skip_ai:
+                ai_data = {}
+        elif request.skipAi:
             logger.info("⏩ AI Generation skipped by user request.")
         else:
              logger.warning("Gemini API Key not set, using mock response")
 
-        if ai_data is None:
+        if not ai_data:
             # Fallback to basic structure
             ai_data = {
-                "markdown_body": f"# [{request.date}] 日記\n\n{request.text}", 
+                "markdown_body": f"# [{ingest_date}] 日記\n\n{request.content}", 
                 "meta": {
-                    "date": request.date,
+                    "date": ingest_date,
                     "metrics": {"mood": 5, "focus": 5, "energy": 5}
                 }, 
                 "tasks": [],
@@ -309,94 +310,222 @@ User's Daily Log:
                 "graph_seeds": []
             }
 
-        # 3. 寫入海馬迴 (Supabase)
-        import uuid
-        
-        # Prepare Meta field (merge graph_seeds into meta for storage)
-        meta_payload = ai_data.get("meta", {})
-        if not isinstance(meta_payload, dict):
-            meta_payload = {}
-            
-        if "graph_seeds" in ai_data:
-            meta_payload["graphSeeds"] = ai_data["graph_seeds"]
-        
-        # Prepare Habits (Convert list to dict for consistency with Schema)
-        habits_payload = {h: True for h in (request.habits or [])}
+        # --- 核心邏輯修正：日期與分數對齊 ---
+        # 1. 優先使用 AI 辨識出的日期，這能解決補寫日誌（如 2/1）的問題
+        if not isinstance(ai_data, dict):
+            ai_data = {}
 
-        # Robust Metrics Extraction
-        metrics = meta_payload.get("metrics")
-        if not isinstance(metrics, dict):
-            metrics = {}
-        
+        # 1. Date Detection (Robust)
+        meta = ai_data.get("meta") or {}
+        detected_date = meta.get("date")
+        if detected_date:
+            import re
+            if re.match(r'^\d{4}-\d{2}-\d{2}$', str(detected_date)):
+                logger.info(f"📅 AI date detection Signal: {detected_date}")
+                ingest_date = str(detected_date)
+            else:
+                logger.warning(f"⚠️ AI returned non-standard date format: {detected_date}")
+
+        # 2. Metrics Extraction (Robust)
+        metrics = meta.get("metrics") or {}
         mood = metrics.get("mood", 5)
         focus = metrics.get("focus", 5)
         energy = metrics.get("energy", 5)
 
+        # 3. Local-First Storage Implementation
+        import uuid
+        import hashlib
+        import os
+        
+        memory_id = str(uuid.uuid4())
+        
+        # 3.1 Generate embedding
+        from app.services.embedder import generate_embedding
+        content_for_embedding = ai_data.get("markdown_body") or request.content
+        embedding = await generate_embedding(content_for_embedding)
+        
+        # 3.2 Write full content to local file (APPEND MODE - one file per day)
+        local_filename = f"{ingest_date}.json"
+        local_dir = "data/memories"
+        os.makedirs(local_dir, exist_ok=True)
+        local_path = os.path.join(local_dir, local_filename)
+        
+        current_time = get_current_iso_taipei()
+        
+        # Check if file exists (append mode)
+        if os.path.exists(local_path):
+            # Load existing memory for this day
+            with open(local_path, "r", encoding="utf-8") as f:
+                existing_memory = json.load(f)
+            
+            # Append new entry
+            new_entry = {
+                "time": current_time,
+                "content": request.content,
+                "ai_processed": ai_data.get("markdown_body"),
+                "metadata": {
+                    "mood": mood,
+                    "focus": focus,
+                    "energy": energy,
+                    "tags": ai_data.get("tags") or [],
+                    "is_ai": not request.skipAi,
+                    "ai_model": model_name if not request.skipAi else "None"
+                }
+            }
+            
+            existing_memory["entries"].append(new_entry)
+            existing_memory["updated_at"] = current_time
+            
+            # Combine all content for full text
+            all_content = "\n\n---\n\n".join([
+                entry.get("content", "") for entry in existing_memory["entries"]
+            ])
+            existing_memory["combined_content"] = all_content
+            
+            full_memory = existing_memory
+            logger.info(f"[OK] Appended to existing memory: {local_path} (now {len(existing_memory['entries'])} entries)")
+        else:
+            # First entry of the day
+            full_memory = {
+                "id": memory_id,
+                "date": ingest_date,
+                "entries": [{
+                    "time": current_time,
+                    "content": request.content,
+                    "ai_processed": ai_data.get("markdown_body"),
+                    "metadata": {
+                        "mood": mood,
+                        "focus": focus,
+                        "energy": energy,
+                        "tags": ai_data.get("tags") or [],
+                        "is_ai": not request.skipAi,
+                        "ai_model": model_name if not request.skipAi else "None"
+                    }
+                }],
+                "combined_content": request.content,
+                "created_at": current_time,
+                "updated_at": current_time
+            }
+            logger.info(f"[OK] Created new daily memory: {local_path}")
+        
+        # Write to file
+        with open(local_path, "w", encoding="utf-8") as f:
+            json.dump(full_memory, f, ensure_ascii=False, indent=2)
+        
+        logger.info(f"[OK] Saved full content to local: {local_path}")
+        
+        # 3.3 Calculate content hash for integrity verification
+        content_hash = hashlib.sha256(full_memory["combined_content"].encode()).hexdigest()
+        
+        # 3.4 Supabase payload: AI insights + metadata only (no full content)
+        # Use combined AI insights from all entries
+        combined_ai_insights = "\n\n---\n\n".join([
+            entry.get("ai_processed", "") for entry in full_memory["entries"] if entry.get("ai_processed")
+        ])
+        
         db_payload = {
-            "id": str(uuid.uuid4()),
-            "date": request.date,
-            "content": ai_data.get("markdown_body", request.text),
+            "date": ingest_date,  # Primary key for upsert
+            "local_path": local_filename,
+            "content_hash": content_hash,
+            "ai_insights": combined_ai_insights or full_memory["combined_content"][:500],  # Fallback to preview
             "mood": mood,
             "focus": focus,
             "energy": energy,
-            "isAi": not request.skip_ai and (ai_data is not None),
-            "aiModel": model_name if not request.skip_ai else "None",
-            "tags": ai_data.get("tags", []),
-            "habits": habits_payload,
-            "meta": meta_payload,
-            "updatedAt": datetime.datetime.now().isoformat()
+            "is_ai": not request.skipAi,
+            "ai_model": model_name if not request.skipAi else "None",
+            "tags": ai_data.get("tags") or [],
+            "updated_at": current_time
         }
         
+        if embedding:
+            db_payload["embedding"] = embedding
+            logger.info(f"[OK] Generated {len(embedding)}-dim embedding")
+
+        # 4. 寫入 Supabase (UPSERT - 一天一筆)
         if supabase:
             try:
-                # 1. Try Full Insert (New Schema)
-                try:
-                    res = supabase.table("LogEntry").insert(db_payload).execute()
-                    logger.info("✅ Memory stored (New Entry).")
-                except Exception as full_insert_error:
-                    error_str = str(full_insert_error)
-                    
-                    # Case A: Column missing (Schema Mismatch)
-                    if "column" in error_str and "does not exist" in error_str:
-                         logger.warning("⚠️ DB Schema missing v7 columns. Falling back to legacy storage...")
-                         # Fallback to legacy payload
-                         legacy_payload = {
-                             "id": db_payload["id"],
-                             "date": db_payload["date"],
-                             "content": db_payload["content"],
-                             "mood": db_payload["mood"],
-                             "focus": db_payload["focus"],
-                             "energy": db_payload["energy"]
-                         }
-                         # Try Legacy Insert
-                         try:
-                             res = supabase.table("LogEntry").insert(legacy_payload).execute()
-                             logger.info("✅ Memory stored (Legacy Entry).")
-                         except Exception as legacy_error:
-                             # Check for duplicate on legacy insert
-                             if "23505" in str(legacy_error) or "duplicate key" in str(legacy_error).lower():
-                                 logger.info("⚠️ Duplicate date detected (Legacy). Updating...")
-                                 del legacy_payload["id"]
-                                 res = supabase.table("LogEntry").update(legacy_payload).eq("date", request.date).execute()
-                             else:
-                                 raise legacy_error
-
-                    # Case B: Duplicate Key (New Schema)
-                    elif "23505" in error_str or "duplicate key" in error_str.lower():
-                        logger.info("⚠️ Duplicate date detected. Updating existing entry...")
-                        update_payload = {k: v for k, v in db_payload.items() if k != "id"}
-                        res = supabase.table("LogEntry").update(update_payload).eq("date", request.date).execute()
-                        logger.info("✅ Memory updated (Existing Entry).")
-                    
-                    # Case C: Other Error
-                    else:
-                        raise full_insert_error
+                # Upsert: 如果日期已存在則更新，否則新增
+                response = supabase.table("memories").upsert(
+                    db_payload,
+                    on_conflict="date"  # 以 date 為唯一鍵
+                ).execute()
+                
+                logger.info(f"[OK] Upserted memory to Supabase for date: {ingest_date}")
+                
+            except Exception as e:
+                logger.error(f"[ERROR] Supabase upsert failed: {e}")
+                # 不中斷流程，本地檔案已存在
+                check_res = supabase.table("memories").select("id").eq("date", ingest_date).execute()
+                
+                if check_res.data:
+                    # 已存在：更新
+                    target_id = check_res.data[0]["id"]
+                    logger.info(f"🔄 Entry for {ingest_date} exists (ID: {target_id}). Updating...")
+                    update_payload = {k: v for k, v in db_payload.items() if k != "id"}
+                    supabase.table("memories").update(update_payload).eq("id", target_id).execute()
+                else:
+                    # 不存在：新增
+                    supabase.table("memories").insert(db_payload).execute()
+                    logger.info(f"✅ New memory stored for {ingest_date}.")
                         
-            except Exception as db_e:
-                logger.error(f"❌ Database Write/Update Failed: {db_e}")
-                # Swallow error to return AI response
+                # --- 5. Process Tasks (Action Items) ---
+                # Added in v7.1: Connect AI Tasks to DB
+                tasks_list = ai_data.get("tasks", [])
+                if tasks_list:
+                    logger.info(f"📋 Found {len(tasks_list)} actionable items. Processing...")
+                    
+                    # 5.1 Pre-fetch Projects for Linking
+                    # optimization: fetch all project names to map (name -> id)
+                    # We use a simple case-insensitive match
+                    project_map = {}
+                    try:
+                        p_res = supabase.table("projects").select("id, name").execute()
+                        if p_res.data:
+                            for p in p_res.data:
+                                project_map[p["name"].lower()] = p["id"]
+                    except Exception as pe:
+                        logger.warning(f"Could not fetch projects for linking: {pe}")
 
-        
+                    # 5.2 Construct Task Payloads
+                    new_tasks = []
+                    target_memory_id = target_id if 'target_id' in locals() else None 
+                    
+                    # Fix: Capture ID on insert
+                    if not target_memory_id:
+                        # We just inserted. Let's fetch it back.
+                        rec_res = supabase.table("memories").select("id").eq("date", ingest_date).execute()
+                        if rec_res.data:
+                            target_memory_id = rec_res.data[0]["id"]
+
+                    for t in tasks_list:
+                        task_title = t.get("title")
+                        if not task_title: continue
+                        
+                        proj_name = t.get("project")
+                        proj_id = None
+                        if proj_name and isinstance(proj_name, str):
+                            proj_id = project_map.get(proj_name.lower())
+                        
+                        new_tasks.append({
+                            "title": task_title,
+                            "status": "todo",
+                            "project_id": proj_id,
+                            "source_memory_id": target_memory_id,
+                            "due_date": ingest_date, # Default to today/ingest date
+                            "priority": 1
+                        })
+
+                    # 5.3 Sort & Insert
+                    if new_tasks:
+                        try:
+                            supabase.table("tasks").insert(new_tasks).execute()
+                            logger.info(f"✅ Successfully created {len(new_tasks)} tasks in DB.")
+                        except Exception as te:
+                            logger.error(f"❌ Failed to insert tasks: {te}")
+
+            except Exception as db_e:
+                logger.error(f"❌ Database Operation Failed: {db_e}")
+
         # 4. 回傳給前端
         return {
             "success": True,
@@ -405,5 +534,7 @@ User's Daily Log:
         }
 
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         logger.error(f"🔥 Ingest Critical Error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))

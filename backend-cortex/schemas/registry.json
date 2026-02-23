@@ -3,26 +3,67 @@
     "last_updated": "2026-02-11T03:16:19+08:00",
     "database": "supabase",
     "tables": {
+        "cortex_growth_logs": {
+            "description": "AI 決策與演化日誌表（玻璃盒協議核心）",
+            "columns": {
+                "id": {
+                    "type": "UUID",
+                    "primary_key": true,
+                    "default": "gen_random_uuid()"
+                },
+                "decision_context": {
+                    "type": "TEXT",
+                    "nullable": false,
+                    "description": "決策背景與面臨的問題"
+                },
+                "options_provided": {
+                    "type": "JSONB",
+                    "nullable": false,
+                    "description": "系統給出的選項矩陣 (A vs B)"
+                },
+                "user_choice": {
+                    "type": "TEXT",
+                    "nullable": false,
+                    "description": "指揮官最終的選擇"
+                },
+                "ai_prediction": {
+                    "type": "TEXT",
+                    "nullable": true,
+                    "description": "系統原先預測的選擇"
+                },
+                "prediction_match": {
+                    "type": "BOOLEAN",
+                    "nullable": true,
+                    "description": "預測是否命中 (用於計算誤判率)"
+                },
+                "lessons_learned": {
+                    "type": "TEXT",
+                    "nullable": true,
+                    "description": "從此次決策中提取的新偏好權重"
+                },
+                "created_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()"
+                }
+            }
+        },
         "memories": {
             "description": "核心日記與記憶表",
             "columns": {
                 "id": {
                     "type": "UUID",
                     "primary_key": true,
-                    "nullable": false,
                     "default": "gen_random_uuid()"
                 },
                 "content": {
                     "type": "TEXT",
-                    "nullable": false,
-                    "description": "日記內容（Markdown 格式）"
+                    "nullable": false
                 },
                 "date": {
                     "type": "DATE",
                     "nullable": false,
                     "default": "CURRENT_DATE",
-                    "indexed": true,
-                    "description": "日記日期"
+                    "indexed": true
                 },
                 "created_at": {
                     "type": "TIMESTAMPTZ",
@@ -37,52 +78,39 @@
                 },
                 "mood": {
                     "type": "INT",
-                    "nullable": false,
                     "default": 5,
-                    "check": "mood >= 0 AND mood <= 10",
-                    "description": "心情指標 (0-10)"
+                    "check": "mood >= 0 AND mood <= 10"
                 },
                 "focus": {
                     "type": "INT",
-                    "nullable": false,
                     "default": 5,
-                    "check": "focus >= 0 AND focus <= 10",
-                    "description": "專注度 (0-10)"
+                    "check": "focus >= 0 AND focus <= 10"
                 },
                 "energy": {
                     "type": "INT",
-                    "nullable": false,
                     "default": 5,
-                    "check": "energy >= 0 AND energy <= 10",
-                    "description": "能量值 (0-10)"
+                    "check": "energy >= 0 AND energy <= 10"
                 },
                 "tags": {
                     "type": "TEXT[]",
                     "nullable": false,
                     "default": "'{}'",
-                    "indexed": true,
-                    "description": "標籤陣列"
+                    "indexed": true
                 },
                 "category": {
                     "type": "TEXT",
-                    "nullable": true,
-                    "default": "'Life'",
-                    "description": "分類"
+                    "default": "'Life'"
                 },
                 "is_ai": {
                     "type": "BOOLEAN",
                     "nullable": false,
-                    "default": false,
-                    "description": "是否由 AI 分析"
+                    "default": false
                 },
                 "ai_model": {
-                    "type": "TEXT",
-                    "nullable": true,
-                    "description": "使用的 AI 模型"
+                    "type": "TEXT"
                 },
                 "embedding": {
                     "type": "VECTOR(768)",
-                    "nullable": true,
                     "description": "向量嵌入（用於語義搜索）"
                 }
             },
@@ -100,25 +128,9 @@
                         "tags"
                     ],
                     "type": "GIN"
-                },
-                {
-                    "name": "idx_memories_created_at",
-                    "columns": [
-                        "created_at"
-                    ],
-                    "order": "DESC"
                 }
             ],
-            "relations": [],
-            "rls_enabled": true,
-            "policies": [
-                {
-                    "name": "Allow all access",
-                    "for": "ALL",
-                    "using": "TRUE",
-                    "check": "TRUE"
-                }
-            ]
+            "rls_enabled": true
         },
         "projects": {
             "description": "專案管理表",
@@ -133,8 +145,7 @@
                     "nullable": false
                 },
                 "description": {
-                    "type": "TEXT",
-                    "nullable": true
+                    "type": "TEXT"
                 },
                 "status": {
                     "type": "TEXT",
@@ -147,16 +158,13 @@
                     "check": "progress >= 0 AND progress <= 100"
                 },
                 "start_date": {
-                    "type": "DATE",
-                    "nullable": true
+                    "type": "DATE"
                 },
                 "due_date": {
-                    "type": "DATE",
-                    "nullable": true
+                    "type": "DATE"
                 },
                 "parent_id": {
                     "type": "UUID",
-                    "nullable": true,
                     "references": {
                         "table": "projects",
                         "column": "id",
@@ -202,7 +210,6 @@
                 },
                 "project_id": {
                     "type": "UUID",
-                    "nullable": true,
                     "references": {
                         "table": "projects",
                         "column": "id",
@@ -211,7 +218,6 @@
                 },
                 "source_memory_id": {
                     "type": "UUID",
-                    "nullable": true,
                     "references": {
                         "table": "memories",
                         "column": "id",
@@ -219,8 +225,7 @@
                     }
                 },
                 "due_date": {
-                    "type": "DATE",
-                    "nullable": true
+                    "type": "DATE"
                 },
                 "priority": {
                     "type": "INT",
@@ -242,12 +247,6 @@
                     "name": "idx_tasks_status",
                     "columns": [
                         "status"
-                    ]
-                },
-                {
-                    "name": "idx_tasks_project_id",
-                    "columns": [
-                        "project_id"
                     ]
                 }
             ],
@@ -280,14 +279,6 @@
                     "default": "NOW()"
                 }
             },
-            "indexes": [
-                {
-                    "name": "idx_nodes_type",
-                    "columns": [
-                        "type"
-                    ]
-                }
-            ],
             "rls_enabled": true
         },
         "edges": {
@@ -329,20 +320,6 @@
                     "default": "NOW()"
                 }
             },
-            "indexes": [
-                {
-                    "name": "idx_edges_source",
-                    "columns": [
-                        "source_id"
-                    ]
-                },
-                {
-                    "name": "idx_edges_target",
-                    "columns": [
-                        "target_id"
-                    ]
-                }
-            ],
             "unique_constraints": [
                 {
                     "name": "unique_edge",
@@ -388,6 +365,50 @@
                     "name": "idx_usage_date",
                     "columns": [
                         "date"
+                    ]
+                }
+            ],
+            "rls_enabled": true
+        },
+        "MonthlyReview": {
+            "description": "AI 生成的月度回顧表",
+            "columns": {
+                "id": {
+                    "type": "UUID",
+                    "primary_key": true,
+                    "default": "gen_random_uuid()"
+                },
+                "year": {
+                    "type": "INT",
+                    "nullable": false
+                },
+                "month": {
+                    "type": "INT",
+                    "nullable": false
+                },
+                "summary": {
+                    "type": "TEXT",
+                    "nullable": false
+                },
+                "metadata": {
+                    "type": "JSONB",
+                    "default": "'{}'"
+                },
+                "created_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()"
+                },
+                "updated_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()"
+                }
+            },
+            "unique_constraints": [
+                {
+                    "name": "unique_monthly_review",
+                    "columns": [
+                        "year",
+                        "month"
                     ]
                 }
             ],

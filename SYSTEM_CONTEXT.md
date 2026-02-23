@@ -18,8 +18,9 @@
 ### Backend
 - **Framework**: FastAPI (Python 3.13+)
 - **Database**: Supabase (PostgreSQL)
-- **AI**: Google Gemini 2.5 Flash (via `google-genai` SDK)
-- **Vector Search**: pgvector extension
+- **AI**: Gemini 3 Pro (Smart) & Gemini Flash Lite (Fast)
+- **SDK**: `google-generativeai` (Legacy wrapper, required for current implementation)
+- **Vector Search**: pgvector (3072 dimensions)
 - **Schema**: Pydantic v2 (strict typing required)
 
 ### Frontend
@@ -74,7 +75,7 @@ Raw Input → Gemini Analysis → Structured Output → Storage
 - ❌ **NEVER** use emojis in Python `print()` statements (Windows encoding issues)
 - ❌ **NEVER** use Tailwind CSS without explicit user request
 - ❌ **NEVER** modify core tables (`memories`, `projects`, `tasks`) without migration
-- ❌ **NEVER** use `google.generativeai` (deprecated, use `google.genai`)
+- ❌ **NEVER** use identifiers like `gemini-3.0` or `gemini-2.5` (use `sanitize_model_name()` logic)
 - ❌ **NEVER** hardcode API keys or credentials
 
 ### Database
@@ -263,8 +264,8 @@ CREATE TABLE public.memories (
   is_ai BOOLEAN DEFAULT FALSE,
   ai_model TEXT,
   
-  -- Vector search
-  embedding VECTOR(768)
+  -- Vector search (Full Precision Protocol)
+  embedding VECTOR(3072)
 );
 ```
 
@@ -436,9 +437,26 @@ Code is considered **production-ready** when:
 
 ---
 
-**Last Updated**: 2026-02-11T03:29:17+08:00  
-**Version**: 3.5  
+**Last Updated**: 2026-02-23T22:15:00+08:00  
+**Version**: 3.5.1 (Stability Patch applied)  
 **Maintained By**: AI + Human Collaboration
+
+---
+
+## 🛑 Critical Safeguards (v3.5.1)
+
+### 1. Model Name Sanitization
+The system is sensitive to Gemini model versioning. **Always use `app.core.gemini.sanitize_model_name()`** before initializing models to prevent 404 errors. Verified IDs:
+- `models/gemini-3-pro-preview` (Smart)
+- `models/gemini-flash-lite-latest` (Fast/Reliable)
+
+### 2. Multi-tier Quota Fallback
+If the Smart model reaches quota (429), `chat.py` automatically chain-falls back to `Flash Lite` to ensure continuity.
+
+### 3. RAG Robustness
+Retrieval in `rag.py` uses **Hybrid Fallback**:
+1. If Vector search (3072 dims) returns nothing, keyword/date matching is triggered.
+2. System Prompt is strictly tuned to prevent hallucinations when data is missing.
 
 ---
 
