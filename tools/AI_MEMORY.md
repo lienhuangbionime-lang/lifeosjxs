@@ -55,7 +55,15 @@
 - 檔案 I/O 必須加 `encoding="utf-8"`
 - `&&` 在 PowerShell 不能用，改用 `;`
 
-###Supabase
+### Python Regex CJK Pitfalls
+- `\b` (word boundary) in Python regex **fails** when English/Numbers are adjacent to CJK characters (e.g., `2/1日記`).
+- **Fix**: Use lookarounds `(?<!\d)` and `(?!\d)` instead of `\b` when extracting dates/numbers from mixed-language text.
+
+### LLM Formatting Non-Determinism
+- Never assume the LLM will strictly follow markup formatting (e.g. `[YYYY-MM-DD]`). Sometimes it drops brackets: `YYYY-MM-DD`.
+- Regex replacing AI-generated markdown must possess ultra-permissive structures (e.g. `\[?` optional brackets) so fixes aren't silently skipped.
+
+### Supabase
 - RPC `match_memories` 需要先執行 `migrations/006_match_memories_rpc.sql`
 - `memories.date` 是 UNIQUE KEY（同一天只有一筆，用 upsert）
 
