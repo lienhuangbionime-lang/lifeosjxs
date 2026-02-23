@@ -332,8 +332,72 @@ User's Daily Log:
         focus = metrics.get("focus", 5)
         energy = metrics.get("energy", 5)
 
+        # ---------------------------------------------------------------
+        # [Phase D] Scoring Engine Validation — AI Bias Detection
+        # Compare AI-assigned focus score against fact-based calculation.
+        # If delta > 2.0, log as a discrepancy to cortex_growth_logs.
+        # ---------------------------------------------------------------
+        if not request.skipAi and ai_data:
+            try:
+                import sys, os as _os
+                # Resolve scoring_engine path (tools/ or sync_brain/)
+                _base = r"c:\Users\lien.huang\AppData\lifeosjxs"
+                for _spath in [
+                    _os.path.join(_base, "tools"),
+                    _os.path.join(_base, "sync_brain"),
+                ]:
+                    if _spath not in sys.path:
+                        sys.path.insert(0, _spath)
+
+                from scoring_engine import engine as scoring_engine
+
+                # Build proxy facts from AI output (graph_seeds + task count)
+                proxy_facts = []
+                tasks_ai = ai_data.get("tasks", [])
+                graph_seeds = ai_data.get("graph_seeds", [])
+
+                if len(tasks_ai) >= 2:
+                    proxy_facts.append({"type": "completed_milestone", "count": 1, "evidence": f"{len(tasks_ai)} tasks extracted"})
+                if any("#distract" in s.lower() or "#procrastin" in s.lower() for s in graph_seeds):
+                    proxy_facts.append({"type": "distraction_event", "count": 1, "evidence": "tag detected"})
+
+                markdown_body = ai_data.get("markdown_body", "")
+                if "deep work" in markdown_body.lower() or "深度工作" in markdown_body:
+                    proxy_facts.append({"type": "deep_work_session", "count": 1, "evidence": "keyword in markdown"})
+                if "overtime" in markdown_body.lower() or "加班" in markdown_body:
+                    proxy_facts.append({"type": "work_overtime", "count": 1, "evidence": "keyword in markdown"})
+
+                if proxy_facts:
+                    calc = scoring_engine.calculate_score("focus", proxy_facts)
+                    engine_score = calc["score"]
+                    ai_focus = float(focus)
+                    delta = abs(ai_focus - engine_score)
+
+                    if delta > 2.0:
+                        logger.warning(f"[WARN] Score delta {delta:.1f}: AI={ai_focus}, Engine={engine_score}. Logging to growth_logs.")
+                        if supabase:
+                            try:
+                                supabase.table("cortex_growth_logs").insert({
+                                    "decision_context": f"Focus scoring discrepancy on {ingest_date}",
+                                    "options_provided": {"ai_score": ai_focus, "engine_score": engine_score, "facts": proxy_facts},
+                                    "user_choice": str(engine_score),
+                                    "ai_prediction": str(ai_focus),
+                                    "prediction_match": False,
+                                    "lessons_learned": f"Focus delta={delta:.1f}. AI={ai_focus} vs Engine={engine_score}. Evidence: {calc['summary']}"
+                                }).execute()
+                            except Exception as _ge:
+                                logger.warning(f"[WARN] growth_log write failed: {_ge}")
+                    else:
+                        logger.info(f"[OK] Scoring aligned (delta={delta:.1f}). AI={ai_focus}, Engine={engine_score}")
+            except ImportError:
+                logger.warning("[WARN] scoring_engine not found. Phase D skipped.")
+            except Exception as _se:
+                logger.warning(f"[WARN] Phase D scoring validation error: {_se}")
+        # ---------------------------------------------------------------
+
         # 3. Local-First Storage Implementation
         import uuid
+
         import hashlib
         import os
         
