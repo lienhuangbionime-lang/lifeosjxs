@@ -270,7 +270,13 @@ async def ingest_log(http_request: Request, request: IngestRequest):
              
         if not request.skipAi:
             # 1. Structure text for LLM
-            prompt = f"{LIFEOS_V7_PROMPT}\n\n[USER LOG - {ingest_date}]:\n{request.content}\n\n[HABITS LOGGED]:\n{', '.join(habits_list) if habits_list else 'None'}"
+            # Explicitly instruct the model to use the target ingest_date in its markdown structure
+            user_context = (
+                f"[SYSTEM INSTRUCTION]\n"
+                f"The target date for this log is: {ingest_date}. "
+                f"You MUST replace [YYYY-MM-DD] in your output (both Header and Graph Seeds) with exactly {ingest_date}.\n\n"
+            )
+            prompt = f"{LIFEOS_V7_PROMPT}\n\n{user_context}[USER LOG - {ingest_date}]:\n{request.content}\n\n[HABITS LOGGED]:\n{', '.join(habits_list) if habits_list else 'None'}"
             
             # 2. Call Gemini API using modern SDK via req_gemini
             try:
