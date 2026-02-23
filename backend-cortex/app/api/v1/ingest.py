@@ -1,6 +1,6 @@
 # 檔案位置: backend-cortex/app/api/v1/ingest.py
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 from typing import Optional, Dict, Any, List
 import logging
@@ -8,8 +8,8 @@ import json
 import datetime
 
 # 引入核心模組
-from app.core.gemini import get_model, get_embeddings, gemini_client
-from app.core.database import supabase
+from app.core.gemini import get_model, get_embeddings, gemini_client, get_request_gemini_client
+from app.core.database import supabase, get_request_client
 from app.core.time_utils import get_today_str_taipei, get_current_iso_taipei
 
 router = APIRouter()
@@ -242,13 +242,18 @@ class IngestRequest(BaseModel):
     skipAi: bool = False
     mode: str = "append"
 
-@router.post("/ingest") 
-async def ingest_log(request: IngestRequest):
+@router.post("")
+@router.post("/")
+async def ingest_log(http_request: Request, request: IngestRequest):
     # Default date if missing
     ingest_date = request.date or get_today_str_taipei()
     habits_list = request.habits or []
     
-    logger.info(f"🧠 Cortex receiving input for {ingest_date} (Skip AI: {request.skipAi})...")
+    db = get_request_client(http_request)
+    req_gemini = get_request_gemini_client(http_request)
+    
+    # Debug info
+    logger.info(f"📥 Received INGEST request. Mode: {request.mode}, skipAi: {request.skipAi}")
     
     try:
         # 1. 呼叫 Gemini with v7.1 Prompt — [SDK v1] google.genai (not google.generativeai)
@@ -257,25 +262,24 @@ async def ingest_log(request: IngestRequest):
         model_name = model_config.get("model")
 
         # Skip AI if requested
-        if not request.skipAi and model_config.get("configured") and gemini_client:
+        if not request.skipAi and model_config.get("configured") and req_gemini:
             # 構建使用者輸入 (注入 Today 作為基準日期)
-            user_content = f"""
-[Reference] Today is: {get_today_str_taipei()}
-Target Date: {ingest_date}
-Habits Tracked: {', '.join(habits_list) if habits_list else 'None'}
-
-User's Daily Log:
-{request.content}
-"""
-            # 使用 v7.1 System Prompt
-            full_prompt = f"{LIFEOS_V7_PROMPT}\n\n{user_content}\n\n請嚴格按照上述格式輸出 JSON。"
-
+            if not model_config.get("configured") or not req_gemini:
+                logger.warning("[WARN] Cortex AI not configured. Running in simple storage mode.")
+                request.skipAi = True
+             
+        if not request.skipAi:
+            # 1. Structure text for LLM
+            prompt = f"{LIFEOS_V7_PROMPT}\n\n[USER LOG - {ingest_date}]:\n{request.content}\n\n[HABITS LOGGED]:\n{', '.join(habits_list) if habits_list else 'None'}"
+            
+            # 2. Call Gemini API using modern SDK via req_gemini
             try:
-                # gemini_client.models.generate_content = google.genai synchronous API
-                response = gemini_client.models.generate_content(
+                from google.genai import types
+                chat = await req_gemini.aio.chats.create(
                     model=model_name,
-                    contents=full_prompt
+                    config=types.GenerateContentConfig(temperature=0.7)
                 )
+                response = await chat.send_message(prompt)
                 # 2. 解析 JSON
                 response_text = response.text.strip()
                 import re
@@ -291,7 +295,7 @@ User's Daily Log:
         elif request.skipAi:
             logger.info("[OK] AI Generation skipped by user request.")
         else:
-            logger.warning("[WARN] gemini_client not configured, using fallback.")
+            logger.warning("[WARN] req_gemini not configured, using fallback.")
 
 
         if not ai_data:
@@ -372,9 +376,9 @@ User's Daily Log:
 
                     if delta > 2.0:
                         logger.warning(f"[WARN] Score delta {delta:.1f}: AI={ai_focus}, Engine={engine_score}. Logging to growth_logs.")
-                        if supabase:
+                        if db: # Replaced supabase with db
                             try:
-                                supabase.table("cortex_growth_logs").insert({
+                                db.table("cortex_growth_logs").insert({
                                     "decision_context": f"Focus scoring discrepancy on {ingest_date}",
                                     "options_provided": {"ai_score": ai_focus, "engine_score": engine_score, "facts": proxy_facts},
                                     "user_choice": str(engine_score),
@@ -503,10 +507,10 @@ User's Daily Log:
             logger.info(f"[OK] Generated {len(embedding)}-dim embedding")
 
         # 4. 寫入 Supabase (UPSERT - 一天一筆)
-        if supabase:
+        if db:
             try:
                 # Upsert: 如果日期已存在則更新，否則新增
-                response = supabase.table("memories").upsert(
+                response = db.table("memories").upsert(
                     db_payload,
                     on_conflict="date"  # 以 date 為唯一鍵
                 ).execute()
@@ -516,17 +520,17 @@ User's Daily Log:
             except Exception as e:
                 logger.error(f"[ERROR] Supabase upsert failed: {e}")
                 # 不中斷流程，本地檔案已存在
-                check_res = supabase.table("memories").select("id").eq("date", ingest_date).execute()
+                check_res = db.table("memories").select("id").eq("date", ingest_date).execute()
                 
                 if check_res.data:
                     # 已存在：更新
                     target_id = check_res.data[0]["id"]
                     logger.info(f"🔄 Entry for {ingest_date} exists (ID: {target_id}). Updating...")
                     update_payload = {k: v for k, v in db_payload.items() if k != "id"}
-                    supabase.table("memories").update(update_payload).eq("id", target_id).execute()
+                    db.table("memories").update(update_payload).eq("id", target_id).execute()
                 else:
                     # 不存在：新增
-                    supabase.table("memories").insert(db_payload).execute()
+                    db.table("memories").insert(db_payload).execute()
                     logger.info(f"✅ New memory stored for {ingest_date}.")
                         
                 # --- 5. Process Tasks (Action Items) ---
@@ -538,51 +542,50 @@ User's Daily Log:
                     # 5.1 Pre-fetch Projects for Linking
                     # optimization: fetch all project names to map (name -> id)
                     # We use a simple case-insensitive match
-                    project_map = {}
-                    try:
-                        p_res = supabase.table("projects").select("id, name").execute()
-                        if p_res.data:
-                            for p in p_res.data:
-                                project_map[p["name"].lower()] = p["id"]
-                    except Exception as pe:
-                        logger.warning(f"Could not fetch projects for linking: {pe}")
-
-                    # 5.2 Construct Task Payloads
-                    new_tasks = []
-                    target_memory_id = target_id if 'target_id' in locals() else None 
+                    logger.info("Fetching existing projects for linking...")
+                    proj_res = db.table("projects").select("id, name").execute()
+                    proj_map = {p["name"].lower(): p["id"] for p in (proj_res.data or [])}
                     
-                    # Fix: Capture ID on insert
-                    if not target_memory_id:
-                        # We just inserted. Let's fetch it back.
-                        rec_res = supabase.table("memories").select("id").eq("date", ingest_date).execute()
-                        if rec_res.data:
-                            target_memory_id = rec_res.data[0]["id"]
-
-                    for t in tasks_list:
-                        task_title = t.get("title")
-                        if not task_title: continue
+                    # Also need the memory id we just created/updated
+                    mem_res = db.table("memories").select("id").eq("date", ingest_date).execute()
+                    memory_id_db = mem_res.data[0]["id"] if mem_res.data else None
+                    
+                    inserted_tasks = 0
+                    for tk in tasks_list:
+                        if not tk.get("title"): continue
                         
-                        proj_name = t.get("project")
+                        # Find project id
                         proj_id = None
-                        if proj_name and isinstance(proj_name, str):
-                            proj_id = project_map.get(proj_name.lower())
-                        
-                        new_tasks.append({
-                            "title": task_title,
+                        if tk.get("project"): # Changed from project_name to project based on original ai_data structure
+                            p_name = tk["project"].lower()
+                            if p_name in proj_map:
+                                proj_id = proj_map[p_name]
+                            else:
+                                # Create new project
+                                logger.info(f"Creating new project '{tk['project']}'...")
+                                new_p = db.table("projects").insert({"name": tk["project"], "status": "active"}).execute()
+                                if new_p.data:
+                                    proj_id = new_p.data[0]["id"]
+                                    proj_map[p_name] = proj_id
+                                    
+                        # Insert task
+                        task_payload = {
+                            "title": tk["title"],
                             "status": "todo",
+                            "priority": tk.get("priority", 1), # Assuming priority might be in task dict
                             "project_id": proj_id,
-                            "source_memory_id": target_memory_id,
-                            "due_date": ingest_date, # Default to today/ingest date
-                            "priority": 1
-                        })
-
-                    # 5.3 Sort & Insert
-                    if new_tasks:
+                            "source_memory_id": memory_id_db
+                        }
                         try:
-                            supabase.table("tasks").insert(new_tasks).execute()
-                            logger.info(f"✅ Successfully created {len(new_tasks)} tasks in DB.")
+                            db.table("tasks").insert(task_payload).execute()
+                            inserted_tasks += 1
                         except Exception as te:
-                            logger.error(f"❌ Failed to insert tasks: {te}")
+                            logger.error(f"❌ Failed to insert task '{tk.get('title')}': {te}")
+                    
+                    if inserted_tasks > 0:
+                        logger.info(f"✅ Successfully created {inserted_tasks} tasks in DB.")
+                    else:
+                        logger.info("No new tasks were inserted.")
 
             except Exception as db_e:
                 logger.error(f"❌ Database Operation Failed: {db_e}")
