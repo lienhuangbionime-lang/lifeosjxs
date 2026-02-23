@@ -322,16 +322,9 @@ async def ingest_log(http_request: Request, request: IngestRequest):
         if not isinstance(ai_data, dict):
             ai_data = {}
 
-        # 1. Date Detection (Robust)
+        # 1. Date: ALWAYS use the user-supplied ingest_date. Never trust AI.
+        # (AI date detection was causing wrong dates by overriding the user's input)
         meta = ai_data.get("meta") or {}
-        detected_date = meta.get("date")
-        if detected_date:
-            import re
-            if re.match(r'^\d{4}-\d{2}-\d{2}$', str(detected_date)):
-                logger.info(f"📅 AI date detection Signal: {detected_date}")
-                ingest_date = str(detected_date)
-            else:
-                logger.warning(f"⚠️ AI returned non-standard date format: {detected_date}")
 
         # 2. Metrics Extraction (Robust + Fallback)
         metrics = meta.get("metrics") or {}
@@ -355,6 +348,44 @@ async def ingest_log(http_request: Request, request: IngestRequest):
         if energy_match:
             try: energy = int(energy_match.group(1))
             except: pass
+        
+        logger.info(f"📊 Final metrics → Date={ingest_date}, Mood={mood}, Focus={focus}, Energy={energy}")
+
+        # 3. Post-process markdown_body to enforce correct date + scores in TEXT
+        markdown_body_raw = ai_data.get("markdown_body", "")
+        if markdown_body_raw:
+            import re as _re
+            # Fix date in header: replace any "# [YYYY-MM-DD]" pattern with the correct date
+            markdown_body_raw = _re.sub(
+                r'#\s*\[\d{4}-\d{2}-\d{2}\]',
+                f'# [{ingest_date}]',
+                markdown_body_raw
+            )
+            # Fix date in Graph Seeds: replace [[YYYY-MM-DD]] with correct date
+            markdown_body_raw = _re.sub(
+                r'\[\[\d{4}-\d{2}-\d{2}\]\]',
+                f'[[{ingest_date}]]',
+                markdown_body_raw
+            )
+            # Fix Mood score in Daily Metrics block
+            markdown_body_raw = _re.sub(
+                r'(>\s*-\s*Mood:\s*)\d+',
+                f'\\g<1>{mood}',
+                markdown_body_raw
+            )
+            # Fix Focus score
+            markdown_body_raw = _re.sub(
+                r'(>\s*-\s*Focus:\s*)\d+',
+                f'\\g<1>{focus}',
+                markdown_body_raw
+            )
+            # Fix Energy score
+            markdown_body_raw = _re.sub(
+                r'(>\s*-\s*Energy:\s*)\d+',
+                f'\\g<1>{energy}',
+                markdown_body_raw
+            )
+            ai_data["markdown_body"] = markdown_body_raw
 
         # ---------------------------------------------------------------
         # [Phase D] Scoring Engine Validation — AI Bias Detection
