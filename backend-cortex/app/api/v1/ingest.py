@@ -388,9 +388,9 @@ async def ingest_log(http_request: Request, request: IngestRequest):
                 f'# [{ingest_date}]',
                 markdown_body_raw
             )
-            # Fix date in Graph Seeds: replace [[YYYY-MM-DD]] with correct date
+            # Fix date in Graph Seeds: replace [[YYYY-MM-DD]] or YYYY-MM-DD with correct date
             markdown_body_raw = _re.sub(
-                r'\[\[\d{4}-\d{2}-\d{2}\]\]',
+                r'\[?\[?\d{4}-\d{2}-\d{2}\]?\]?',
                 f'[[{ingest_date}]]',
                 markdown_body_raw
             )
