@@ -296,24 +296,34 @@ async def ingest_log(http_request: Request, request: IngestRequest):
             )
             prompt = f"{LIFEOS_V7_PROMPT}\n\n{user_context}[USER LOG - {ingest_date}]:\n{request.content}\n\n[HABITS LOGGED]:\n{', '.join(habits_list) if habits_list else 'None'}"
             
-            # 2. Call Gemini API — using synchronous generate_content (proven stable)
+            # 2. Call Gemini API — using correct google.genai SDK syntax
             try:
+                # Based on google.genai, we use client.models.generate_content(model=..., contents=...)
                 response = req_gemini.models.generate_content(
                     model=model_name,
                     contents=prompt
                 )
-                # Parse JSON from response
+                
+                logger.info("[OK] Gemini raw generation returned.")
                 response_text = response.text.strip()
                 import re
                 json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
                 if json_match:
                     response_text = json_match.group(0)
-                ai_data = json.loads(response_text)
-                if not isinstance(ai_data, dict):
+                
+                try:
+                    ai_data = json.loads(response_text)
+                    if not isinstance(ai_data, dict):
+                        ai_data = {}
+                    logger.info("[OK] Gemini JSON parsing complete.")
+                except json.JSONDecodeError as je:
+                    logger.error(f"[ERROR] Gemini JSON Decode Error: {je}. Raw output snippet: {response_text[:100]}")
                     ai_data = {}
-                logger.info(f"[OK] Gemini analysis complete.")
+                    
             except Exception as e:
-                logger.error(f"Gemini/JSON Error: {e}")
+                import traceback
+                logger.error(f"[ERROR] Gemini API Error in ingest: type={type(e).__name__}, msg={e}")
+                logger.error(traceback.format_exc())
                 ai_data = {}
         elif request.skipAi:
             logger.info("[OK] AI Generation skipped by user request.")
