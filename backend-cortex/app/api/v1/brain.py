@@ -19,7 +19,7 @@ async def get_brain_graph(limit: int = 500):
 
     try:
         # 1. Fetch recent memories
-        response = supabase.table("memories").select("id,date,ai_insights,tags,mood,focus,energy").order("date", desc=True).limit(limit).execute()
+        response = supabase.table("memories").select("id,date,content,ai_insights,tags,mood,focus,energy").order("date", desc=True).limit(limit).execute()
         memories = response.data or []
 
         # 1.5 Fetch Structural Entities
@@ -73,7 +73,9 @@ async def get_brain_graph(limit: int = 500):
         # 3. Process Memories
         for memory in memories:
             date_id = memory.get("date")
-            content = memory.get("ai_insights") or ""
+            ai_insights = memory.get("ai_insights")
+            raw_content = memory.get("content") or ""
+            content = ai_insights if ai_insights else raw_content
             db_tags = memory.get("tags") or []
             
             if not date_id:
