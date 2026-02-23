@@ -1,0 +1,25 @@
+{
+  "id": "542cad6a-2ef4-4891-a0e7-6167526878ca",
+  "date": "2026-02-01",
+  "entries": [
+    {
+      "time": "2026-02-24T03:49:32.086556+08:00",
+      "content": "Test log entry for debugging # 2026-02-01",
+      "ai_processed": "# 2026-02-01 日記\n\n> Daily Metrics\n> - Mood: 5 (Manual/Auto)\n> - Focus: 5 (Manual/Auto)\n> - Energy: 5 (Manual/Auto)\n> - Time Ratio: 🔧 0% / 🌊 0%\n> - Action Check: ⚠️\n> - Drift Point: 無\n\n## 1. Highlights\n- Day Summary: 測試日誌輸入，無具體活動紀錄。\n- Signals Detected: 無\n\n## 2. Gratitude\n今日無特別記錄\n\n## 3. Reflection\n- Behavior Path: 今日無記錄\n- Anti-Cognitive Closure: 無\n- Blind Spot Question: 無\n- Self-Deception Trigger: 無\n\n## 4. Tomorrow's MIT\n\n## 5. Action Tip\n請提供結構化的行為記錄。\n\n## 6. Cognitive Lens Reframing\n- Model/Concept: N/A\n- Reframe: N/A\n\n## 7. Tags\n#Debug #SystemCheck\n\n## Graph Seeds\n[[2026-02-01]] #System-Test",
+      "metadata": {
+        "mood": 5,
+        "focus": 5,
+        "energy": 5,
+        "tags": [
+          "#Debug",
+          "#SystemCheck"
+        ],
+        "is_ai": true,
+        "ai_model": "models/gemini-flash-lite-latest"
+      }
+    }
+  ],
+  "combined_content": "Test log entry for debugging # 2026-02-01",
+  "created_at": "2026-02-24T03:49:32.086556+08:00",
+  "updated_at": "2026-02-24T03:49:32.086556+08:00"
+}
