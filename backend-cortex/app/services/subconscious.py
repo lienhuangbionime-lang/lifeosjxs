@@ -110,5 +110,98 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
              return None
 
     except Exception as e:
-        logger.error(f"🧠 [Subconscious] Reflection failed: {e}")
+        logger.error(f"[ERROR] [Subconscious] Reflection failed: {e}")
         return None
+
+
+async def run_growth_analysis() -> None:
+    """
+    [Phase B] Reads recent cortex_growth_logs, identifies recurring mistake patterns,
+    and appends a learning entry to evolution_log.json.
+    Runs every 12h alongside run_autonomous_reflection().
+    """
+    logger.info("[Subconscious] Running growth log analysis...")
+    try:
+        # 1. Fetch recent growth logs (last 30)
+        res = supabase.table("cortex_growth_logs") \
+            .select("decision_context,user_choice,ai_prediction,prediction_match,lessons_learned,created_at") \
+            .order("created_at", desc=True) \
+            .limit(30) \
+            .execute()
+
+        logs = res.data or []
+        if len(logs) < 3:
+            logger.info("[Subconscious] Not enough growth log entries to analyze yet.")
+            return
+
+        # 2. Compute stats
+        judged = [l for l in logs if l.get("prediction_match") is not None]
+        mismatches = [l for l in judged if l.get("prediction_match") is False]
+        accuracy = round(len(judged) - len(mismatches)) / max(len(judged), 1) * 100
+
+        # 3. Ask Gemini to identify patterns in mistakes
+        from app.core.gemini import gemini_client
+        from google.genai import types as genai_types
+        model_config = get_model("fast")
+        model_name = model_config.get("model", "gemini-1.5-flash")
+
+        lessons_text = "\n".join([
+            f"- [{l.get('created_at','?')[:10]}] Mismatch: AI predicted '{l.get('ai_prediction')}', user chose '{l.get('user_choice')}'. Lesson: {l.get('lessons_learned','')}"
+            for l in mismatches[:10]
+        ]) or "No recent mismatches found."
+
+        prompt = f"""You are a meta-cognitive AI analyzer reviewing your own past decision errors.
+
+Recent AI Prediction Mismatches (last 30 sessions):
+{lessons_text}
+
+Overall prediction accuracy: {accuracy:.0f}%
+
+Based on these patterns, write ONE brief "lesson learned" entry (2-3 sentences max) that:
+1. Identifies the most common type of mistake
+2. States a concrete behavioral adjustment to avoid it
+3. Is written in first person ("I should...")
+
+Output only the lesson text, no headers or preamble."""
+
+        response = gemini_client.models.generate_content(
+            model=model_name,
+            contents=prompt,
+            config=genai_types.GenerateContentConfig(temperature=0.3, max_output_tokens=150)
+        )
+        lesson = (response.text or "").strip()
+        if not lesson:
+            logger.warning("[Subconscious] Growth analysis returned empty lesson.")
+            return
+
+        # 4. Append to evolution_log.json
+        import json, os
+        from pathlib import Path
+        evo_paths = [
+            Path("sync_brain/evolution_log.json"),
+            Path(r"c:\Users\lien.huang\AppData\lifeosjxs\sync_brain\evolution_log.json"),
+        ]
+        evo_path = next((p for p in evo_paths if p.exists()), None)
+        if evo_path:
+            with open(evo_path, "r", encoding="utf-8") as f:
+                evo_log = json.load(f)
+            evo_log.append({
+                "timestamp": get_current_iso_taipei(),
+                "event": "growth_analysis",
+                "type": "ai_lesson",
+                "description": lesson,
+                "meta": {
+                    "source": "run_growth_analysis",
+                    "prediction_accuracy_pct": round(accuracy, 1),
+                    "judged_decisions": len(judged),
+                    "mismatch_count": len(mismatches)
+                }
+            })
+            with open(evo_path, "w", encoding="utf-8") as f:
+                json.dump(evo_log, f, ensure_ascii=False, indent=2)
+            logger.info(f"[OK] Growth lesson appended to evolution_log.json (accuracy={accuracy:.0f}%)")
+        else:
+            logger.warning("[WARN] evolution_log.json not found, lesson not persisted.")
+
+    except Exception as e:
+        logger.error(f"[ERROR] Growth analysis failed: {e}")
