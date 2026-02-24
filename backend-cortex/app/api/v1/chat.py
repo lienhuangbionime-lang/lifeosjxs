@@ -115,21 +115,21 @@ async def stream_chat(request: Request, payload: ChatRequest):
              raise HTTPException(status_code=503, detail="Cortex AI not configured (API Key missing)")
 
         from app.core.gemini import sanitize_model_name
-        model_name = sanitize_model_name(request.model or model_config.get("model"))
+        model_name = sanitize_model_name(payload.model or model_config.get("model"))
         
         # [v3.5 Phase 11] URL Discussion Model Interceptor
         # URL content easily exhausts Gemini 3 Pro (experimental) low tier quota
         # We intercept URL requests and route them to 1.5 Pro / Flash series which 
         # have 1M-2M context windows and proven 'summarization' capability parity 
         # with LifeOSvs-main.
-        if request.url_context and "gemini-3" in model_name:
+        if payload.url_context and "gemini-3" in model_name:
             logger.info("🔗 URL Context detected. Routing to proven 1.5 Pro (via latest mapping) for Context Length resilience.")
             model_name = sanitize_model_name("gemini-1.5-pro")
             
         # Convert history to Gemini format using new genai.types
         from google.genai import types
         gemini_history = []
-        for msg in request.history:
+        for msg in payload.history:
              role = "user" if msg.role == "user" else "model"
              gemini_history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg.content)]))
              
@@ -140,7 +140,7 @@ async def stream_chat(request: Request, payload: ChatRequest):
         
         # Search for relevant memories before creating chat instance
         relevant_memories = await hybrid_search(
-            query=request.message,
+            query=payload.message,
             limit=5,
             similarity_threshold=0.4
         )
@@ -151,9 +151,9 @@ async def stream_chat(request: Request, payload: ChatRequest):
         
         async def event_generator():
             try:
-                if request.url_context:
+                if payload.url_context:
                     # URL Discussion Mode
-                    url_data = request.url_context
+                    url_data = payload.url_context
                     url_content_block = f"""
 ## Shared Content
 Title: {url_data.get('title')}
@@ -163,12 +163,12 @@ Type: {url_data.get('type')}
 ### Content:
 {url_data.get('content')}
 """
-                    full_input = f"{URL_DISCUSSION_PROMPT}\n{url_content_block}\n\nUser: {request.message}"
+                    full_input = f"{URL_DISCUSSION_PROMPT}\n{url_content_block}\n\nUser: {payload.message}"
                     logger.info(f"[OK] URL Discussion Mode: {url_data.get('title')}")
 
                 else:
                     # Standard Chat Mode (Memories and Projects already injected into system_instruction)
-                    full_input = f"User: {request.message}"
+                    full_input = f"User: {payload.message}"
                     if relevant_memories:
                         logger.info(f"[OK] Injected {len(relevant_memories)} memories into context")
                     else:
