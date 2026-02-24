@@ -1,113 +1,216 @@
-import React, { useEffect, useState } from 'react';
-import { Target, CheckCircle2, FileText, ArrowRight } from 'lucide-react';
-import { cortex } from '@/lib/api/client';
+'use client';
 
-interface TodaySnapshotProps {
-    logs: any[];
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import {
+    Sun,
+    CheckCircle2,
+    Target,
+    Loader2,
+    TrendingUp,
+    Brain,
+    Zap,
+    Activity
+} from 'lucide-react';
+import { cortex, LogEntry } from '@/lib/api/client';
+import { Project } from '@/lib/types/api-schema';
+
+interface TodaySnapshotData {
+    latestMemory: LogEntry | null;
+    pendingTasksCount: number;
+    focusedProject: Project | null;
 }
 
-export const TodaySnapshot = ({ logs }: TodaySnapshotProps) => {
-    const [taskCount, setTaskCount] = useState<number>(0);
-    const [focusedProject, setFocusedProject] = useState<string>('No Active Project');
-    const [isLoading, setIsLoading] = useState(true);
+export const TodaySnapshot = () => {
+    const [data, setData] = useState<TodaySnapshotData | null>(null);
+    const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        let isMounted = true;
-        const fetchData = async () => {
+        let mounted = true;
+
+        const fetchSnapshotData = async () => {
             try {
-                // Fetch tasks and count pending
+                setLoading(true);
+
+                // Fetch recent memory
+                const memories = await cortex.getRecentMemories(1);
+                const latestMemory = memories.length > 0 ? memories[0] : null;
+
+                // Fetch active tasks
+                // Assuming cortex.getTasks returns tasks, we filter for "todo"
                 const tasks = await cortex.getTasks();
-                const pendingCount = tasks.filter(t => t.status === 'todo').length;
+                const pendingTasksCount = Array.isArray(tasks)
+                    ? tasks.filter((t: any) => t.status === 'todo').length
+                    : 0;
 
                 // Fetch projects and find the most recently updated active one
                 const projects = await cortex.projects.list();
-                const activeProjects = projects.filter(p => p.status === 'active');
-                if (activeProjects.length > 0) {
-                    // Sort by updated_at descending
-                    activeProjects.sort((a, b) => {
-                        const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-                        const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
-                        return dateB - dateA;
-                    });
-                    if (isMounted) setFocusedProject(activeProjects[0].name);
-                }
+                const activeProjects = Array.isArray(projects)
+                    ? projects.filter((p: Project) => p.status === 'active')
+                    : [];
 
-                if (isMounted) {
-                    setTaskCount(pendingCount);
-                    setIsLoading(false);
+                // Sort by updated_at descending
+                activeProjects.sort((a, b) => {
+                    const dateA = new Date(a.updated_at || 0).getTime();
+                    const dateB = new Date(b.updated_at || 0).getTime();
+                    return dateB - dateA;
+                });
+
+                const focusedProject = activeProjects.length > 0 ? activeProjects[0] : null;
+
+                if (mounted) {
+                    setData({
+                        latestMemory,
+                        pendingTasksCount,
+                        focusedProject
+                    });
                 }
             } catch (err) {
-                console.error("Failed to load snapshot data:", err);
-                if (isMounted) setIsLoading(false);
+                console.error("Failed to fetch TodaySnapshot data", err);
+            } finally {
+                if (mounted) setLoading(false);
             }
         };
-        fetchData();
-        return () => { isMounted = false; };
+
+        fetchSnapshotData();
+
+        return () => {
+            mounted = false;
+        };
     }, []);
 
-    // Get yesterday/latest summary from logs
-    const latestLog = logs.length > 0 ? logs[logs.length - 1] : null; // Assuming logs are ascending, if descending take logs[0]
-    // Wait, CardStackDashboard sorts them, but props `logs` are normally raw DB entries which might be chronological.
-    // Let's sort them to be sure.
-    const sortedLogs = [...logs].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-    const mostRecent = sortedLogs[0];
-
-    // Extract a 60-char summary snippet
-    let summaryText = 'No recent diary entry.';
-    if (mostRecent) {
-        const rawContent = mostRecent.ai_insights || mostRecent.content || '';
-        // Clean markdown
-        const plainText = rawContent.replace(/[#*>`[\]_-]/g, '').trim();
-        summaryText = plainText.length > 60 ? plainText.substring(0, 60) + '...' : plainText || 'Empty entry.';
-    }
-
-    if (isLoading) {
+    if (loading) {
         return (
-            <div className="mb-6 h-24 bg-slate-900/50 rounded-2xl border border-slate-800 animate-pulse" />
+            <div className="w-full bg-[#111] border border-white/5 rounded-2xl p-6 flex flex-col justify-center items-center py-12">
+                <Loader2 className="animate-spin text-slate-600 mb-3" size={24} />
+                <p className="text-xs text-slate-500 font-medium uppercase tracking-widest">
+                    Syncing Cortex...
+                </p>
+            </div>
         );
     }
 
     return (
-        <div className="mb-6 bg-gradient-to-br from-slate-900 to-slate-800/80 rounded-2xl border border-slate-700 p-4 shadow-lg backdrop-blur-md">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="w-full grid grid-cols-1 md:grid-cols-3 gap-4 mb-8"
+        >
+            {/* 1. Yesterday's / Latest Abstract */}
+            <div className="bg-[#111] border border-white/10 rounded-2xl p-5 relative overflow-hidden group hover:border-white/20 transition-all flex flex-col justify-between">
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-violet-500/10 rounded-full blur-2xl group-hover:bg-violet-500/20 transition-all" />
 
-                {/* 1. Focused Project */}
-                <div className="flex items-start gap-4 p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                    <div className="mt-1 p-2 bg-indigo-500/20 text-indigo-400 rounded-lg">
-                        <Target size={18} />
-                    </div>
-                    <div>
-                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Focus Project</h4>
-                        <p className="font-bold text-indigo-300 text-sm">{focusedProject}</p>
+                <div>
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                        <Brain size={12} className="text-violet-400" />
+                        LATEST MEMORY
+                    </h3>
+
+                    <div className="mb-4">
+                        {data?.latestMemory ? (
+                            <div>
+                                <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">
+                                    {data.latestMemory.content?.replace(/[#*`]/g, '') || "No content."}
+                                </p>
+                                <span className="text-[10px] text-slate-600 font-mono mt-2 block">
+                                    {data.latestMemory.date}
+                                </span>
+                            </div>
+                        ) : (
+                            <p className="text-xs text-slate-600 italic">No recent memories found.</p>
+                        )}
                     </div>
                 </div>
 
-                {/* 2. Yesterday Summary */}
-                <div className="flex items-start gap-4 p-3 bg-slate-800/50 rounded-xl border border-slate-700/50 md:col-span-1">
-                    <div className="mt-1 p-2 bg-emerald-500/20 text-emerald-400 rounded-lg">
-                        <FileText size={18} />
-                    </div>
-                    <div className="overflow-hidden">
-                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Latest Log</h4>
-                        <p className="text-slate-300 text-xs leading-relaxed truncate-2-lines">{summaryText}</p>
-                    </div>
-                </div>
-
-                {/* 3. Pending Tasks */}
-                <div className="flex items-start gap-4 p-3 bg-slate-800/50 rounded-xl border border-slate-700/50">
-                    <div className="mt-1 p-2 bg-amber-500/20 text-amber-400 rounded-lg">
-                        <CheckCircle2 size={18} />
-                    </div>
-                    <div className="flex-1">
-                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">Action Items</h4>
-                        <div className="flex items-baseline gap-2">
-                            <span className="text-xl font-black text-amber-300">{taskCount}</span>
-                            <span className="text-xs text-slate-400 font-medium">Pending Tasks</span>
+                {data?.latestMemory && (
+                    <div className="flex items-center gap-3 pt-3 border-t border-white/5">
+                        <div className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                            <Activity size={10} /> Mood {data.latestMemory.mood || '-'}
+                        </div>
+                        <div className="flex items-center gap-1 text-[11px] font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-md">
+                            <Target size={10} /> Focus {data.latestMemory.focus || '-'}
+                        </div>
+                        <div className="flex items-center gap-1 text-[11px] font-bold text-cyan-400 bg-cyan-500/10 px-2 py-0.5 rounded-md">
+                            <Zap size={10} /> Energy {data.latestMemory.energy || '-'}
                         </div>
                     </div>
+                )}
+            </div>
+
+            {/* 2. Tasks / Action Summary */}
+            <div className="bg-[#111] border border-white/10 rounded-2xl p-5 relative overflow-hidden group hover:border-emerald-500/20 transition-all flex flex-col justify-between">
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-500/10 rounded-full blur-2xl group-hover:bg-emerald-500/20 transition-all" />
+
+                <div>
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                        <CheckCircle2 size={12} className="text-emerald-400" />
+                        PENDING TASKS
+                    </h3>
+
+                    <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-black text-white tracking-tighter">
+                            {data?.pendingTasksCount || 0}
+                        </span>
+                        <span className="text-xs text-slate-500 font-medium">actionable items</span>
+                    </div>
                 </div>
 
+                <p className="text-xs text-slate-500 leading-relaxed mt-4">
+                    Tasks mentioned in notes or linked to active projects waiting for execution.
+                </p>
             </div>
-        </div>
+
+            {/* 3. Focused Project */}
+            <div className="bg-[#111] border border-white/10 rounded-2xl p-5 relative overflow-hidden group hover:border-cyan-500/20 transition-all flex flex-col justify-between">
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-cyan-500/10 rounded-full blur-2xl group-hover:bg-cyan-500/20 transition-all" />
+
+                <div>
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                        <TrendingUp size={12} className="text-cyan-400" />
+                        FOCUSED PROJECT
+                    </h3>
+
+                    {data?.focusedProject ? (
+                        <div>
+                            <div className="flex items-center gap-2 mb-2">
+                                {data.focusedProject.meta?.emoji && (
+                                    <span className="text-xl">{data.focusedProject.meta.emoji}</span>
+                                )}
+                                <h4 className="text-lg font-black text-white tracking-tight leading-tight truncate">
+                                    {data.focusedProject.name}
+                                </h4>
+                            </div>
+
+                            <div className="mt-3 space-y-1.5">
+                                <div className="flex justify-between items-center text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                    <span>進度 (Progress)</span>
+                                    <span className="text-cyan-400">{data.focusedProject.progress || 0}%</span>
+                                </div>
+                                <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
+                                    <motion.div
+                                        className="h-full bg-cyan-500 rounded-full relative"
+                                        initial={{ width: 0 }}
+                                        animate={{ width: `${data.focusedProject.progress || 0}%` }}
+                                        transition={{ duration: 1, ease: "easeOut" }}
+                                    >
+                                        <div className="absolute inset-0 bg-white/20" style={{ backgroundImage: 'linear-gradient(45deg, rgba(255,255,255,.15) 25%, transparent 25%, transparent 50%, rgba(255,255,255,.15) 50%, rgba(255,255,255,.15) 75%, transparent 75%, transparent)' }} />
+                                    </motion.div>
+                                </div>
+                            </div>
+                        </div>
+                    ) : (
+                        <p className="text-xs text-slate-600 italic mt-2">No active projects currently.</p>
+                    )}
+                </div>
+
+                {data?.focusedProject && (
+                    <p className="text-xs text-slate-500 mt-4 border-t border-white/5 pt-3">
+                        Last active or mentioned project.
+                    </p>
+                )}
+            </div>
+
+        </motion.div>
     );
 };

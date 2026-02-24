@@ -16,6 +16,7 @@ import { ConfirmModal, ContextModal } from '@/components/Modals'; // Adjust path
 import { CreateProjectModal } from '@/components/CreateProjectModal';
 import { ProjectBoard } from '@/components/ProjectBoard';
 import { EntryDetailModal } from '@/components/EntryDetailModal'; // [NEW]
+import { TodaySnapshot } from '@/components/TodaySnapshot';
 
 // ... existing code ...
 
@@ -202,7 +203,12 @@ export default function Home() {
           )}
 
           {activeTab === 'dashboard' && (
-            <CardStackDashboard logs={logs} />
+            <div className="w-full flex justify-center mt-6 fade-in-up">
+              <div className="w-full max-w-4xl px-4 flex flex-col gap-6">
+                <TodaySnapshot />
+                <CardStackDashboard logs={logs} />
+              </div>
+            </div>
           )}
 
           {activeTab === 'settings' && (
