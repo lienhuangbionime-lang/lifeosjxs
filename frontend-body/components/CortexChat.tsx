@@ -20,6 +20,7 @@ export const CortexChat = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
     const [systemStatus, setSystemStatus] = useState<EvolutionStatus | null>(null);
+    const [learningStatus, setLearningStatus] = useState<{ total: number; accuracy: number | null; count: number } | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string }>>([]);
     const [selectedModel, setSelectedModel] = useState('models/gemini-flash-lite-latest');
@@ -62,6 +63,22 @@ export const CortexChat = () => {
             }
         };
         fetchStatus();
+
+        const fetchLearningStatus = async () => {
+            try {
+                const res = await cortex.brain.growth.getLessons(1);
+                if (res) {
+                    setLearningStatus({
+                        total: res.total || 0,
+                        accuracy: res.prediction_accuracy_pct,
+                        count: res.judged_decisions || 0
+                    });
+                }
+            } catch (e) {
+                console.error("Failed to fetch learning status", e);
+            }
+        };
+        fetchLearningStatus();
 
         // Load cached models
         const cachedModels = localStorage.getItem('CORTEX_AVAILABLE_MODELS');
@@ -527,11 +544,22 @@ export const CortexChat = () => {
 
                         {/* Stats */}
                         <div className="flex justify-between items-center px-2 mt-2">
-                            <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">
-                                {systemStatus?.current_model?.replace('models/', '') || 'GEMINI-PRO'}
+                            <div className="flex gap-4">
+                                <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest shrink-0" title="Current Model">
+                                    {systemStatus?.current_model?.replace('models/', '') || 'GEMINI-PRO'}
+                                </div>
+                                {learningStatus && (
+                                    <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest hidden sm:flex gap-2" title="AI Evolution Metrics">
+                                        <span>🧠 MEM: {learningStatus.total}</span>
+                                        <span>|</span>
+                                        <span className={learningStatus.accuracy && learningStatus.accuracy > 70 ? 'text-emerald-500' : ''}>
+                                            ACC: {learningStatus.accuracy !== null ? `${learningStatus.accuracy}%` : 'N/A'}
+                                        </span>
+                                    </div>
+                                )}
                             </div>
-                            <div className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest">
-                                {systemStatus?.remaining_requests || '0'} REQUESTS LEFT
+                            <div className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest shrink-0 text-right">
+                                {systemStatus?.remaining_requests || '0'} REQ LEFT
                             </div>
                         </div>
                     </div>

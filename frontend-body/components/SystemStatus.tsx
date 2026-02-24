@@ -12,6 +12,11 @@ export const SystemStatus = () => {
   const [upgrading, setUpgrading] = useState(false);
   const [upgradeMessage, setUpgradeMessage] = useState<string | null>(null);
 
+  // [Phase B] Growth state
+  const [lessons, setLessons] = useState<any[]>([]);
+  const [growthStats, setGrowthStats] = useState<{ accuracy: number | null, judged: number } | null>(null);
+  const [loadingLessons, setLoadingLessons] = useState(false);
+
   // 1. 初始化檢查
   const checkHealth = async () => {
     try {
@@ -28,6 +33,24 @@ export const SystemStatus = () => {
     const timer = setInterval(checkHealth, 60000);
     return () => clearInterval(timer);
   }, []);
+
+  // Fetch AI Growth lessons when modal opens
+  useEffect(() => {
+    if (isModalOpen && lessons.length === 0) {
+      setLoadingLessons(true);
+      cortex.brain.growth.getLessons(5).then(res => {
+        setLessons(res.lessons || []);
+        setGrowthStats({
+          accuracy: res.prediction_accuracy_pct,
+          judged: res.judged_decisions
+        });
+      }).catch(err => {
+        console.error("Failed to load growth lessons", err);
+      }).finally(() => {
+        setLoadingLessons(false);
+      });
+    }
+  }, [isModalOpen, lessons.length]);
 
   // 2. 觸發進化
   const handleUpgrade = async () => {
@@ -106,6 +129,47 @@ export const SystemStatus = () => {
                     {status.remaining_requests ?? "Unknown"}
                   </span>
                 </div>
+              </div>
+
+              {/* AI Growth Statistics */}
+              <div className="flex flex-col bg-slate-800/50 p-4 rounded-xl border border-slate-700">
+                <div className="flex justify-between items-center mb-1">
+                  <span className="text-slate-400 text-xs font-medium uppercase tracking-wider flex items-center gap-2">
+                    <Brain size={12} /> AI Growth Metrics
+                  </span>
+                  {growthStats && growthStats.accuracy !== null && (
+                    <span className="text-[10px] items-center flex gap-1 font-bold border border-indigo-900/50 bg-indigo-950/30 px-2 py-0.5 rounded-md text-indigo-400">
+                      <Zap size={10} />
+                      {growthStats.accuracy}% Match Rate ({growthStats.judged} evaluated)
+                    </span>
+                  )}
+                </div>
+
+                {loadingLessons ? (
+                  <div className="text-xs text-slate-500 italic py-2 text-center animate-pulse">Reading Core Memories...</div>
+                ) : lessons.length > 0 ? (
+                  <div className="space-y-3 mt-3 max-h-40 overflow-y-auto pr-2 custom-scrollbar">
+                    {lessons.map((lesson, idx) => (
+                      <div key={idx} className="bg-slate-900/40 border border-slate-700/50 p-3 rounded-lg flex flex-col gap-2">
+                        <div className="flex justify-between items-start gap-2">
+                          <span className="text-[10px] text-slate-500 font-mono leading-tight flex-1">
+                            <span className="text-slate-400">Context:</span> {lesson.decision_context}
+                          </span>
+                          {lesson.prediction_match !== null && (
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${lesson.prediction_match ? 'bg-emerald-950/50 text-emerald-500 border border-emerald-900' : 'bg-amber-950/50 text-amber-500 border border-amber-900'}`}>
+                              {lesson.prediction_match ? 'Hit' : 'Miss'}
+                            </span>
+                          )}
+                        </div>
+                        {lesson.lessons_learned ? (
+                          <p className="text-xs text-slate-300 bg-slate-800/30 p-2 rounded italic border-l-2 border-indigo-500/50">"{lesson.lessons_learned}"</p>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-500 italic py-2 mt-2 text-center border border-slate-700/30 rounded-lg bg-slate-900/20">No growth logs recorded yet.</div>
+                )}
               </div>
 
               {/* 升級路徑 */}

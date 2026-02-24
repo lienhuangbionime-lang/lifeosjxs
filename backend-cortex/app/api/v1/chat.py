@@ -38,8 +38,8 @@ Your goal is to help the user manage their projects, clarify their thoughts, and
 - GLASS BOX: Expose your reasoning layer implicitly in your output structure.
 """
 
-def build_system_prompt(db, memory_context: str = "") -> str:
-    """Builds the system prompt with active projects, pending tasks, memories, and short-term memory injected."""
+def build_system_prompt(db, memory_context: str = "", growth_context: str = "") -> str:
+    """Builds the system prompt with active projects, pending tasks, growth lessons, memories, and short-term memory injected."""
     recent_events = ""
     try:
         # Try both relative path and absolute fallback
@@ -110,6 +110,9 @@ def build_system_prompt(db, memory_context: str = "") -> str:
 【待辦任務（Pending Tasks）】
 {active_tasks_str}
 
+【AI 核心成長記憶 (Related Lessons)】
+{growth_context if growth_context else "No relevant past lessons found."}
+
 【最相關的記憶片段】
 {memory_context if memory_context else "No relevant records found. Ask to create one if needed."}
 
@@ -179,7 +182,28 @@ async def stream_chat(request: Request, payload: ChatRequest):
         )
         memory_context = format_memories_for_context(relevant_memories)
 
-        system_instruction = build_system_prompt(db, memory_context)
+        # [v3.6 P3] Semantic Growth Logs Injection
+        growth_context = ""
+        if db:
+            try:
+                from app.services.embedder import generate_embedding
+                query_embedding = await generate_embedding(payload.message)
+                if query_embedding:
+                    res = db.rpc("match_growth_logs", {
+                        "query_embedding": query_embedding,
+                        "match_threshold": 0.4,
+                        "match_count": 3
+                    }).execute()
+                    lessons = res.data or []
+                    if lessons:
+                        lines = []
+                        for idx, l in enumerate(lessons):
+                            lines.append(f"[{idx+1}] Context: {l.get('decision_context')} -> Lesson: {l.get('lessons_learned')}")
+                        growth_context = "\n".join(lines)
+            except Exception as e:
+                logger.warning(f"[WARN] Failed to fetch growth logs: {e}")
+
+        system_instruction = build_system_prompt(db, memory_context, growth_context)
         
         # [v3.6] Cortex Function Calling Tools
         def create_task(title: str, priority: int = 1) -> str:

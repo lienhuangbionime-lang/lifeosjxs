@@ -102,6 +102,19 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
         
         insert_res = supabase.table("memories").insert(new_memory).execute()
         
+        # [P3-3] Log to cortex_growth_logs as a lesson learned
+        try:
+            supabase.table("cortex_growth_logs").insert({
+                "decision_context": f"Daily Subconscious Reflection on {get_current_iso_taipei()[:10]}",
+                "options_provided": {"analyzed_memories": len(memories)},
+                "user_choice": "Autonomous Synthesis",
+                "lessons_learned": insight_text,
+                "embedding": embedding
+            }).execute()
+            logger.info("🧠 [Subconscious] Reflection insight stored in growth logs.")
+        except Exception as _g_err:
+            logger.warning(f"[WARN] Failed to insert subconscious insight into growth logs: {_g_err}")
+
         if insert_res.data:
             logger.info("🧠 [Subconscious] Reflection successfully integrated into LifeOS.")
             return insert_res.data[0]
