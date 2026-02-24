@@ -32,9 +32,10 @@ async def generate_embedding(text: str, task_type: str = "retrieval_document") -
             logger.error("[ERROR] gemini_client not configured")
             return None
 
-        # Generate embedding using google.genai SDK (v1)
+        # Generate embedding using google.genai SDK
+        # text-embedding-004 deprecated 2026-01-14, replaced by gemini-embedding-001
         result = gemini_client.models.embed_content(
-            model="text-embedding-004",
+            model="gemini-embedding-001",
             contents=text,
             config=types.EmbedContentConfig(
                 task_type="RETRIEVAL_DOCUMENT" if task_type == "retrieval_document" else "RETRIEVAL_QUERY",

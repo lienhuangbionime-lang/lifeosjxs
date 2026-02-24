@@ -151,29 +151,47 @@ async def get_node_context(http_request: Request, label: str):
         from app.services.embedder import generate_embedding
         
         # 1. Generate embedding for the label
-        query_vector = await generate_embedding(label)
+        query_vector = await generate_embedding(label, task_type="retrieval_query")
 
-        # 2. Call match_memories RPC for semantic similarity
-        rpc_params = {
-            "query_embedding": query_vector,
-            "match_threshold": 0.3,
-            "match_count": 10
-        }
-        
-        response = db.rpc("match_memories", rpc_params).execute()
-        related_memories = response.data or []
+        related_memories = []
 
-        # 3. Add match reason (Semantic)
-        for mem in related_memories:
-            mem["matchReason"] = {"type": "semantic", "label": "Semantic Match"}
+        # 2. Vector search (only if embedding succeeded)
+        if query_vector:
+            rpc_params = {
+                "query_embedding": query_vector,
+                "match_threshold": 0.3,
+                "match_count": 10
+            }
+            response = db.rpc("match_memories", rpc_params).execute()
+            related_memories = response.data or []
+            for mem in related_memories:
+                mem["matchReason"] = {"type": "semantic", "label": "Semantic Match"}
+
+        # 3. If no vector results, fallback to keyword search
+        if not related_memories:
+            logger.info(f"Vector search empty for '{label}', falling back to keyword search")
+            # Search both content and ai_insights
+            resp = db.table("memories") \
+                .select("id,date,content,ai_insights,mood,focus,energy") \
+                .or_(f"content.ilike.%{label}%,ai_insights.ilike.%{label}%") \
+                .order("date", desc=True) \
+                .limit(10) \
+                .execute()
+            related_memories = resp.data or []
+            for mem in related_memories:
+                mem["matchReason"] = {"type": "keyword", "label": "Keyword Match"}
 
         return related_memories
 
     except Exception as e:
         logger.error(f"Node Context Error ({label}): {e}")
-        # Fallback to keyword search if embedding fails
         try:
-            resp = db.table("memories").select("*").ilike("content", f"%{label}%").limit(10).execute()
+            resp = db.table("memories") \
+                .select("id,date,content,ai_insights,mood") \
+                .or_(f"content.ilike.%{label}%,ai_insights.ilike.%{label}%") \
+                .order("date", desc=True) \
+                .limit(10) \
+                .execute()
             return resp.data or []
         except:
             return []
