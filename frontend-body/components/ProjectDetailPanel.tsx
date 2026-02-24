@@ -1,6 +1,6 @@
 'use client';
 import React, { useEffect, useState, useRef } from 'react';
-import { X, Zap, BookOpen, Brain, CheckSquare, Circle, Loader2, ExternalLink } from 'lucide-react';
+import { X, Zap, BookOpen, Brain, CheckSquare, Circle, Loader2, ExternalLink, GitMerge, Edit2, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Project } from '@/lib/types/api-schema';
 
@@ -50,6 +50,12 @@ export const ProjectDetailPanel = ({ project, onClose, onUpdate }: ProjectDetail
     const [loadingInsight, setLoadingInsight] = useState(false);
     const [editingProgress, setEditingProgress] = useState(false);
     const [progressVal, setProgressVal] = useState(0);
+    const [editingDesc, setEditingDesc] = useState(false);
+    const [descVal, setDescVal] = useState('');
+    const [allProjects, setAllProjects] = useState<Project[]>([]);
+    const [mergeTarget, setMergeTarget] = useState('');
+    const [showMerge, setShowMerge] = useState(false);
+    const [merging, setMerging] = useState(false);
     const panelRef = useRef<HTMLDivElement>(null);
 
     const status = project?.status || 'active';
@@ -59,8 +65,10 @@ export const ProjectDetailPanel = ({ project, onClose, onUpdate }: ProjectDetail
     useEffect(() => {
         if (!project) return;
         setProgressVal(project.progress ?? 0);
+        setDescVal(project.description || '');
         setMemories([]);
         setInsight('');
+        setShowMerge(false);
 
         // Fetch related memories
         const fetchContext = async () => {
@@ -90,6 +98,16 @@ export const ProjectDetailPanel = ({ project, onClose, onUpdate }: ProjectDetail
 
         fetchContext();
         fetchInsight();
+
+        // Load all projects for merge dropdown
+        const loadProjects = async () => {
+            try {
+                const { cortex } = await import('@/lib/api/client');
+                const data = await cortex.projects.list();
+                setAllProjects((data || []).filter((p: Project) => p.id !== project.id && p.status !== 'archived'));
+            } catch { }
+        };
+        loadProjects();
     }, [project?.id]);
 
     // Click outside to close
@@ -106,6 +124,26 @@ export const ProjectDetailPanel = ({ project, onClose, onUpdate }: ProjectDetail
     const handleProgressSave = () => {
         if (project) onUpdate(project.id, { progress: progressVal });
         setEditingProgress(false);
+    };
+
+    const handleDescSave = () => {
+        if (project) onUpdate(project.id, { description: descVal });
+        setEditingDesc(false);
+    };
+
+    const handleMerge = async () => {
+        if (!mergeTarget || !project) return;
+        setMerging(true);
+        try {
+            const { cortex } = await import('@/lib/api/client');
+            await cortex.projects.merge(project.id, mergeTarget);
+            alert(`已合併！此專案的任務已轉移到目標專案。`);
+            onClose();
+        } catch (e) {
+            alert('合併失敗，請稍後再試。');
+        } finally {
+            setMerging(false);
+        }
     };
 
     if (!project) return null;
@@ -183,8 +221,37 @@ export const ProjectDetailPanel = ({ project, onClose, onUpdate }: ProjectDetail
                     <section>
                         <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-3 flex items-center gap-2">
                             <BookOpen size={11} /> 說明
+                            {!editingDesc && (
+                                <button onClick={() => setEditingDesc(true)}
+                                    className="ml-auto text-[9px] text-slate-500 hover:text-white flex items-center gap-1">
+                                    <Edit2 size={9} /> 編輯
+                                </button>
+                            )}
                         </h3>
-                        <SimpleMd text={project.description || ''} />
+                        {editingDesc ? (
+                            <div className="space-y-2">
+                                <textarea
+                                    value={descVal}
+                                    onChange={e => setDescVal(e.target.value)}
+                                    rows={6}
+                                    autoFocus
+                                    className="w-full bg-white/5 border border-cyan-500 text-slate-200 text-sm rounded-xl p-3 outline-none resize-none font-mono"
+                                    placeholder="說明這個專案的目標、背景、里程碑..."
+                                />
+                                <div className="flex gap-2">
+                                    <button onClick={handleDescSave}
+                                        className="flex items-center gap-1 px-3 py-1.5 bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 rounded-lg text-xs font-bold hover:bg-cyan-500/30">
+                                        <Check size={11} /> 儲存
+                                    </button>
+                                    <button onClick={() => { setEditingDesc(false); setDescVal(project?.description || ''); }}
+                                        className="px-3 py-1.5 text-slate-500 text-xs rounded-lg hover:bg-white/5">取消</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div onClick={() => setEditingDesc(true)} className="cursor-pointer">
+                                <SimpleMd text={project.description || ''} />
+                            </div>
+                        )}
                     </section>
 
                     {/* AI Insight */}
@@ -237,6 +304,39 @@ export const ProjectDetailPanel = ({ project, onClose, onUpdate }: ProjectDetail
                             </div>
                         ) : (
                             <p className="text-xs text-slate-600 italic">找不到相關日記（試著把專案名稱寫進日記）</p>
+                        )}
+                    </section>
+
+                    {/* Merge */}
+                    <section>
+                        <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-3 flex items-center gap-2">
+                            <GitMerge size={11} /> 合併到另一個專案
+                        </h3>
+                        {!showMerge ? (
+                            <button onClick={() => setShowMerge(true)}
+                                className="text-xs text-slate-500 hover:text-amber-400 border border-white/8 rounded-lg px-3 py-1.5 transition-colors">
+                                合併此專案...
+                            </button>
+                        ) : (
+                            <div className="space-y-2">
+                                <select
+                                    value={mergeTarget}
+                                    onChange={e => setMergeTarget(e.target.value)}
+                                    className="w-full bg-white/5 border border-amber-500/30 text-slate-300 text-sm rounded-xl px-3 py-2 outline-none">
+                                    <option value="">選擇目標專案...</option>
+                                    {allProjects.map(p => (
+                                        <option key={p.id} value={p.id}>{p.name}</option>
+                                    ))}
+                                </select>
+                                <p className="text-[10px] text-slate-500">合併後，此專案的任務和 Brain 連線將移到目標專案，此專案將標記為 Archived。</p>
+                                <div className="flex gap-2">
+                                    <button onClick={handleMerge} disabled={!mergeTarget || merging}
+                                        className="flex items-center gap-1 px-3 py-1.5 bg-amber-500/20 text-amber-400 border border-amber-500/30 rounded-lg text-xs font-bold disabled:opacity-40">
+                                        {merging ? <Loader2 size={11} className="animate-spin" /> : <GitMerge size={11} />} 確認合併
+                                    </button>
+                                    <button onClick={() => setShowMerge(false)} className="px-3 py-1.5 text-slate-500 text-xs rounded-lg hover:bg-white/5">取消</button>
+                                </div>
+                            </div>
                         )}
                     </section>
 

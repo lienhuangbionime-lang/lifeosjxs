@@ -248,31 +248,34 @@ export const cortex = {
   },
 
   // 5. 專案管理 (Project Management)
-  async createProject(data: any): Promise<any> {
-    return await fetchProxy("/api/v1/projects", {
-      method: "POST",
-      body: JSON.stringify(data),
-    });
-  },
-
-  async updateProject(id: number | string, data: any): Promise<any> {
-    return await fetchProxy(`/api/v1/projects/${id}`, {
-      method: "PATCH",
-      body: JSON.stringify(data),
-    });
-  },
-
-  async deleteProject(id: number | string): Promise<any> {
-    return await fetchProxy(`/api/v1/projects/${id}`, {
-      method: "DELETE",
-    });
-  },
-
-  async mergeProject(sourceId: number | string, targetId: number | string): Promise<any> {
-    return await fetchProxy(`/api/v1/projects/${sourceId}/merge`, {
-      method: "POST",
-      body: JSON.stringify({ target_id: targetId }),
-    });
+  projects: {
+    list: async (): Promise<any[]> => {
+      // NOTE: Using general GET for projects list
+      return await fetchProxy("/api/v1/projects/");
+    },
+    create: async (data: any): Promise<any> => {
+      return await fetchProxy("/api/v1/projects", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    update: async (id: number | string, data: any): Promise<any> => {
+      return await fetchProxy(`/api/v1/projects/${id}`, {
+        method: "PATCH",
+        body: JSON.stringify(data),
+      });
+    },
+    delete: async (id: number | string): Promise<any> => {
+      return await fetchProxy(`/api/v1/projects/${id}`, {
+        method: "DELETE",
+      });
+    },
+    merge: async (sourceId: number | string, targetId: number | string): Promise<any> => {
+      return await fetchProxy(`/api/v1/projects/${sourceId}/merge`, {
+        method: "POST",
+        body: JSON.stringify({ target_id: targetId }),
+      });
+    }
   },
 
   // 6. Prompt Management (大腦指引管理)

@@ -9,6 +9,8 @@ class ProjectUpdate(BaseModel):
     name: Optional[str] = None
     status: Optional[str] = None
     progress: Optional[int] = None
+    description: Optional[str] = None
+    parent_id: Optional[str] = None
     meta: Optional[Dict[str, Any]] = None
 
 class ProjectCreate(BaseModel):
@@ -80,10 +82,23 @@ async def merge_project(source_id: str, merge_data: ProjectMerge):
     # 2. Merge Logic
     new_tags = list(set((target.get("tags") or []) + (source.get("tags") or []) + [source["name"]]))
     
-    # Update Target
+    # Update Target tags
     supabase.table("projects").update({"tags": new_tags}).eq("id", target_id).execute()
     
+    # Migrate Tasks from source → target
+    supabase.table("tasks").update({"project_id": target_id}).eq("project_id", source_id).execute()
+    
+    # Migrate Brain Edges from source → target
+    try:
+        supabase.table("edges").update({"source": target_id}).eq("source", source_id).execute()
+        supabase.table("edges").update({"target": target_id}).eq("target", source_id).execute()
+    except Exception:
+        pass  # edges table may not exist yet — non-critical
+    
     # Archive Source
-    supabase.table("projects").update({"status": "archived", "name": f"{source['name']} (Merged)"}).eq("id", source_id).execute()
+    supabase.table("projects").update({
+        "status": "archived",
+        "name": f"{source['name']} → {target['name']}"
+    }).eq("id", source_id).execute()
 
-    return {"message": f"Merged {source['name']} into {target['name']}"}
+    return {"message": f"Merged {source['name']} into {target['name']}", "tasks_migrated": True}
