@@ -46,7 +46,7 @@ export default function Home() {
         // Map backend schema to frontend LogEntry interface
         const mappedLogs = rawLogs.map((log: any) => ({
           ...log,
-          note: log.content || '',
+          note: log.content || log.ai_insights || '',
           metrics: {
             mood: log.mood || 5,
             focus: log.focus || 5,
