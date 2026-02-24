@@ -45,7 +45,7 @@ export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: { mainNod
                 const results = await cortex.brain.getNodeContext(label);
                 const mapped = results.map(r => ({
                     ...r,
-                    note: r.content || '',
+                    note: r.content || r.ai_insights || '',
                     matchReason: r.matchReason || { type: 'semantic', label: 'Semantic Match' }
                 }));
                 setDynamicLogs(mapped);

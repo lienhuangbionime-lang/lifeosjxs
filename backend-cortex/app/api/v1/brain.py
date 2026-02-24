@@ -144,7 +144,7 @@ async def get_node_context(http_request: Request, label: str):
         import re
         # Check if label is a specific date YYYY-MM-DD
         if re.match(r'^\d{4}-\d{2}-\d{2}$', label):
-            resp = db.table("memories").select("id,date,content,ai_insights,mood").eq("date", label).execute()
+            resp = db.table("memories").select("id,date,content,ai_insights,mood,focus,energy").eq("date", label).execute()
             if resp.data:
                 m = resp.data[0]
                 content = m.get("ai_insights") or m.get("content") or ""
@@ -153,6 +153,8 @@ async def get_node_context(http_request: Request, label: str):
                     "date": m.get("date"),
                     "content": content,
                     "mood": m.get("mood"),
+                    "focus": m.get("focus"),
+                    "energy": m.get("energy"),
                     "matchReason": {"type": "date_match", "label": "Exact Date Match"}
                 }]
             return []
@@ -197,6 +199,8 @@ async def get_node_context(http_request: Request, label: str):
                             "date": full_mem.get("date") or rpc_mem.get("metadata", {}).get("date", "Unknown"),
                             "content": content,
                             "mood": full_mem.get("mood"),
+                            "focus": full_mem.get("focus"),
+                            "energy": full_mem.get("energy"),
                             "matchReason": {"type": "semantic", "label": f"Semantic Match ({rpc_mem.get('similarity', 0):.2f})"}
                         })
 

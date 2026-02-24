@@ -21,7 +21,7 @@ export const EntryDetailModal = ({ entry, isOpen, onClose, onSave, onDelete }: E
     useEffect(() => {
         if (entry) {
             // @ts-ignore
-            setContent(entry.note || entry.content || '');
+            setContent(entry.note || entry.content || entry.ai_insights || '');
             setIsEditing(false);
         }
     }, [entry]);
