@@ -23,6 +23,16 @@ class ProjectCreate(BaseModel):
 class ProjectMerge(BaseModel):
     target_id: str
 
+@router.get("/")
+async def list_projects(status: Optional[str] = None):
+    supabase = get_supabase_client()
+    query = supabase.table("projects").select("*")
+    if status:
+        query = query.eq("status", status)
+    
+    response = query.order("created_at", desc=True).execute()
+    return response.data
+
 @router.post("/")
 async def create_project(project: ProjectCreate):
     supabase = get_supabase_client()
