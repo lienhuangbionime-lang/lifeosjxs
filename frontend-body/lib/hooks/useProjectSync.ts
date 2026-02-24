@@ -63,7 +63,7 @@ export const useProjectSync = () => {
         setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
 
         try {
-            await cortex.updateProject(id, data);
+            await cortex.projects.update(id, data);
         } catch (err) {
             console.error("Update Failed", err);
             setProjects(previousProjects); // Rollback
@@ -78,7 +78,7 @@ export const useProjectSync = () => {
         setProjects(prev => prev.filter(p => p.id !== id));
 
         try {
-            await cortex.deleteProject(id);
+            await cortex.projects.delete(id);
         } catch (err) {
             console.error("Delete Failed", err);
             setProjects(previousProjects); // Rollback
@@ -93,7 +93,7 @@ export const useProjectSync = () => {
         setProjects(prev => prev.map(p => p.id === sourceId ? { ...p, status: 'archived' } : p));
 
         try {
-            await cortex.mergeProject(sourceId, targetId);
+            await cortex.projects.merge(sourceId, targetId);
             // Re-fetch to get updated target? Or just assume success.
             // Ideally we should re-fetch or return updated data from API.
         } catch (err) {
