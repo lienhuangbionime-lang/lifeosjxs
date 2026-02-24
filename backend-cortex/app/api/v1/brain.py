@@ -148,6 +148,22 @@ async def get_node_context(http_request: Request, label: str):
         raise HTTPException(status_code=503, detail="Database unavailable")
 
     try:
+        import re
+        # Check if label is a specific date YYYY-MM-DD
+        if re.match(r'^\d{4}-\d{2}-\d{2}$', label):
+            resp = db.table("memories").select("id,date,content,ai_insights,mood").eq("date", label).execute()
+            if resp.data:
+                m = resp.data[0]
+                content = m.get("ai_insights") or m.get("content") or ""
+                return [{
+                    "id": m["id"],
+                    "date": m.get("date"),
+                    "content": content,
+                    "mood": m.get("mood"),
+                    "matchReason": {"type": "date_match", "label": "Exact Date Match"}
+                }]
+            return []
+
         from app.services.embedder import generate_embedding
         
         # 1. Generate embedding for the label
