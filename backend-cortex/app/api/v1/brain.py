@@ -121,13 +121,6 @@ async def get_brain_graph(http_request: Request, limit: int = 500):
                 if p['name'] in content:
                     add_link(date_id, p['id'], 3)
 
-            for i in range(len(processed_tags)):
-                for j in range(i + 1, len(processed_tags)):
-                    t1 = processed_tags[i]
-                    t2 = processed_tags[j]
-                    source, target = sorted([t1, t2])
-                    add_link(source, target, 0.2)
-
         return {
             "nodes": list(nodes.values()),
             "links": list(links.values())
