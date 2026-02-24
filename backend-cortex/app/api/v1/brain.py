@@ -163,9 +163,33 @@ async def get_node_context(http_request: Request, label: str):
                 "match_count": 10
             }
             response = db.rpc("match_memories", rpc_params).execute()
-            related_memories = response.data or []
-            for mem in related_memories:
-                mem["matchReason"] = {"type": "semantic", "label": "Semantic Match"}
+            rpc_results = response.data or []
+            
+            # Hydrate full memory data since RPC might return null content / no ai_insights
+            if rpc_results:
+                matched_ids = [m["id"] for m in rpc_results]
+                hydrated = db.table("memories") \
+                    .select("id,date,content,ai_insights,mood,focus,energy") \
+                    .in_("id", matched_ids) \
+                    .execute()
+                
+                # Create a lookup mapping and preserve RPC similarity order
+                mem_map = {m["id"]: m for m in (hydrated.data or [])}
+                
+                for rpc_mem in rpc_results:
+                    m_id = rpc_mem["id"]
+                    if m_id in mem_map:
+                        full_mem = mem_map[m_id]
+                        # Prefer ai_insights, fallback to content
+                        content = full_mem.get("ai_insights") or full_mem.get("content") or ""
+                        
+                        related_memories.append({
+                            "id": m_id,
+                            "date": full_mem.get("date") or rpc_mem.get("metadata", {}).get("date", "Unknown"),
+                            "content": content,
+                            "mood": full_mem.get("mood"),
+                            "matchReason": {"type": "semantic", "label": f"Semantic Match ({rpc_mem.get('similarity', 0):.2f})"}
+                        })
 
         # 3. If no vector results, fallback to keyword search
         if not related_memories:
