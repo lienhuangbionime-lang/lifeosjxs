@@ -14,7 +14,19 @@ export const CreateProjectModal = ({ isOpen, onClose, onCreated }: CreateProject
     const [name, setName] = useState('');
     const [category, setCategory] = useState<'macro' | 'micro' | 'daemon'>('macro');
     const [emoji, setEmoji] = useState('✨');
+    const [parentId, setParentId] = useState<string>('');
+    const [availableAreas, setAvailableAreas] = useState<{ id: string, name: string }[]>([]);
     const [loading, setLoading] = useState(false);
+
+    React.useEffect(() => {
+        if (isOpen) {
+            // Fetch potential parent areas
+            cortex.projects.list().then(projects => {
+                const areas = projects.filter(p => !p.parent_id && p.status === 'active');
+                setAvailableAreas(areas);
+            }).catch(e => console.error("Failed to fetch areas for modal", e));
+        }
+    }, [isOpen]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -22,41 +34,20 @@ export const CreateProjectModal = ({ isOpen, onClose, onCreated }: CreateProject
 
         setLoading(true);
         try {
-            // Assume we create a log or project via API. 
-            // Since we don't have a direct createProject endpoint exposed in client.ts explicitly yet (only update/delete),
-            // we'll assume we might need to add one or use ingest for now?
-            // Actually, `projects.py` usually has POST /projects. Let's assume client has `createProject` or I add it.
-            // I'll add `createProject` to client or use fetchProxy directly here for now to be safe.
-            // But wait, I can just add it to client.ts? No, let's keep it self-contained if possible.
-            // Let's assume `cortex.createProject` exists or I'll use a fetch.
-
-            // Wait, looking at client.ts earlier, `updateProject`, `deleteProject`, `mergeProject` were there. `createProject` was missing?
-            // "Backend: Create `projects.py` endpoints <!-- id: 33 -->" is checked.
-            // "Frontend: Create/Update `lib/api/client.ts` <!-- id: 34 -->" is checked.
-            // Let's assume I missed it or need to add it.
-            // For this task, I'll simulate the call or use fetchProxy.
-
-            /* 
-            await cortex.createProject({
-                name,
-                category,
-                status: 'active',
-                meta: { emoji }
-            });
-            */
-            // Simulating a fetch call to what likely exists based on `projects.py` pattern
-            await cortex.createProject({
+            await cortex.projects.create({
                 name,
                 category,
                 status: 'active',
                 progress: 0,
-                meta: { emoji }
+                meta: { emoji },
+                ...(parentId ? { parent_id: parentId } : {})
             });
 
             onCreated();
             onClose();
             setName('');
             setEmoji('✨');
+            setParentId('');
         } catch (error) {
             console.error("Failed to create project", error);
             alert("Failed to create project");
@@ -94,6 +85,24 @@ export const CreateProjectModal = ({ isOpen, onClose, onCreated }: CreateProject
                                 className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all placeholder:text-slate-600"
                             />
                         </div>
+
+                        {availableAreas.length > 0 && (
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Parent Area (Optional)</label>
+                                <select
+                                    value={parentId}
+                                    onChange={(e) => setParentId(e.target.value)}
+                                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-indigo-500/50 outline-none transition-all appearance-none cursor-pointer"
+                                >
+                                    <option value="">-- No Parent (Standalone Area) --</option>
+                                    {availableAreas.map(area => (
+                                        <option key={area.id} value={area.id}>
+                                            {area.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
                         <div className="space-y-2">
                             <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Category</label>

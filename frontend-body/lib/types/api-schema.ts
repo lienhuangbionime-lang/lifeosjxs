@@ -7,6 +7,7 @@ export interface Project {
   updated_at?: string;
   name: string;
   description?: string;
+  parent_id?: string;
   category?: 'macro' | 'micro' | 'daemon';
   status: 'active' | 'archived' | 'completed' | 'idea' | 'on_hold';
   progress: number;

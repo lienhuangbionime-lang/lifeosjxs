@@ -61,6 +61,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
     }, [supabase]);
 
     const filteredProjects = projects.filter(p => filter === 'all' || p.status === filter);
+    const rootProjects = filteredProjects.filter(p => !p.parent_id || !filteredProjects.some(parent => parent.id === p.parent_id));
 
     // --- Actions ---
 
@@ -68,7 +69,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
         try {
             // Optimistic Update
             setProjects(prev => prev.map(p => p.id === id ? { ...p, ...data } : p));
-            await cortex.updateProject(id, data);
+            await cortex.projects.update(id, data);
             showToast("Project updated");
         } catch (e) {
             showToast("Update failed", "error");
@@ -81,7 +82,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
 
         try {
             setProjects(prev => prev.filter(p => p.id !== id));
-            await cortex.deleteProject(id);
+            await cortex.projects.delete(id);
             showToast("Project deleted");
         } catch (e) {
             showToast("Delete failed", "error");
@@ -122,7 +123,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
 
             if (window.confirm(`Merge "${source.name}" into "${target.name}"? This will archive the source project.`)) {
                 try {
-                    await cortex.mergeProject(mergeSourceId, id);
+                    await cortex.projects.merge(mergeSourceId, id);
                     showToast("Projects merged successfully");
                     setIsMergeMode(false);
                     setMergeSourceId(null);
@@ -153,7 +154,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
             const executeMerge = async () => {
                 try {
                     // Call the real merge API
-                    await cortex.mergeProject(sourceId, targetId);
+                    await cortex.projects.merge(sourceId, targetId);
                     showToast("Projects merged successfully");
                     fetchProjects(); // Refresh UI to show archived/merged state
                 } catch (e) {
@@ -229,22 +230,52 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
                 onUpdate={handleUpdate}
             />
 
-            {/* Nomad List Style Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {filteredProjects.map((proj) => (
-                    <ProjectCard
-                        key={proj.id}
-                        project={proj}
-                        isSelectionMode={isMergeMode}
-                        isSelected={proj.id === mergeSourceId}
-                        onSelect={handleCardSelect}
-                        onUpdate={handleUpdate}
-                        onDelete={handleDelete}
-                        onOpen={(p) => setSelectedProject(p)}
-                        onDragStart={handleDragStart}
-                        onDrop={handleDrop}
-                    />
-                ))}
+            {/* Hierarchical Grid */}
+            <div className="flex flex-col gap-12">
+                {rootProjects.map((rootProj) => {
+                    const children = filteredProjects.filter(p => p.parent_id === rootProj.id);
+                    return (
+                        <div key={rootProj.id} className="flex flex-col gap-6 relative">
+                            {/* Area / Root Project */}
+                            <div className="w-full sm:w-1/2 md:w-1/2 lg:w-1/3 xl:w-1/4">
+                                <ProjectCard
+                                    project={rootProj}
+                                    isSelectionMode={isMergeMode}
+                                    isSelected={rootProj.id === mergeSourceId}
+                                    onSelect={handleCardSelect}
+                                    onUpdate={handleUpdate}
+                                    onDelete={handleDelete}
+                                    onOpen={(p) => setSelectedProject(p)}
+                                    onDragStart={handleDragStart}
+                                    onDrop={handleDrop}
+                                />
+                            </div>
+
+                            {/* Children Projects */}
+                            {children.length > 0 && (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 ml-4 md:ml-12 pl-4 md:pl-8 border-l-2 border-slate-800/60">
+                                    {children.map(child => (
+                                        <div key={child.id} className="relative">
+                                            {/* Branch connection visual */}
+                                            <div className="absolute top-1/2 -left-4 md:-left-8 w-4 md:w-8 h-[2px] bg-slate-800/60 -z-10" />
+                                            <ProjectCard
+                                                project={child}
+                                                isSelectionMode={isMergeMode}
+                                                isSelected={child.id === mergeSourceId}
+                                                onSelect={handleCardSelect}
+                                                onUpdate={handleUpdate}
+                                                onDelete={handleDelete}
+                                                onOpen={(p) => setSelectedProject(p)}
+                                                onDragStart={handleDragStart}
+                                                onDrop={handleDrop}
+                                            />
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
 
                 {/* Empty State */}
                 {filteredProjects.length === 0 && !loading && (

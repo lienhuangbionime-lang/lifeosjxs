@@ -38,8 +38,8 @@ Your goal is to help the user manage their projects, clarify their thoughts, and
 - GLASS BOX: Expose your reasoning layer implicitly in your output structure.
 """
 
-def build_system_prompt() -> str:
-    """Builds the system prompt with recent evolution_log entries injected as short-term memory."""
+def build_system_prompt(db, memory_context: str = "") -> str:
+    """Builds the system prompt with active projects, memories, and short-term memory injected."""
     recent_events = ""
     try:
         # Try both relative path and absolute fallback
@@ -59,14 +59,32 @@ def build_system_prompt() -> str:
     except Exception as e:
         logger.warning(f"[WARN] Could not load evolution_log: {e}")
 
-    if recent_events:
-        return f"""{_BASE_SYSTEM_PROMPT}
+    # Fetch Active Projects
+    active_projects_str = ""
+    if db:
+        try:
+            projects = db.table("projects").select("name,progress").eq("status", "active").execute().data
+            if projects:
+                active_projects_str = "\n".join(f"- {p['name']} (Progress: {p['progress']}%)" for p in projects)
+            else:
+                active_projects_str = "No active projects currently."
+        except Exception as e:
+            logger.warning(f"[WARN] Failed to fetch valid projects for prompt: {e}")
+            active_projects_str = "Fetch error."
+
+    return f"""{_BASE_SYSTEM_PROMPT}
+
+【目前的北極星（Active Projects）】
+{active_projects_str}
+
+【最相關的記憶片段】
+{memory_context if memory_context else "No relevant records found. Ask to create one if needed."}
+
 ---
 ## System Short-Term Memory (Last 5 Events)
 {recent_events}
 ---
 """
-    return _BASE_SYSTEM_PROMPT
 
 # Keep for backward compat (URL mode)
 SYSTEM_PROMPT = _BASE_SYSTEM_PROMPT
@@ -115,25 +133,24 @@ async def stream_chat(request: Request, payload: ChatRequest):
              role = "user" if msg.role == "user" else "model"
              gemini_history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg.content)]))
              
-        chat = req_gemini.aio.chats.create(model=model_name, config=types.GenerateContentConfig(system_instruction=build_system_prompt()))
+        # [v3.5 Phase 2] RAG Memory Injection
+        from app.services.rag import hybrid_search, format_memories_for_context
+        from app.core.database import get_supabase_client
+        db = get_supabase_client(request)
+        
+        # Search for relevant memories before creating chat instance
+        relevant_memories = await hybrid_search(
+            query=request.message,
+            limit=5,
+            similarity_threshold=0.4
+        )
+        memory_context = format_memories_for_context(relevant_memories)
+
+        system_instruction = build_system_prompt(db, memory_context)
+        chat = req_gemini.aio.chats.create(model=model_name, config=types.GenerateContentConfig(system_instruction=system_instruction))
         
         async def event_generator():
             try:
-                # [v3.5 Phase 2] RAG Memory Injection
-                from app.services.rag import hybrid_search, format_memories_for_context
-                
-                # Search for relevant memories
-                relevant_memories = await hybrid_search(
-                    query=request.message,
-                    limit=5,
-                    similarity_threshold=0.4
-                )
-                
-                # Format memories for context
-                memory_context = format_memories_for_context(relevant_memories)
-                
-                # Construct full prompt — use fresh system prompt with short-term memory
-                dynamic_prompt = build_system_prompt()
                 if request.url_context:
                     # URL Discussion Mode
                     url_data = request.url_context
@@ -146,22 +163,15 @@ Type: {url_data.get('type')}
 ### Content:
 {url_data.get('content')}
 """
-                    full_input = f"{URL_DISCUSSION_PROMPT}\n{url_content_block}\n\n"
-                    
-                    if memory_context:
-                        full_input += f"## User Context (Memories)\n{memory_context}\n\n"
-                        
-                    full_input += f"User: {request.message}"
+                    full_input = f"{URL_DISCUSSION_PROMPT}\n{url_content_block}\n\nUser: {request.message}"
                     logger.info(f"[OK] URL Discussion Mode: {url_data.get('title')}")
 
                 else:
-                    # Standard Chat Mode
-                    if memory_context:
-                        full_input = f"{SYSTEM_PROMPT}\n\n{memory_context}\n\nUser: {request.message}"
+                    # Standard Chat Mode (Memories and Projects already injected into system_instruction)
+                    full_input = f"User: {request.message}"
+                    if relevant_memories:
                         logger.info(f"[OK] Injected {len(relevant_memories)} memories into context")
                     else:
-                        # Explicitly tell the AI there is NO data to prevent hallucinations
-                        full_input = f"{SYSTEM_PROMPT}\n\n## Relevant Context\n[NO RELEVANT MEMORIES FOUND IN DATABASE FOR THIS QUERY]\n\nUser: {request.message}"
                         logger.info("[INFO] No relevant memories found for this query")
                 
                 try:
