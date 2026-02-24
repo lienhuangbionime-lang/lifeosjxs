@@ -27,6 +27,7 @@ from app.api.v1 import url_fetch as url_fetch_router_mod
 from app.api.v1 import crystallize as crystallize_router_mod
 from app.api.v1 import tasks as tasks_router_mod
 from app.api.v1 import subconscious as subconscious_router_mod
+from app.api.v1 import growth as growth_router_mod
 from app.core.scheduler import subconscious_scheduler
 
 # Logging
@@ -83,6 +84,7 @@ app.include_router(url_fetch_router_mod.router, prefix="/api/v1/url", tags=["Too
 app.include_router(crystallize_router_mod.router, prefix="/api/v1/brain", tags=["Brain"]) # Same prefix as brain for now or specialized
 app.include_router(tasks_router_mod.router, prefix="/api/v1/tasks", tags=["Tasks"])
 app.include_router(subconscious_router_mod.router, prefix="/api/v1/subconscious", tags=["Subconscious"])
+app.include_router(growth_router_mod.router, prefix="/api/v1/growth", tags=["Growth"])
 
 
 # 根路徑檢查

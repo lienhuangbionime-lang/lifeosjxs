@@ -201,23 +201,28 @@ export const cortex = {
     // [Phase B] AI Self-Reflection — Decision Logging
     growth: {
       logDecision: async (payload: {
-        context: string;
-        options: Record<string, string>;
+        decision_context: string;
+        options_provided: Record<string, string>;
         user_choice: string;
-        ai_prediction: string;
-        lessons?: string;
-      }): Promise<{ status: string; prediction_match: boolean }> => {
-        return await fetchProxy("/api/v1/brain/growth/log-decision", {
+        ai_prediction?: string;
+        prediction_match?: boolean;
+        lessons_learned?: string;
+      }): Promise<{ success: boolean; id: string; prediction_match: boolean | null }> => {
+        return await fetchProxy("/api/v1/growth/log-decision", {
           method: "POST",
           body: JSON.stringify(payload),
         });
       },
-      getLessons: async (limit: number = 10): Promise<{
+      getLessons: async (limit: number = 20): Promise<{
         lessons: any[];
         total: number;
-        mismatch_rate_pct: number;
+        prediction_accuracy_pct: number | null;
+        judged_decisions: number;
       }> => {
-        return await fetchProxy(`/api/v1/brain/growth/lessons?limit=${limit}`);
+        return await fetchProxy(`/api/v1/growth/lessons?limit=${limit}`);
+      },
+      search: async (q: string, limit: number = 10): Promise<{ results: any[] }> => {
+        return await fetchProxy(`/api/v1/growth/search?q=${encodeURIComponent(q)}&limit=${limit}`);
       },
     },
     getNodeContext: async (label: string): Promise<any[]> => {
