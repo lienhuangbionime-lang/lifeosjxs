@@ -248,7 +248,11 @@ async def get_node_insight(http_request: Request, label: str):
         # 2. Prepare context for Gemini
         context_snippets = "\n".join([f"- [{m.get('date')}] {m.get('content')[:150]}..." for m in memories[:5]])
         
-        sys_prompt = f"You are the LifeOS Insights Engine. Review the provided context about the concept '{label}'. Generate exactly one short, insightful sentence (in Traditional Chinese) that describes the pattern or significance of this concept in the user's life. Do not be generic. Be observational."
+        import re
+        if re.match(r'^\d{4}-\d{2}-\d{2}$', label):
+            sys_prompt = f"You are the LifeOS Insights Engine. Review the provided journal entry for the date '{label}'. Generate exactly one short, insightful sentence (in Traditional Chinese) summarizing the core theme, emotional tone, or main event of this day."
+        else:
+            sys_prompt = f"You are the LifeOS Insights Engine. Review the provided context about the concept '{label}'. Generate exactly one short, insightful sentence (in Traditional Chinese) that describes the pattern or significance of this concept in the user's life. Do not be generic. Be observational."
         
         from app.core.gemini import gemini_client, get_model, types
         

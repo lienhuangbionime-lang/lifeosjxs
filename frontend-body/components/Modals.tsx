@@ -37,7 +37,7 @@ export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: { mainNod
             return;
         }
 
-        const label = mainNode.id || mainNode.label;
+        const label = mainNode.label || mainNode.id;
 
         const fetchContext = async () => {
             setIsLoading(true);
@@ -77,7 +77,7 @@ export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: { mainNod
     if (!mainNode) return null;
 
     const handleDelete = async () => {
-        const nodeLabel = mainNode.id || mainNode.label;
+        const nodeLabel = mainNode.label || mainNode.id;
         if (!confirm(`確定要從大腦中刪除「${nodeLabel}」及其所有關聯嗎？`)) return;
 
         setIsDeleting(true);
@@ -101,7 +101,7 @@ export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: { mainNod
             isOpen={!!mainNode}
             onClose={onClose}
             className="max-w-xl bg-slate-100"
-            title={mainNode.id || mainNode.label}
+            title={mainNode.label || mainNode.id}
         >
             <div className="flex-1 flex flex-col max-h-[75vh]">
                 <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-white shadow-sm">
@@ -162,9 +162,9 @@ export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: { mainNod
                                         <span className="text-xs font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded-lg border border-slate-100">{log.date}</span>
 
                                         <span className={`text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1 font-bold border ${log.matchReason?.type === 'semantic' ? 'bg-amber-50 text-amber-600 border-amber-100' :
-                                                log.matchReason?.type === 'tag' ? 'bg-pink-50 text-pink-600 border-pink-100' :
-                                                    log.matchReason?.type === 'date' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
-                                                        'bg-blue-50 text-blue-600 border-blue-100'
+                                            log.matchReason?.type === 'tag' ? 'bg-pink-50 text-pink-600 border-pink-100' :
+                                                log.matchReason?.type === 'date' ? 'bg-indigo-50 text-indigo-600 border-indigo-100' :
+                                                    'bg-blue-50 text-blue-600 border-blue-100'
                                             }`}>
                                             {log.matchReason?.type === 'semantic' && <Sparkles size={10} />}
                                             {log.matchReason?.type === 'tag' && <Hash size={10} />}
@@ -173,7 +173,9 @@ export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: { mainNod
                                             {log.matchReason?.label || 'Linked'}
                                         </span>
                                     </div>
-                                    <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">{log.note || log.content}</p>
+                                    <p className="text-sm text-slate-600 line-clamp-3 leading-relaxed">
+                                        {((log.note || log.content) || '').replace(/[#*\[\]`>]/g, '')}
+                                    </p>
                                 </div>
                             ))
                         ) : (
