@@ -251,20 +251,37 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
     # [FIX] Extract date from content FIRST using Python regex
     # Use (?<!\d) and (?!\d) instead of \b to avoid Unicode word boundary issues (e.g. "2/1日記")
     import re as _re_date
-    # Match YYYY-MM-DD in content
+    
+    # 1. Match YYYY-MM-DD
     _date_explicit = _re_date.search(r'(?<!\d)(\d{4}-\d{2}-\d{2})(?!\d)', request.content)
+    # 2. Match YYYY年M月D日
+    _date_zh_full = _re_date.search(r'(\d{4})年(\d{1,2})月(\d{1,2})日', request.content)
+    # 3. Match M月D日 (assume current year)
+    _date_zh_short = _re_date.search(r'(?<!\d)(\d{1,2})月(\d{1,2})日', request.content)
+    # 4. Match M/D or MM/DD (assume current year)
+    _date_short = _re_date.search(r'(?<!\d)(\d{1,2})/(\d{1,2})(?!\d)', request.content)
+
     if _date_explicit:
         ingest_date = _date_explicit.group(1)
-        logger.info(f"[OK] Date extracted from content: {ingest_date}")
-    else:
-        # Match M/D or MM/DD with current year (e.g. 2/1 → 2026-02-01)
-        _date_short = _re_date.search(r'(?<!\d)(\d{1,2})/(\d{1,2})(?!\d)', request.content)
-        if _date_short:
-            year = get_today_str_taipei()[:4]  # e.g. "2026"
-            month = _date_short.group(1).zfill(2)
-            day = _date_short.group(2).zfill(2)
-            ingest_date = f"{year}-{month}-{day}"
-            logger.info(f"[OK] Short date extracted: {ingest_date}")
+        logger.info(f"[OK] Date extracted from content (YYYY-MM-DD): {ingest_date}")
+    elif _date_zh_full:
+        year = _date_zh_full.group(1)
+        month = _date_zh_full.group(2).zfill(2)
+        day = _date_zh_full.group(3).zfill(2)
+        ingest_date = f"{year}-{month}-{day}"
+        logger.info(f"[OK] Date extracted from content (YYYY年M月D日): {ingest_date}")
+    elif _date_zh_short:
+        year = get_today_str_taipei()[:4]
+        month = _date_zh_short.group(1).zfill(2)
+        day = _date_zh_short.group(2).zfill(2)
+        ingest_date = f"{year}-{month}-{day}"
+        logger.info(f"[OK] Date extracted from content (M月D日): {ingest_date}")
+    elif _date_short:
+        year = get_today_str_taipei()[:4]  # e.g. "2026"
+        month = _date_short.group(1).zfill(2)
+        day = _date_short.group(2).zfill(2)
+        ingest_date = f"{year}-{month}-{day}"
+        logger.info(f"[OK] Short date extracted (M/D): {ingest_date}")
     
     db = get_request_client(http_request)
     req_gemini = get_request_gemini_client(http_request)
