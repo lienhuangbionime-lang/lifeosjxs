@@ -33,6 +33,7 @@ from app.core.scheduler import subconscious_scheduler
 # Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("cortex.main")
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

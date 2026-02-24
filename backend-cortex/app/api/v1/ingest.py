@@ -523,10 +523,11 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
             try:
                 import sys, os as _os
                 # Resolve scoring_engine path (tools/ or sync_brain/)
-                _base = r"c:\Users\lien.huang\AppData\lifeosjxs"
+                _base = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "../../../.."))
                 for _spath in [
                     _os.path.join(_base, "tools"),
                     _os.path.join(_base, "sync_brain"),
+                    _os.path.join(_base, "app", "services"),
                 ]:
                     if _spath not in sys.path:
                         sys.path.insert(0, _spath)
@@ -557,18 +558,17 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
 
                     if delta > 2.0:
                         logger.warning(f"[WARN] Score delta {delta:.1f}: AI={ai_focus}, Engine={engine_score}. Logging to growth_logs.")
-                        if db: # Replaced supabase with db
-                            try:
-                                db.table("cortex_growth_logs").insert({
-                                    "decision_context": f"Focus scoring discrepancy on {ingest_date}",
-                                    "options_provided": {"ai_score": ai_focus, "engine_score": engine_score, "facts": proxy_facts},
-                                    "user_choice": str(engine_score),
-                                    "ai_prediction": str(ai_focus),
-                                    "prediction_match": False,
-                                    "lessons_learned": f"Focus delta={delta:.1f}. AI={ai_focus} vs Engine={engine_score}. Evidence: {calc['summary']}"
-                                }).execute()
-                            except Exception as _ge:
-                                logger.warning(f"[WARN] growth_log write failed: {_ge}")
+                        try:
+                            supabase.table("cortex_growth_logs").insert({
+                                "decision_context": f"Focus scoring discrepancy on {ingest_date}",
+                                "options_provided": {"ai_score": ai_focus, "engine_score": engine_score, "facts": proxy_facts},
+                                "user_choice": str(engine_score),
+                                "ai_prediction": str(ai_focus),
+                                "prediction_match": False,
+                                "lessons_learned": f"Focus delta={delta:.1f}. AI={ai_focus} vs Engine={engine_score}. Evidence: {calc['summary']}"
+                            }).execute()
+                        except Exception as _ge:
+                            logger.warning(f"[WARN] growth_log write failed: {_ge}")
                     else:
                         logger.info(f"[OK] Scoring aligned (delta={delta:.1f}). AI={ai_focus}, Engine={engine_score}")
             except ImportError:
