@@ -116,11 +116,18 @@ export const CardStackDashboard = ({ logs = [], onNavigate }: CardStackDashboard
         const filtered = logs.filter(l => l.date?.startsWith(dashboardMonth));
         const sorted = filtered.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-        // Tag Cloud
+        // Tag Cloud — gather from all logs this month across tags DB column OR parsed from markdown
         const tagsMap = new Map<string, number>();
         sorted.forEach(l => {
-            const tags = l.tags || (l.note?.match(/#([\w\u4e00-\u9fa5]+)/g) || []).map((t: string) => t.slice(1));
-            tags.forEach((t: string) => tagsMap.set(t, (tagsMap.get(t) || 0) + 1));
+            // Prefer the DB tags array
+            const dbTags: string[] = Array.isArray(l.tags) ? l.tags : [];
+            // Fallback: parse hashtags from note or ai_insights markdown
+            const rawText = l.note || l.ai_insights || '';
+            const parsedTags: string[] = dbTags.length > 0
+                ? []
+                : (rawText.match(/#([\w\u4e00-\u9fa5]+)/g) || []).map((t: string) => t.slice(1));
+            const allTags = [...dbTags, ...parsedTags];
+            allTags.forEach((t: string) => tagsMap.set(t, (tagsMap.get(t) || 0) + 1));
         });
         const tagCloud = Array.from(tagsMap.entries())
             .map(([name, count]) => ({ name, count }))
@@ -164,8 +171,8 @@ export const CardStackDashboard = ({ logs = [], onNavigate }: CardStackDashboard
         switch (cardId) {
             case 'overview':
                 return (
-                    <div className="space-y-6">
-                        <div className="grid grid-cols-3 gap-4">
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-3 gap-3">
                             <StatCard
                                 label="Total Entries"
                                 value={processedData.totalEntries.toString()}
@@ -186,11 +193,32 @@ export const CardStackDashboard = ({ logs = [], onNavigate }: CardStackDashboard
                             />
                         </div>
 
-                        <div className="bg-slate-800/30 rounded-2xl p-6 border border-slate-700/50 flex flex-col items-center justify-center text-center h-48">
-                            <Activity className="w-12 h-12 text-indigo-500/50 mb-4" />
-                            <h4 className="text-sm font-bold text-slate-400">System Logs Active</h4>
-                            <p className="text-xs text-slate-500 mt-2">Data is flowing into your cortex.</p>
-                        </div>
+                        {processedData.chartData.length > 0 ? (
+                            <div className="bg-slate-900/60 rounded-2xl p-4 border border-slate-700/50">
+                                <p className="text-[10px] text-slate-400 uppercase font-bold tracking-widest mb-3 flex items-center gap-2">
+                                    <TrendingUp className="w-3 h-3 text-indigo-400" /> Mood · Focus · Energy
+                                </p>
+                                <ResponsiveContainer width="100%" height={160}>
+                                    <ComposedChart data={processedData.chartData} margin={{ top: 0, right: 0, bottom: 0, left: -34 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#334155" />
+                                        <XAxis dataKey="date" tick={{ fill: '#64748b', fontSize: 9 }} tickFormatter={(v: string) => v?.slice(5) || ''} />
+                                        <YAxis domain={[0, 10]} tick={{ fill: '#64748b', fontSize: 9 }} />
+                                        <Tooltip
+                                            contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 12, fontSize: 11 }}
+                                            labelStyle={{ color: '#94a3b8' }}
+                                        />
+                                        <Area type="monotone" dataKey="metrics.mood" fill="#6366f155" stroke="#6366f1" strokeWidth={2} name="Mood" dot={false} />
+                                        <Line type="monotone" dataKey="metrics.focus" stroke="#10b981" strokeWidth={2} name="Focus" dot={false} />
+                                        <Line type="monotone" dataKey="metrics.energy" stroke="#f59e0b" strokeWidth={2} name="Energy" dot={false} strokeDasharray="4 2" />
+                                    </ComposedChart>
+                                </ResponsiveContainer>
+                            </div>
+                        ) : (
+                            <div className="bg-slate-800/30 rounded-2xl p-6 border border-slate-700/50 flex flex-col items-center justify-center text-center h-36">
+                                <Activity className="w-8 h-8 text-indigo-500/50 mb-3" />
+                                <p className="text-xs text-slate-500">這個月尚無日記資料</p>
+                            </div>
+                        )}
                     </div>
                 );
 
