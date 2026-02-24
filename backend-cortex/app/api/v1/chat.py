@@ -258,9 +258,46 @@ Type: {url_data.get('type')}
                 
                 try:
                     response = await chat.send_message_stream(full_input)
+                    
+                    # [v3.6] Agentic Tool Call Execution Loop
+                    # When Gemini emits function_calls, execute them and feed results back.
+                    pending_tool_calls = []
                     async for chunk in response:
                         if chunk.text:
                             yield chunk.text
+                        # Collect function calls emitted by Gemini
+                        if hasattr(chunk, 'function_calls') and chunk.function_calls:
+                            pending_tool_calls.extend(chunk.function_calls)
+
+                    # Process any pending tool calls after the stream ends
+                    if pending_tool_calls:
+                        tool_map = {fn.__name__: fn for fn in cortex_tools}
+                        tool_results = []
+                        for fc in pending_tool_calls:
+                            fn = tool_map.get(fc.name)
+                            if fn:
+                                logger.info(f"[Tool Call] Executing: {fc.name}({fc.args})")
+                                try:
+                                    result_str = fn(**fc.args)
+                                except Exception as te:
+                                    result_str = f"Error: {str(te)}"
+                                tool_results.append(
+                                    types.Part.from_function_response(
+                                        name=fc.name,
+                                        response={"output": result_str}
+                                    )
+                                )
+                                yield f"\n\n> **[Cortex Action]** `{fc.name}` → {result_str}\n"
+                        
+                        # Send tool results back to Gemini for a final reply
+                        if tool_results:
+                            follow_up = await chat.send_message_stream(
+                                types.Content(role="tool", parts=tool_results)
+                            )
+                            async for chunk in follow_up:
+                                if chunk.text:
+                                    yield chunk.text
+
                 except Exception as e:
                     # Check if it's a Quota Error (429)
                     if "429" in str(e) or "ResourceExhausted" in str(e) or "quota" in str(e).lower():
