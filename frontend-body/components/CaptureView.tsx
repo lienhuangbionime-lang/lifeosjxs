@@ -126,6 +126,7 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showToast, setShowToast] = useState(false);
+  const [toastMsg, setToastMsg] = useState('Neural Capture Complete');
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [detectedDate, setDetectedDate] = useState<string | null>(null); // [New] Store AI-detected date
 
@@ -165,6 +166,11 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
       }
 
       // 3. Show success toast
+      if (response.link_result && (response.link_result.completed_tasks > 0 || response.link_result.projects_linked > 0)) {
+        setToastMsg(`✅ 自動完成 ${response.link_result.completed_tasks} 個任務，推進了 ${response.link_result.projects_linked} 項專案`);
+      } else {
+        setToastMsg('Neural Capture Complete');
+      }
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
 
@@ -495,7 +501,7 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
             className="fixed bottom-8 right-8 bg-indigo-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-50"
           >
             <CheckCircle size={24} className="text-green-300" />
-            <span className="font-bold">Neural Capture Complete</span>
+            <span className="font-bold">{toastMsg}</span>
           </motion.div>
         )}
       </AnimatePresence>

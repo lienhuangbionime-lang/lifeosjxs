@@ -69,6 +69,10 @@ export interface IngestResponse {
     };
     tasks: Array<{ title: string; status: string }>;
   };
+  link_result?: {
+    completed_tasks: number;
+    projects_linked: number;
+  };
 }
 
 /* --- Private Helper (神經傳導物質) --- */

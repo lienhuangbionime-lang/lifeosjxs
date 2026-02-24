@@ -233,6 +233,90 @@ Markdown 結構固定如下，不可增減欄位：
 記住：你是秩序引擎，不是心理諮商師。
 """
 
+async def auto_link_tasks_projects(content: str, db, http_request: Request) -> dict:
+    """自動比對日記內容，標記已完成的現有任務，並更新專案活躍狀態。"""
+    try:
+        # 1. Fetch active tasks and projects
+        tasks_res = db.table("tasks").select("id,title,project_id").eq("status", "todo").execute()
+        proj_res = db.table("projects").select("id,name").in_("status", ["active"]).execute()
+        
+        active_tasks = tasks_res.data or []
+        active_projects = proj_res.data or []
+
+        if not active_tasks and not active_projects:
+            return {"completed_tasks": 0, "projects_linked": 0}
+
+        # 2. Ask Gemini to match
+        from app.core.gemini import get_request_gemini_client
+        from pydantic import BaseModel as pydantic_BaseModel
+
+        class AutoLinkResult(pydantic_BaseModel):
+            completed_task_ids: List[str]
+            mentioned_project_ids: List[str]
+
+        gemini = get_request_gemini_client(http_request)
+        
+        prompt = f"""
+分析使用者的日記內容，判斷他們「是否明確完成了」清單上的哪些任務，以及「提到了」哪些專案。
+
+【當前待辦任務清單】（JSON 陣列，包含 id 和 title）:
+{json.dumps(active_tasks, ensure_ascii=False)}
+
+【當前活躍專案清單】（JSON 陣列，包含 id 和 name）:
+{json.dumps(active_projects, ensure_ascii=False)}
+
+【使用者今日日記】:
+{content}
+
+你的任務：
+1. `completed_task_ids`: 從待辦清單中，找出使用者在日記中暗示他已經完成的任務 ID。（注意：必須是明確完成，如果只是「正在做」或「準備做」則不要納入）。
+2. `mentioned_project_ids`: 從專案清單中，找出使用者在日記中提到的專案 ID。
+
+僅回傳匹配到的 ID 字串陣列。若無任何匹配，回傳空陣列 []。
+"""
+        model = gemini.models.get(model="gemini-2.0-flash")
+        resp = gemini.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_schema": AutoLinkResult,
+                "temperature": 0.1
+            }
+        )
+        
+        result_str = resp.text
+        if result_str:
+            result = json.loads(result_str)
+            completed_ids = result.get("completed_task_ids", [])
+            mentioned_ids = result.get("mentioned_project_ids", [])
+            
+            # 3. Update DB
+            logger = logging.getLogger("cortex.api.ingest.autolink")
+            
+            # 3.1 Mark tasks done
+            for t_id in completed_ids:
+                db.table("tasks").update({"status": "done"}).eq("id", t_id).execute()
+                logger.info(f"Task marked done via auto-link: {t_id}")
+                
+            # 3.2 Update projects updated_at (to bubble them up as "focused")
+            from app.core.utils import get_current_iso_taipei
+            for p_id in mentioned_ids:
+                db.table("projects").update({"updated_at": get_current_iso_taipei()}).eq("id", p_id).execute()
+                logger.info(f"Project updated_at bumped via auto-link: {p_id}")
+                
+            return {
+                "completed_tasks": len(completed_ids),
+                "projects_linked": len(mentioned_ids)
+            }
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        logging.getLogger("cortex").error(f"Auto-link failed: {e}")
+        
+    return {"completed_tasks": 0, "projects_linked": 0}
+
 # 定義請求格式
 class IngestRequest(BaseModel):
     content: str
@@ -697,11 +781,21 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
             except Exception as db_e:
                 logger.error(f"❌ Database Operation Failed: {db_e}")
 
-        # 4. 回傳給前端
+        # --- 7. Diary × Project Auto-Linking (P2/P3) ---
+        link_result = {"completed_tasks": 0, "projects_linked": 0}
+        if db and not request.skipAi:
+            try:
+                link_result = await auto_link_tasks_projects(request.content, db, http_request)
+                logger.info(f"🔗 Auto-link summary: +{link_result['completed_tasks']} tasks done, +{link_result['projects_linked']} projects linked.")
+            except Exception as link_e:
+                logger.warning(f"⚠️ Auto-link failed, skipping: {link_e}")
+
+        # 8. 回傳給前端
         return {
             "success": True,
             "model": model_name,
-            "data": ai_data
+            "data": ai_data,
+            "link_result": link_result
         }
 
     except Exception as e:
