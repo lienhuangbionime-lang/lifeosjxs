@@ -112,9 +112,19 @@ async def get_recent_memories(
         loop = asyncio.get_running_loop()
         result = await loop.run_in_executor(None, query)
 
-        # supabase-py returns a dict-like object with 'data' and 'error'
-        data = getattr(result, "data", None) or result.get("data") if isinstance(result, dict) else None
-        error = getattr(result, "error", None) or result.get("error") if isinstance(result, dict) else None
+        # supabase-py returns a dict-like object or APIResponse object
+        if hasattr(result, "data"):
+            data = result.data
+        elif isinstance(result, dict):
+            data = result.get("data")
+        else:
+            data = None
+
+        error = None
+        if hasattr(result, "error"):
+            error = result.error
+        elif isinstance(result, dict):
+            error = result.get("error")
 
         if error:
             logger.error("Supabase error while fetching memories: %s", error)
