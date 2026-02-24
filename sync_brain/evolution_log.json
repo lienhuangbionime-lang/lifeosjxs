@@ -67,5 +67,12 @@
         "type": "FIX",
         "description": "Fixed 'embedder' name import error in brain.py. Resolved Gemini 404 version errors in crystallizer/brain by standardizing on get_model() factory. Updated SYSTEM_CONTEXT to v3.5.6.",
         "impact": "High - Restored semantic search and AI insight generation stability."
+    },
+    {
+        "timestamp": "2026-02-25T02:03:00+08:00",
+        "event": "Project Board Redesign + Embedding System Fix",
+        "type": "EVOLUTION",
+        "description": "Nomads.com-style ProjectCard + ProjectDetailPanel (AI insights, related memories, status switcher). Fixed deprecated text-embedding-004 → gemini-embedding-001. Fixed brain.py context fallback. Created batch_embed.py for retroactive vectorization. Updated ROADMAP with P3/P4 long-term plan.",
+        "impact": "High - Project Board now has visual identity and AI associations. Embedding pipeline unblocked."
     }
 ]
