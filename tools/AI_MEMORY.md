@@ -82,9 +82,35 @@
 - **NEVER** write a rule in `SYSTEM_CONTEXT` or commit a "fix" claiming it resolves an issue before actually testing it in the real application flow.
 - A previous AI wrote a Regex fix for `ingest.py` and claimed success in Docs, but failed to realize the async Gemini call was broken, leading to silent failures and loss of user trust. **Verify first, Document second.**
 
+### 🚫 FATAL ERROR: API Namespace Refactor Must Be Global
+
+- **Date**: 2026-02-25
+- **Mistake**: When refactoring API methods from `cortex.updateProject()` to `cortex.projects.update()`,
+  I only updated the **file I was directly editing** (`ProjectBoard.tsx`). I forgot `useProjectSync.ts`
+  also used the old API, causing a build failure.
+- **Rule**: **After any API rename/namespace change, ALWAYS run a global search before committing:**
+  ```bash
+  # Search for ALL usages of old API names before committing
+  grep -r "cortex\.updateProject\|cortex\.deleteProject\|cortex\.mergeProject\|cortex\.createProject" frontend-body/
+  ```
+- **Root cause**: I did not treat the refactor as a cross-codebase change.
+
 ---
 
-## 🔄 開發工作流程
+### 🚫 FATAL ERROR: FastAPI `request` vs `payload` Confusion
+
+- **Date**: 2026-02-25
+- **Mistake**: In `chat.py`, the function signature is `stream_chat(request: Request, payload: ChatRequest)`.
+  When I added new code inside the function, I kept writing `request.message`, `request.history`,
+  `request.url_context` — but `request` is the **HTTP Request object** (used only for headers like 
+  Gemini API key). The JSON body lives on `payload`.
+- **Rule**: In FastAPI endpoints with both `request: Request` and a Pydantic `payload`:
+  - `request` → **HTTP/headers only** (use `request.headers.get(...)`)
+  - `payload` → **JSON body fields** (`.message`, `.history`, `.model`, etc.)
+
+---
+
+
 
 ```bash
 # 開始前
@@ -104,5 +130,5 @@
 
 ---
 
-**最後更新**: 2026-02-24  
-**狀態**: Phase 15 (Crystallization) 完成 | Phase E (autonomous scheduler) 待實作
+**最後更新**: 2026-02-25  
+**狀態**: v3.5.3 完成（三層串接 + AI Context 注入）| 下一步: Phase A ~ D (Dev Intelligence)
