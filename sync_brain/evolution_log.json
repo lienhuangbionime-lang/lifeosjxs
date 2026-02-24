@@ -74,5 +74,12 @@
         "type": "EVOLUTION",
         "description": "Nomads.com-style ProjectCard + ProjectDetailPanel (AI insights, related memories, status switcher). Fixed deprecated text-embedding-004 → gemini-embedding-001. Fixed brain.py context fallback. Created batch_embed.py for retroactive vectorization. Updated ROADMAP with P3/P4 long-term plan.",
         "impact": "High - Project Board now has visual identity and AI associations. Embedding pipeline unblocked."
+    },
+    {
+        "timestamp": "2026-02-25T04:23:48+08:00",
+        "event": "Combined Projects hierarchy functionality into client.ts and UI with TodaySnapsh",
+        "type": "SESSION",
+        "description": "Combined Projects hierarchy functionality into client.ts and UI with TodaySnapshot.",
+        "impact": "Logged by session_end.py"
     }
 ]

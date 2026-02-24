@@ -39,7 +39,7 @@ Your goal is to help the user manage their projects, clarify their thoughts, and
 """
 
 def build_system_prompt(db, memory_context: str = "") -> str:
-    """Builds the system prompt with active projects, memories, and short-term memory injected."""
+    """Builds the system prompt with active projects, pending tasks, memories, and short-term memory injected."""
     recent_events = ""
     try:
         # Try both relative path and absolute fallback
@@ -61,21 +61,54 @@ def build_system_prompt(db, memory_context: str = "") -> str:
 
     # Fetch Active Projects
     active_projects_str = ""
+    projects_map = {}
     if db:
         try:
-            projects = db.table("projects").select("name,progress").eq("status", "active").execute().data
+            projects = db.table("projects").select("id,name,progress").eq("status", "active").execute().data
             if projects:
+                for p in projects:
+                    projects_map[p['id']] = p['name']
                 active_projects_str = "\n".join(f"- {p['name']} (Progress: {p['progress']}%)" for p in projects)
             else:
                 active_projects_str = "No active projects currently."
         except Exception as e:
             logger.warning(f"[WARN] Failed to fetch valid projects for prompt: {e}")
             active_projects_str = "Fetch error."
+            
+    # Fetch Active Tasks
+    active_tasks_str = ""
+    if db:
+        try:
+            tasks = db.table("tasks").select("id,title,project_id,priority").eq("status", "todo").execute().data
+            if tasks:
+                # Group by project name
+                grouped_tasks = {}
+                for t in tasks:
+                    p_name = projects_map.get(t['project_id'], "Uncategorized / No Project")
+                    if p_name not in grouped_tasks:
+                        grouped_tasks[p_name] = []
+                    grouped_tasks[p_name].append(t)
+                
+                lines = []
+                for p_name, t_list in grouped_tasks.items():
+                    lines.append(f"Project: {p_name}")
+                    for t in t_list:
+                        priority_mark = "🔥 " if t.get('priority', 0) > 1 else ""
+                        lines.append(f"  - [ ] {priority_mark}{t['title']} (ID: {t['id']})")
+                active_tasks_str = "\n".join(lines)
+            else:
+                active_tasks_str = "No pending tasks."
+        except Exception as e:
+            logger.warning(f"[WARN] Failed to fetch active tasks for prompt: {e}")
+            active_tasks_str = "Fetch error."
 
     return f"""{_BASE_SYSTEM_PROMPT}
 
 【目前的北極星（Active Projects）】
 {active_projects_str}
+
+【待辦任務（Pending Tasks）】
+{active_tasks_str}
 
 【最相關的記憶片段】
 {memory_context if memory_context else "No relevant records found. Ask to create one if needed."}
@@ -147,7 +180,56 @@ async def stream_chat(request: Request, payload: ChatRequest):
         memory_context = format_memories_for_context(relevant_memories)
 
         system_instruction = build_system_prompt(db, memory_context)
-        chat = req_gemini.aio.chats.create(model=model_name, config=types.GenerateContentConfig(system_instruction=system_instruction))
+        
+        # [v3.6] Cortex Function Calling Tools
+        def create_task(title: str, priority: int = 1) -> str:
+            """Create a new actionable task for the user in their LifeOS."""
+            if not db:
+                return "Database not connected. Cannot create task."
+            try:
+                db.table("tasks").insert({
+                    "title": title,
+                    "status": "todo",
+                    "priority": priority
+                }).execute()
+                return f"Successfully created pending task: '{title}'"
+            except Exception as e:
+                return f"Failed to create task: {str(e)}"
+
+        def mark_task_done(task_id: str) -> str:
+            """Mark a specific pending task (by ID) as done."""
+            if not db:
+                return "Database not connected. Cannot update task."
+            try:
+                db.table("tasks").update({"status": "done"}).eq("id", task_id).execute()
+                return f"Task {task_id} marked as done."
+            except Exception as e:
+                return f"Failed to mark task done: {str(e)}"
+                
+        def update_project_progress(project_name: str, progress: int) -> str:
+            """Update the completion progress percentage (0-100) of a specific active project."""
+            if not db:
+                return "Database not connected. Cannot update project."
+            try:
+                # Find project first
+                res = db.table("projects").select("id").eq("name", project_name).execute()
+                if not res.data:
+                    return f"Project '{project_name}' not found."
+                proj_id = res.data[0]["id"]
+                db.table("projects").update({"progress": progress}).eq("id", proj_id).execute()
+                return f"Project progress updated to {progress}%."
+            except Exception as e:
+                return f"Failed to update project: {str(e)}"
+
+        cortex_tools = [create_task, mark_task_done, update_project_progress] if db else []
+
+        chat = req_gemini.aio.chats.create(
+            model=model_name, 
+            config=types.GenerateContentConfig(
+                system_instruction=system_instruction,
+                tools=cortex_tools
+            )
+        )
         
         async def event_generator():
             try:
