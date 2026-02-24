@@ -307,8 +307,6 @@ export const CardStackDashboard = ({ logs = [], onNavigate }: CardStackDashboard
 
     return (
         <div className="relative h-full w-full pb-24 overflow-hidden">
-            {/* Today's Snapshot P4 */}
-            <TodaySnapshot logs={logs} />
 
             {/* Month Selector */}
             <div className="mb-6 flex justify-between items-center bg-slate-900/50 p-3 rounded-2xl border border-slate-800 backdrop-blur-sm">
