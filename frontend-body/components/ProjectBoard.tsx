@@ -1,9 +1,10 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { GitMerge, Plus, X, ArrowRight, Loader2 } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Project } from '@/lib/types/api-schema';
-import { ProjectCard } from './ProjectCard'; // Make sure this path is correct
+import { ProjectCard } from './ProjectCard';
+import { ProjectDetailPanel } from './ProjectDetailPanel';
 import { cortex } from '@/lib/api/client';
 
 interface ProjectBoardProps {
@@ -15,6 +16,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'active' | 'archived' | 'idea' | 'completed'>('active');
+    const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
     // Merge Mode State
     const [isMergeMode, setIsMergeMode] = useState(false);
@@ -220,6 +222,13 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
                 </div>
             </div>
 
+            {/* Project Detail Panel */}
+            <ProjectDetailPanel
+                project={selectedProject}
+                onClose={() => setSelectedProject(null)}
+                onUpdate={handleUpdate}
+            />
+
             {/* Nomad List Style Grid */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                 {filteredProjects.map((proj) => (
@@ -231,8 +240,9 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
                         onSelect={handleCardSelect}
                         onUpdate={handleUpdate}
                         onDelete={handleDelete}
-                        onDragStart={handleDragStart} // [NEW]
-                        onDrop={handleDrop} // [NEW]
+                        onOpen={(p) => setSelectedProject(p)}
+                        onDragStart={handleDragStart}
+                        onDrop={handleDrop}
                     />
                 ))}
 

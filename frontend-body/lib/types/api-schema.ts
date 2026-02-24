@@ -4,9 +4,11 @@
 export interface Project {
   id: string;
   created_at?: string;
+  updated_at?: string;
   name: string;
-  category?: 'macro' | 'micro' | 'daemon'; // [NEW]
-  status: 'active' | 'archived' | 'completed' | 'idea';
+  description?: string;
+  category?: 'macro' | 'micro' | 'daemon';
+  status: 'active' | 'archived' | 'completed' | 'idea' | 'on_hold';
   progress: number;
   meta: {
     vibe?: string;
