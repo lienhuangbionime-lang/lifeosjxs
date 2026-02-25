@@ -290,15 +290,15 @@ async def stream_chat(request: Request, payload: ChatRequest):
                     url_data = payload.url_context
                     url_content_block = f"""
 ## Shared Content
-Title: {url_data.get('title')}
-URL: {url_data.get('url')}
-Type: {url_data.get('type')}
+Title: {url_data.get("title", 'Unknown')}
+URL: {url_data.get("url", 'Unknown')}
+Type: {url_data.get("type", 'webpage')}
 
 ### Content:
-{url_data.get('content')}
+{url_data.get("content", 'No content available.')}
 """
                     full_input = f"{URL_DISCUSSION_PROMPT}\n{url_content_block}\n\nUser: {payload.message}"
-                    logger.info(f"[OK] URL Discussion Mode: {url_data.get('title')}")
+                    logger.info(f"[OK] URL Discussion Mode: {url_data.get('title', 'Unknown')}")
 
                 else:
                     # Standard Chat Mode (Memories and Projects already injected into system_instruction)

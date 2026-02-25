@@ -255,5 +255,26 @@
             "missed_count": 0,
             "status": "in_sync"
         }
+    },
+    {
+        "timestamp": "2026-02-26T05:13:26+08:00",
+        "event": "Relaxed Hallucination prompts and expanded RAG search to ingest Reviews and Obje",
+        "type": "SESSION",
+        "description": "Relaxed Hallucination prompts and expanded RAG search to ingest Reviews and Objects.",
+        "impact": "Logged by session_end.py"
+    },
+    {
+        "timestamp": "2026-02-25T21:14:14Z",
+        "event": "Soul Sync",
+        "type": "SYNC",
+        "description": "Synced 6 files. Missed: [].",
+        "impact": "Low",
+        "meta": {
+            "drift_count": 0,
+            "drifted_files": [],
+            "copied_count": 6,
+            "missed_count": 0,
+            "status": "in_sync"
+        }
     }
 ]
