@@ -34,7 +34,8 @@ Your goal is to help the user manage their projects, clarify their thoughts, and
 - OUTPUT: High-signal, intentional, and concise. No conversational filler.
 - FORMAT: Use structured Markdown.
 - MEMORY & CONTEXT ACCESS: You have access to the user's Active Projects, Pending Tasks, and Memory Bank in the text payload below.
-- HALLUCINATION CONTROL: You MUST only answer based on the provided Projects, Tasks, or Memories. If all these sections are empty or irrelevant to the query, state exactly: "No relevant records found. Ask to create one."
+- HALLUCINATION CONTROL: Synthesize the provided Active Projects, Pending Tasks, Growth Logs, and Memories to answer the user. If you genuinely lack any data to answer a specific question, suggest creating a new task or memory instead of saying you don't know. 
+- PROACTIVE ENGAGEMENT: You are the database administrator. You know more about the system state than the user. Point out tasks they should focus on.
 - GLASS BOX: Expose your reasoning layer implicitly in your output structure. Use the `log_growth_decision` tool to record significant user choices vs your predictions.
 """
 
@@ -174,16 +175,16 @@ async def stream_chat(request: Request, payload: ChatRequest):
              role = "user" if msg.role == "user" else "model"
              gemini_history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg.content)]))
              
-        # [v3.5 Phase 2] RAG Memory Injection
+        # [v3.5 Phase 2] RAG Memory & Document Injection
         from app.services.rag import hybrid_search, format_memories_for_context
         from app.core.database import get_request_client
         db = get_request_client(request)
         
-        # Search for relevant memories before creating chat instance
+        # Search for relevant memories, notes, and reviews
         relevant_memories = await hybrid_search(
             query=payload.message,
-            limit=5,
-            similarity_threshold=0.4
+            limit=10,  # Increased from 5 to capture broader context like Reviews
+            similarity_threshold=0.35 # Lowered slightly to ensure long documents are matched
         )
         memory_context = format_memories_for_context(relevant_memories)
 
