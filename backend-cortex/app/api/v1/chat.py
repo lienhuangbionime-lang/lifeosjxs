@@ -144,7 +144,7 @@ Your Role:
 Constraint: Zero boilerplate. Direct reference. No generic summaries.
 """
 
-@router.post("/chat")
+@router.post("/message")
 async def stream_chat(request: Request, payload: ChatRequest):
     """Stream chat with Gemini, using per-user Gemini Key if provided via X-Gemini-Key header."""
     req_gemini = get_request_gemini_client(request)
@@ -176,8 +176,8 @@ async def stream_chat(request: Request, payload: ChatRequest):
              
         # [v3.5 Phase 2] RAG Memory Injection
         from app.services.rag import hybrid_search, format_memories_for_context
-        from app.core.database import get_supabase_client
-        db = get_supabase_client(request)
+        from app.core.database import get_request_client
+        db = get_request_client(request)
         
         # Search for relevant memories before creating chat instance
         relevant_memories = await hybrid_search(

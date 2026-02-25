@@ -165,5 +165,49 @@
         "type": "SYNC",
         "description": "Synced 6 files. Missed: []. Drift check: [OK] Versions aligned: **Version**: 3.6.1 (Self-Reflection Implementation) [in_sync]",
         "impact": "Low"
+    },
+    {
+        "timestamp": "2026-02-25T22:27:00+08:00",
+        "event": "Project Semantic Synthesis & Async Core Upgrade",
+        "type": "ARCH",
+        "description": "Implemented Phase F: Structured project insights (Themes, Milestones, Observations) + Async Gemini Upgrade (aio.models) across the core. Fixed ECONNRESET server hangs and improved data organization (v3.6.3).",
+        "impact": "High - Established high-performance non-blocking AI architecture and rich project intelligence."
+    },
+    {
+        "timestamp": "2026-02-25T14:27:20Z",
+        "event": "Soul Sync",
+        "type": "SYNC",
+        "description": "Synced 6 files. Missed: [].",
+        "impact": "Low",
+        "meta": {
+            "drift_count": 1,
+            "drifted_files": [
+                "SYSTEM_CONTEXT.md"
+            ],
+            "copied_count": 6,
+            "missed_count": 0,
+            "status": "drift_resolved"
+        }
+    },
+    {
+        "timestamp": "2026-02-25T23:45:00Z",
+        "event": "Environment Error Discovery (setup_db.py)",
+        "type": "FIX",
+        "description": "Encountered a UnicodeEncodeError ('cp950' codec can't encode character '\\\\u2705' - emoji) while executing a logic verification script ('test_setup_logic.py') on a Windows terminal. Fixed by substituting emojis with ASCII-safe formatting ('[OK]', '[ERROR]') in the script and future setup files to ensure safe execution natively.",
+        "impact": "Low/Medium - Ensures CLI scripts operate robustly on Windows without specialized encoding settings."
+    },
+    {
+        "timestamp": "2026-02-26T03:00:00+08:00",
+        "event": "Glass Box UI Optimization & Async Core Fix",
+        "type": "PERF/FIX",
+        "description": "Resolved critical server hangs/timeouts by refactoring system API endpoints to use non-blocking asynchronous operations (google-genai aio SDK). Offloaded synchronous Supabase IO in usage.py to background threads via anyio.to_thread. Eliminated circular imports in gemini.py and blocking network checks in database.py.",
+        "impact": "Critical - Restored system responsiveness and successfully unblocked Glass Box (System) UI Dashboards."
+    },
+    {
+        "timestamp": "2026-02-26T03:55:00+08:00",
+        "event": "Header-First Architectural Refinement & Global Sync",
+        "type": "ARCH/SYNC",
+        "description": "Established Header-First configuration as the primary credential injection method. Harmonized vector search, memory ingestion, and background crystallization workers to propagate transient clients. Upgraded all workers to google.genai SDK. Upgraded system to v3.7.0.",
+        "impact": "Critical - Eliminated configuration-dependent 503 errors and ensured seamless operation in credential-less server environments."
     }
 ]

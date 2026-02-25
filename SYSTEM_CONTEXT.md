@@ -1,4 +1,4 @@
-# LifeOS v3.5 - System Context (AI Truth Source)
+# LifeOS v3.6 - System Context (AI Truth Source)
 
 > **Purpose**: This document serves as the **Single Source of Truth** for all AI assistants working on LifeOS. Read this FIRST before generating any code.
 
@@ -6,10 +6,10 @@
 
 ## 🎯 Project Identity
 
-**Name**: LifeOS v3.5  
+**Name**: LifeOS v3.6  
 **Philosophy**: Personal Operating System for Life Management  
-**Architecture**: Symbiotic AI + Human Intelligence  
-**Status**: Production-ready with active schema evolution
+**Architecture**: Symbiotic AI + Human Intelligence + Self-Reflection  
+**Status**: Production-ready with Autonomous Growth Engine (v3.6.3)
 
 ---
 
@@ -99,6 +99,8 @@ Raw Input → Gemini Analysis → Structured Output → Storage
 - ✅ **ALWAYS** treat LLM JSON output as untrustworthy for exact values (e.g. Dates, User Manual Scores).
 - ✅ **ALWAYS** use Python regex post-processing to force-inject user-supplied exact values into the LLM's generated markdown or metadata. Never rely solely on system prompt instructions for data exactness.
 - ✅ **ALWAYS** use strict TypeScript
+- ✅ **ALWAYS** use async/await for ALL AI model calls to prevent event loop blocking (v3.6.3 Requirement).
+- ✅ **ALWAYS** log AI decision paths to `cortex_growth_logs` for evolution analysis.
 
 ### Database
 - ✅ **ALWAYS** read `schemas/registry.json` before schema changes
@@ -449,8 +451,8 @@ Code is considered **production-ready** when:
 
 ---
 
-**Last Updated**: 2026-02-24T05:25:00+08:00  
-**Version**: 3.6.1 (Self-Reflection Implementation)  
+**Last Updated**: 2026-02-25T22:25:00+08:00  
+**Version**: 3.6.3 (Autonomous Reflection & Project Synthesis)  
 **Maintained By**: AI + Human Collaboration
 
 ---
