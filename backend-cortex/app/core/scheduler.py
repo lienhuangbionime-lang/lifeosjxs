@@ -26,8 +26,17 @@ class SubconsciousScheduler:
         # [Phase B] Growth Log Analysis — every 12 hours (offset 30 min)
         self.scheduler.add_job(
             self._run_growth_analysis,
-            trigger=IntervalTrigger(hours=12, start_date=None, jitter=1800),
+            trigger=IntervalTrigger(hours=12, jitter=1800),
             id="growth_analysis",
+            replace_existing=True,
+            misfire_grace_time=300
+        )
+
+        # [Phase E] Knowledge Decay (Brain Cleanup) — every 12 hours (offset 60 min)
+        self.scheduler.add_job(
+            self._run_knowledge_decay,
+            trigger=IntervalTrigger(hours=12, jitter=3600),
+            id="knowledge_decay",
             replace_existing=True,
             misfire_grace_time=300
         )
@@ -55,5 +64,12 @@ class SubconsciousScheduler:
             await run_growth_analysis()
         except Exception as e:
             logger.error(f"[ERROR] Scheduled growth analysis failed: {e}")
+
+    async def _run_knowledge_decay(self):
+        try:
+            from app.services.subconscious import run_knowledge_decay
+            await run_knowledge_decay()
+        except Exception as e:
+            logger.error(f"[ERROR] Scheduled knowledge decay failed: {e}")
 
 subconscious_scheduler = SubconsciousScheduler()

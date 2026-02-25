@@ -109,8 +109,8 @@ export const CardStackDashboard = ({ logs = [], onNavigate }: CardStackDashboard
     const triggerReflection = async () => {
         setIsReflecting(true);
         try {
-            const res = await fetch("/api/v1/subconscious/reflect", { method: "POST" });
-            const data = await res.json();
+            const { cortex } = await import('@/lib/api/client');
+            const data = await cortex.subconscious.reflect();
             if (data.success && data.data) {
                 setInsightText(data.data.content);
                 alert("New Insight Generated!");

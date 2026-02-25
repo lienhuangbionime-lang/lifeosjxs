@@ -6,8 +6,7 @@ Usage: Called by ingest.py and rag.py for semantic search
 
 import logging
 from typing import List, Optional
-from app.core.gemini import gemini_client
-from google.genai import types
+from app.core.gemini import gemini_client, types
 
 logger = logging.getLogger("cortex.embedder")
 
@@ -34,7 +33,7 @@ async def generate_embedding(text: str, task_type: str = "retrieval_document") -
 
         # Generate embedding using google.genai SDK
         # text-embedding-004 deprecated 2026-01-14, replaced by gemini-embedding-001
-        result = gemini_client.models.embed_content(
+        result = await gemini_client.aio.models.embed_content(
             model="gemini-embedding-001",
             contents=text,
             config=types.EmbedContentConfig(

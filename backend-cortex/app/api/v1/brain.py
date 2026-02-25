@@ -31,7 +31,7 @@ async def get_brain_graph(http_request: Request, limit: int = 500):
             projects = []
 
         try:
-            resp_nodes = db.table("nodes").select("id,label,type").execute()
+            resp_nodes = db.table("nodes").select("id,label,type,metadata").execute()
             db_nodes = resp_nodes.data or []
         except:
             db_nodes = []
@@ -249,24 +249,42 @@ async def get_node_insight(http_request: Request, label: str):
         if not memories or isinstance(memories, dict): # Check for error dict
              return {"insight": "此節點尚無足夠的上下文供分析。"}
 
-        # 2. Prepare context for Gemini
-        context_snippets = "\n".join([f"- [{m.get('date')}] {m.get('content')[:150]}..." for m in memories[:5]])
+        # 2. Prepare context for Gemini (Increased to 10 for better synthesis)
+        context_snippets = "\n".join([f"- [{m.get('date')}] {m.get('content')[:300]}..." for m in memories[:10]])
         
         import re
         if re.match(r'^\d{4}-\d{2}-\d{2}$', label):
-            sys_prompt = f"You are the LifeOS Insights Engine. Review the provided journal entry for the date '{label}'. Generate exactly one short, insightful sentence (in Traditional Chinese) summarizing the core theme, emotional tone, or main event of this day."
+            sys_prompt = """You are the LifeOS Insights Engine. 
+Review the provided journal entry for the date '{label}'. 
+Generate a short, insightful response in Traditional Chinese summarizing the day.
+"""
         else:
-            sys_prompt = f"You are the LifeOS Insights Engine. Review the provided context about the concept '{label}'. Generate exactly one short, insightful sentence (in Traditional Chinese) that describes the pattern or significance of this concept in the user's life. Do not be generic. Be observational."
+            sys_prompt = f"""You are the LifeOS Project Historian & Data Organizer.
+Review the provided context about '{label}'. 
+Your goal is to ORGANIZE and SYNTHESIZE the data into a high-signal brief.
+
+STRUCTURE:
+1. **主題與趨勢** (Core themes/patterns)
+2. **關鍵里程碑** (Highlights or progress noted)
+3. **現況觀測** (A sharp observation on the current state)
+
+FORMAT:
+- Use Markdown.
+- Use point form.
+- Be observational, not generic.
+- Keep it under 150 words.
+- Language: Traditional Chinese.
+"""
         
         from app.core.gemini import gemini_client, get_model, types
         
         model_conf = get_model("fast")
-        response = gemini_client.models.generate_content(
+        response = await gemini_client.aio.models.generate_content(
             model=model_conf["model"],
             contents=f"CONTEXT FOR '{label}':\n{context_snippets}",
             config=types.GenerateContentConfig(
                 system_instruction=sys_prompt,
-                temperature=0.7
+                temperature=0.4 # Reduced for more factual organization
             )
         )
         

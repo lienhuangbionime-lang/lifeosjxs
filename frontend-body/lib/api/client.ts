@@ -225,6 +225,16 @@ export const cortex = {
       search: async (q: string, limit: number = 10): Promise<{ results: any[] }> => {
         return await fetchProxy(`/api/v1/growth/search?q=${encodeURIComponent(q)}&limit=${limit}`);
       },
+      getScoringAnalysis: async (limit: number = 50): Promise<{
+        success: boolean;
+        avg_bias: number;
+        direction: string;
+        sample_size: number;
+        stats: { overscore_events: number; underscore_events: number };
+        recommendation: string;
+      }> => {
+        return await fetchProxy(`/api/v1/growth/analysis/scoring?limit=${limit}`);
+      },
     },
     getNodeContext: async (label: string): Promise<any[]> => {
       return await fetchProxy(`/api/v1/brain/node/${encodeURIComponent(label)}/context`);
@@ -306,10 +316,23 @@ export const cortex = {
     return await fetchProxy(`/api/v1/tasks/${query}`);
   },
 
+  async createTask(title: string, projectId?: string): Promise<any> {
+    return await fetchProxy(`/api/v1/tasks/`, {
+      method: "POST",
+      body: JSON.stringify({ title, project_id: projectId }),
+    });
+  },
+
   async completeTask(taskId: string): Promise<any> {
     return await fetchProxy(`/api/v1/tasks/${taskId}/complete`, {
       method: "POST",
     });
+  },
+
+  subconscious: {
+    reflect: async (): Promise<{ success: boolean; data?: any; message?: string }> => {
+      return await fetchProxy("/api/v1/subconscious/reflect", { method: "POST" });
+    }
   },
 
   // [New] One-Click Supabase Schema Setup — runs full LifeOS schema on user's DB

@@ -19,6 +19,7 @@ interface TodaySnapshotData {
     latestMemory: LogEntry | null;
     pendingTasksCount: number;
     focusedProject: Project | null;
+    focusedProjectTasks: any[];
 }
 
 const getRelativeTime = (dateStr?: string) => {
@@ -71,11 +72,17 @@ export const TodaySnapshot = () => {
 
                 const focusedProject = activeProjects.length > 0 ? activeProjects[0] : null;
 
+                // Extract tasks for that focused project
+                const focusedProjectTasks = focusedProject && Array.isArray(tasks)
+                    ? tasks.filter((t: any) => t.status === 'todo' && t.project_id === focusedProject.id).slice(0, 2)
+                    : [];
+
                 if (mounted) {
                     setData({
                         latestMemory,
                         pendingTasksCount,
-                        focusedProject
+                        focusedProject,
+                        focusedProjectTasks
                     });
                 }
             } catch (err) {
@@ -214,6 +221,23 @@ export const TodaySnapshot = () => {
                         </div>
                     ) : (
                         <p className="text-xs text-slate-600 italic mt-2">No active projects currently.</p>
+                    )}
+
+                    {/* FOCUSED ACTION ITEMS */}
+                    {data?.focusedProjectTasks && data.focusedProjectTasks.length > 0 && (
+                        <div className="mt-4 pt-3 border-t border-white/5">
+                            <h4 className="text-[9px] font-bold text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-1">
+                                <Target size={10} className="text-emerald-400" /> NEXT ACTIONS
+                            </h4>
+                            <div className="space-y-1.5">
+                                {data.focusedProjectTasks.map(t => (
+                                    <div key={t.id} className="text-xs text-slate-300 flex items-start gap-1.5">
+                                        <div className="mt-0.5 w-1 h-1 rounded-full bg-emerald-500 shrink-0" />
+                                        <span className="line-clamp-1">{t.title}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
                     )}
                 </div>
 

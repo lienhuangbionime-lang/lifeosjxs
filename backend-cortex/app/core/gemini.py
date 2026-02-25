@@ -14,6 +14,7 @@ try:
     from google.genai import types
 except ImportError:
     genai = None
+    types = None
 
 logger = logging.getLogger("app.core.gemini")
 
@@ -101,7 +102,7 @@ def get_model(mode: Literal["fast", "smart"] = "fast") -> Dict[str, Any]:
         logger.exception("Error in get_model: %s", e)
         return {"model": DEFAULT_FAST, "configured": False}
 
-def get_embeddings(text: str) -> list[float]:
+async def get_embeddings(text: str) -> list[float]:
     """
     Generate vector embeddings for given text using Gemini.
     Dimension: 3072 (Full Precision Protocol)
@@ -110,7 +111,7 @@ def get_embeddings(text: str) -> list[float]:
         return []
         
     try:
-        result = gemini_client.models.embed_content(
+        result = await gemini_client.aio.models.embed_content(
             model="text-embedding-004",
             contents=text,
             config=types.EmbedContentConfig(

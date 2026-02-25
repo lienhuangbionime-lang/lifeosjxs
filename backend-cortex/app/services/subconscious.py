@@ -4,7 +4,7 @@ import datetime
 from typing import List, Dict, Any, Optional
 
 from app.core.database import supabase
-from app.core.gemini import get_model, genai, get_embeddings
+from app.core.gemini import get_model, genai, get_embeddings, types, gemini_client
 from app.core.time_utils import get_current_iso_taipei
 
 logger = logging.getLogger("cortex.subconscious")
@@ -59,17 +59,11 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
         
         logger.info(f"🧠 [Subconscious] Analyzing {len(memories)} memories using {model_name}...")
         
-        # We must align with new google-genai SDK 
-        from google.genai import types
-        # Since we just initialize client in gemini.py usually, let's use the exported genai client if available, or GenerativeModel if older
-        # Assuming we migrated to google-genai, we use client.models.generate_content
-        from app.core.gemini import gemini_client
-        
         if not gemini_client:
              logger.error("Gemini client not found.")
              return None
              
-        response_model = gemini_client.models.generate_content(
+        response_model = await gemini_client.aio.models.generate_content(
             model=model_name,
             contents=full_prompt,
             config=types.GenerateContentConfig(
@@ -86,7 +80,7 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
         # 5. Store the reflection back into the database
         logger.info("🧠 [Subconscious] Insight generated. Storing to memory...")
         
-        embedding = get_embeddings(insight_text)
+        embedding = await get_embeddings(insight_text)
         
         new_memory = {
             "user_id": "default_user",
@@ -153,8 +147,6 @@ async def run_growth_analysis() -> None:
         accuracy = round(len(judged) - len(mismatches)) / max(len(judged), 1) * 100
 
         # 3. Ask Gemini to identify patterns in mistakes
-        from app.core.gemini import gemini_client
-        from google.genai import types as genai_types
         model_config = get_model("fast")
         model_name = model_config.get("model", "gemini-1.5-flash")
 
@@ -177,10 +169,10 @@ Based on these patterns, write ONE brief "lesson learned" entry (2-3 sentences m
 
 Output only the lesson text, no headers or preamble."""
 
-        response = gemini_client.models.generate_content(
+        response = await gemini_client.aio.models.generate_content(
             model=model_name,
             contents=prompt,
-            config=genai_types.GenerateContentConfig(temperature=0.3, max_output_tokens=150)
+            config=types.GenerateContentConfig(temperature=0.3, max_output_tokens=150)
         )
         lesson = (response.text or "").strip()
         if not lesson:
@@ -218,3 +210,86 @@ Output only the lesson text, no headers or preamble."""
 
     except Exception as e:
         logger.error(f"[ERROR] Growth analysis failed: {e}")
+
+async def run_knowledge_decay() -> Dict[str, Any]:
+    """
+    [Phase E] Identifies 'cold' nodes (> 30 days without mention) and marks them as archived.
+    Reduces noise in the Neural Graph and RAG context.
+    """
+    logger.info("[Subconscious] Running knowledge decay audit...")
+    try:
+        # 1. Calculate the 30-day threshold
+        threshold_days = 30
+        now = datetime.datetime.now()
+        threshold_date = (now - datetime.timedelta(days=threshold_days)).date().isoformat()
+
+        # 2. Get all active nodes (not already archived in metadata)
+        # Note: We skip 'project' type nodes as they have their own lifecycle
+        res_nodes = supabase.table("nodes").select("id, label, metadata") \
+            .neq("type", "project") \
+            .execute()
+        
+        all_nodes = res_nodes.data or []
+        active_nodes = [n for n in all_nodes if not n.get("metadata", {}).get("archived")]
+
+        if not active_nodes:
+            logger.info("[Subconscious] No active nodes found for decay audit.")
+            return {"archived_count": 0}
+
+        # 3. Get labels mentioned in memories within the last 30 days
+        res_memories = supabase.table("memories") \
+            .select("tags") \
+            .gte("date", threshold_date) \
+            .execute()
+        
+        recent_tags = set()
+        for m in (res_memories.data or []):
+            if m.get("tags"):
+                recent_tags.update(m["tags"])
+
+        # 4. Identify cold nodes
+        cold_node_ids = []
+        for node in active_nodes:
+            label = node["label"]
+            # A node is cold if its label hasn't been used in recent tags
+            if label not in recent_tags:
+                cold_node_ids.append(node["id"])
+
+        # 5. Archive cold nodes by updating metadata
+        archived_count = 0
+        for node_id in cold_node_ids:
+            # We fetch existing metadata to preserve other fields
+            node = next(n for n in active_nodes if n["id"] == node_id)
+            meta = node.get("metadata") or {}
+            meta["archived"] = True
+            meta["archived_at"] = get_current_iso_taipei()
+            
+            supabase.table("nodes").update({"metadata": meta}).eq("id", node_id).execute()
+            archived_count += 1
+
+        if archived_count > 0:
+            logger.info(f"[OK] Knowledge decay complete. Archived {archived_count} cold nodes.")
+            # Record the decay event in evolution_log
+            from pathlib import Path
+            import json
+            evo_path = Path("sync_brain/evolution_log.json")
+            if evo_path.exists():
+                with open(evo_path, "r", encoding="utf-8") as f:
+                    evo_log = json.load(f)
+                evo_log.append({
+                    "timestamp": get_current_iso_taipei(),
+                    "event": "knowledge_decay",
+                    "type": "cleanup",
+                    "description": f"Archived {archived_count} nodes that haven't been used in {threshold_days} days.",
+                    "meta": {"archived_nodes_count": archived_count}
+                })
+                with open(evo_path, "w", encoding="utf-8") as f:
+                    json.dump(evo_log, f, ensure_ascii=False, indent=2)
+        else:
+            logger.info("[Subconscious] No cold nodes identified in this cycle.")
+
+        return {"archived_count": archived_count}
+
+    except Exception as e:
+        logger.error(f"[ERROR] Knowledge decay failed: {e}")
+        return {"error": str(e)}

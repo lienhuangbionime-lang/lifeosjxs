@@ -91,6 +91,9 @@ export const NeuralGraph = memo(({ logs, onNodeClick, highlightTag }: NeuralGrap
             .join("circle")
             .attr("r", (d: any) => (d.val || 5) * 1.5)
             .attr("fill", (d: any) => {
+                // [Phase E] Archived Nodes are dimmed (Slate)
+                if (d.raw?.metadata?.archived) return NEON_PALETTE.SLATE;
+
                 if (d.group === 1 || d.group === 'log') {
                     const mood = (d.raw as any)?.metrics?.mood || 5;
                     if (mood >= 8) return NEON_PALETTE.NEON_LIME;
@@ -102,6 +105,7 @@ export const NeuralGraph = memo(({ logs, onNodeClick, highlightTag }: NeuralGrap
                 if (d.group === 'concept') return NEON_PALETTE.warning;
                 return NEON_PALETTE.primary;
             })
+            .attr("opacity", (d: any) => d.raw?.metadata?.archived ? 0.4 : 1)
             .attr("stroke", "#0a0a0a")
             .attr("stroke-width", 2)
             .style("cursor", "grab")

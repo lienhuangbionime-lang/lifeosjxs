@@ -35,11 +35,13 @@ Your goal is to help the user manage their projects, clarify their thoughts, and
 - FORMAT: Use structured Markdown.
 - MEMORY ACCESS: You have access to the user's Memory Bank via the "## Relevant Context" section below.
 - HALLUCINATION CONTROL: If the context is empty or says "NO MEMORIES FOUND", state exactly: "No relevant records found. Ask to create one."
-- GLASS BOX: Expose your reasoning layer implicitly in your output structure.
+- GLASS BOX: Expose your reasoning layer implicitly in your output structure. Use the `log_growth_decision` tool to record significant user choices vs your predictions.
 """
 
 def build_system_prompt(db, memory_context: str = "", growth_context: str = "") -> str:
     """Builds the system prompt with active projects, pending tasks, growth lessons, memories, and short-term memory injected."""
+    user_name = "Lien" # Standardizing user name
+    
     recent_events = ""
     try:
         # Try both relative path and absolute fallback
@@ -102,7 +104,9 @@ def build_system_prompt(db, memory_context: str = "", growth_context: str = "") 
             logger.warning(f"[WARN] Failed to fetch active tasks for prompt: {e}")
             active_tasks_str = "Fetch error."
 
-    return f"""{_BASE_SYSTEM_PROMPT}
+    return f"""
+你是 Cortex，{user_name} 的個人 AI 副駕。
+你的任務：根據以下脈絡回答問題，語氣直接、不廢話、具有啟發性。若發現 {user_name} 的思考盲點，請直接點出。
 
 【目前的北極星（Active Projects）】
 {active_projects_str}
@@ -110,21 +114,22 @@ def build_system_prompt(db, memory_context: str = "", growth_context: str = "") 
 【待辦任務（Pending Tasks）】
 {active_tasks_str}
 
-【AI 核心成長記憶 (Related Lessons)】
-{growth_context if growth_context else "No relevant past lessons found."}
+【Cortex 近期的學習紀錄 (Growth Logs)】
+{growth_context if growth_context else "無"}
 
 【最相關的記憶片段】
-{memory_context if memory_context else "No relevant records found. Ask to create one if needed."}
+{memory_context if memory_context else "無相關紀錄。您可以提議建立一個。"}
 
 ---
 ## System Short-Term Memory (Last 5 Events)
 {recent_events}
 ---
+{_BASE_SYSTEM_PROMPT}
 """
 
 # Keep for backward compat (URL mode)
+# System prompt templates
 SYSTEM_PROMPT = _BASE_SYSTEM_PROMPT
-
 
 URL_DISCUSSION_PROMPT = """
 [SYSTEM PROTOCOL: URL CodeSpeak Extraction Active]
@@ -133,7 +138,7 @@ You are Cortex. The user has injected an external context node (URL).
 Your Role:
 1. [SYNTHESIS]: Extract raw signal / key ideas.
 2. [MEMORY BINDING]: Connect to user context provided below.
-3. [PROVOCATION]: Generate 2-3 sharp, tension-exposing questions.
+3. [PROVOKATION]: Generate 2-3 sharp, tension-exposing questions.
 4. [CONVERGENCE]: Output a concrete, actionable angle.
 
 Constraint: Zero boilerplate. Direct reference. No generic summaries.
@@ -229,7 +234,7 @@ async def stream_chat(request: Request, payload: ChatRequest):
                 return f"Task {task_id} marked as done."
             except Exception as e:
                 return f"Failed to mark task done: {str(e)}"
-                
+
         def update_project_progress(project_name: str, progress: int) -> str:
             """Update the completion progress percentage (0-100) of a specific active project."""
             if not db:
@@ -245,7 +250,29 @@ async def stream_chat(request: Request, payload: ChatRequest):
             except Exception as e:
                 return f"Failed to update project: {str(e)}"
 
-        cortex_tools = [create_task, mark_task_done, update_project_progress] if db else []
+        def log_growth_decision(context: str, options: dict, choice: str, prediction: str = None, match: bool = None, lesson: str = None) -> str:
+            """
+            [Glass Box Protocol] Log an architectural or strategic decision. 
+            Use this AFTER presenting a Decision Matrix or when the user makes a significant choice.
+            """
+            if not db:
+                return "Database not connected. Cannot log decision."
+            try:
+                # 1. Build record
+                record = {
+                    "decision_context": context,
+                    "options_provided": options,
+                    "user_choice": choice,
+                    "ai_prediction": prediction,
+                    "prediction_match": match,
+                    "lessons_learned": lesson
+                }
+                db.table("cortex_growth_logs").insert(record).execute()
+                return f"Decision logged. Match: {match}. Calibration record updated."
+            except Exception as e:
+                return f"Failed to log decision: {str(e)}"
+
+        cortex_tools = [create_task, mark_task_done, update_project_progress, log_growth_decision] if db else []
 
         chat = req_gemini.aio.chats.create(
             model=model_name, 
@@ -302,7 +329,10 @@ Type: {url_data.get('type')}
                             if fn:
                                 logger.info(f"[Tool Call] Executing: {fc.name}({fc.args})")
                                 try:
-                                    result_str = fn(**fc.args)
+                                    if asyncio.iscoroutinefunction(fn):
+                                        result_str = await fn(**fc.args)
+                                    else:
+                                        result_str = fn(**fc.args)
                                 except Exception as te:
                                     result_str = f"Error: {str(te)}"
                                 tool_results.append(

@@ -110,30 +110,81 @@ async def get_lessons(request: Request, limit: int = 20):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/search")
-async def search_decisions(request: Request, q: str, limit: int = 10):
+@router.get("/analysis/scoring")
+async def analyze_scoring_mismatches(request: Request, limit: int = 50):
     """
-    Semantic search through past AI decisions by topic.
-    Used by build_system_prompt() to inject relevant past lessons.
+    Analyzes historical scoring discrepancies to detect structural AI bias.
+    Identifies if the AI consistently over-estimates or under-estimates scores.
     """
     db = get_supabase_client(request)
     if not db:
         raise HTTPException(status_code=503, detail="Database not connected.")
 
     try:
-        from app.services.embedder import generate_embedding
-        query_embedding = await generate_embedding(q)
-        if not query_embedding:
-            raise HTTPException(status_code=422, detail="Could not generate embedding for query.")
+        # Search for Focus scoring discrepancy events
+        res = db.table("cortex_growth_logs") \
+            .select("options_provided,ai_prediction,user_choice,prediction_match") \
+            .ilike("decision_context", "%Focus scoring discrepancy%") \
+            .order("created_at", desc=True) \
+            .limit(limit) \
+            .execute()
 
-        res = db.rpc("match_growth_logs", {
-            "query_embedding": query_embedding,
-            "match_threshold": 0.5,
-            "match_count": limit
-        }).execute()
+        logs = res.data or []
+        if not logs:
+            return {
+                "success": True,
+                "message": "No scoring discrepancies found to analyze.",
+                "bias_score": 0.0,
+                "direction": "neutral",
+                "sample_size": 0
+            }
 
-        return {"results": res.data or []}
+        total_delta = 0.0
+        overscore_count = 0
+        underscore_count = 0
+
+        for log in logs:
+            try:
+                # Based on ingest.py: 
+                # ai_score = float(focus)
+                # user_choice = str(engine_score)
+                ai_val = float(log.get("ai_prediction", 0))
+                engine_val = float(log.get("user_choice", 0))
+                
+                delta = ai_val - engine_val
+                total_delta += delta
+                
+                if delta > 0:
+                    overscore_count += 1
+                elif delta < 0:
+                    underscore_count += 1
+            except (ValueError, TypeError):
+                continue
+
+        avg_bias = total_delta / len(logs) if logs else 0.0
+        direction = "overscoring" if avg_bias > 0.5 else ("underscoring" if avg_bias < -0.5 else "neutral")
+
+        # Recommendation logic
+        recommendation = ""
+        if direction == "overscoring":
+            recommendation = "AI is too optimistic. Suggest reducing FOCUS_WEIGHTS for 'completed_milestone'."
+        elif direction == "underscoring":
+            recommendation = "AI is too pessimistic. Suggest increasing FOCUS_WEIGHTS for 'deep_work_session'."
+        else:
+            recommendation = "Scoring is balanced within acceptable margin."
+
+        return {
+            "success": True,
+            "avg_bias": round(avg_bias, 2),
+            "direction": direction,
+            "sample_size": len(logs),
+            "stats": {
+                "overscore_events": overscore_count,
+                "underscore_events": underscore_count
+            },
+            "recommendation": recommendation
+        }
 
     except Exception as e:
-        logger.error(f"[ERROR] Growth search failed: {e}")
+        logger.error(f"[ERROR] Scoring analysis failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))

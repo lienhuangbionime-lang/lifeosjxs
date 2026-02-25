@@ -1,8 +1,9 @@
 'use client';
 import React, { useEffect, useState, useRef } from 'react';
-import { X, Zap, BookOpen, Brain, CheckSquare, Circle, Loader2, ExternalLink, GitMerge, Edit2, Check } from 'lucide-react';
+import { X, Zap, BookOpen, Brain, CheckSquare, Circle, Loader2, ExternalLink, GitMerge, Edit2, Check, Network } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Project } from '@/lib/types/api-schema';
+import { TaskList } from './TaskList';
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; bar: string; bg: string }> = {
     active: { label: 'ACTIVE', color: 'text-cyan-400', bar: 'bg-cyan-500', bg: 'bg-cyan-500/10' },
@@ -16,6 +17,7 @@ interface ProjectDetailPanelProps {
     project: Project | null;
     onClose: () => void;
     onUpdate: (id: string, data: Partial<Project>) => void;
+    onJumpToGraph?: (projectName: string) => void;
 }
 
 interface RelatedMemory {
@@ -27,23 +29,58 @@ interface RelatedMemory {
 
 function SimpleMd({ text }: { text: string }) {
     if (!text) return <p className="text-slate-600 italic text-sm">尚無說明。點擊「編輯」加入...</p>;
-    // Very light render — bold+newlines
+
+    const renderText = (str: string) => {
+        // Handle **bold**
+        const parts = str.split(/(\*\*.*?\*\*)/g);
+        return parts.map((part, i) => {
+            if (part.startsWith('**') && part.endsWith('**')) {
+                return <span key={i} className="font-bold text-white/90">{part.slice(2, -2)}</span>;
+            }
+            return part;
+        });
+    };
+
     const lines = text.split('\n');
     return (
         <div className="space-y-1.5">
             {lines.map((line, i) => {
-                if (line.startsWith('### ')) return <p key={i} className="text-sm font-bold text-slate-200 mt-3">{line.slice(4)}</p>;
-                if (line.startsWith('## ')) return <p key={i} className="text-base font-black text-white mt-4">{line.slice(3)}</p>;
-                if (line.startsWith('# ')) return <p key={i} className="text-lg font-black text-white mt-4">{line.slice(2)}</p>;
-                if (line.startsWith('- ')) return <p key={i} className="text-sm text-slate-400 pl-3 before:content-['—'] before:mr-2 before:text-slate-600">{line.slice(2)}</p>;
-                if (line.trim() === '') return <div key={i} className="h-2" />;
-                return <p key={i} className="text-sm text-slate-400 leading-relaxed">{line}</p>;
+                const trimmed = line.trim();
+                if (!trimmed) return <div key={i} className="h-2" />;
+
+                // Headers
+                if (line.startsWith('### ')) return <p key={i} className="text-sm font-bold text-slate-200 mt-3">{renderText(line.slice(4))}</p>;
+                if (line.startsWith('## ')) return <p key={i} className="text-base font-black text-white mt-4">{renderText(line.slice(3))}</p>;
+                if (line.startsWith('# ')) return <p key={i} className="text-lg font-black text-white mt-4">{renderText(line.slice(2))}</p>;
+
+                // Lists
+                if (line.startsWith('- ')) {
+                    return (
+                        <div key={i} className="flex gap-2 text-sm text-slate-400 pl-1">
+                            <span className="text-slate-600 mt-1.5 shrink-0">•</span>
+                            <span className="leading-relaxed">{renderText(line.slice(2))}</span>
+                        </div>
+                    );
+                }
+
+                // Numbered Lists (1. Content)
+                const numMatch = line.match(/^(\d+\.)\s+(.*)/);
+                if (numMatch) {
+                    return (
+                        <div key={i} className="flex gap-2 text-sm text-slate-400 pl-1 mt-1">
+                            <span className="font-black text-violet-400 shrink-0 min-w-[20px]">{numMatch[1]}</span>
+                            <span className="leading-relaxed">{renderText(numMatch[2])}</span>
+                        </div>
+                    );
+                }
+
+                return <p key={i} className="text-sm text-slate-400 leading-relaxed">{renderText(line)}</p>;
             })}
         </div>
     );
 }
 
-export const ProjectDetailPanel = ({ project, onClose, onUpdate }: ProjectDetailPanelProps) => {
+export const ProjectDetailPanel = ({ project, onClose, onUpdate, onJumpToGraph }: ProjectDetailPanelProps) => {
     const [memories, setMemories] = useState<RelatedMemory[]>([]);
     const [insight, setInsight] = useState<string>('');
     const [loadingMemories, setLoadingMemories] = useState(false);
@@ -174,10 +211,19 @@ export const ProjectDetailPanel = ({ project, onClose, onUpdate }: ProjectDetail
                                 {project.name}
                             </h2>
                         </div>
-                        <button onClick={onClose}
-                            className="p-2 text-slate-500 hover:text-white hover:bg-white/10 rounded-full transition-all shrink-0">
-                            <X size={18} />
-                        </button>
+                        <div className="flex gap-1 shrink-0">
+                            {onJumpToGraph && (
+                                <button onClick={() => onJumpToGraph(project.name)}
+                                    title="View in Brain Graph"
+                                    className="p-2 text-indigo-400 hover:text-white hover:bg-indigo-500/20 rounded-full transition-all shrink-0">
+                                    <Network size={18} />
+                                </button>
+                            )}
+                            <button onClick={onClose}
+                                className="p-2 text-slate-500 hover:text-white hover:bg-white/10 rounded-full transition-all shrink-0">
+                                <X size={18} />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Progress */}
@@ -254,6 +300,11 @@ export const ProjectDetailPanel = ({ project, onClose, onUpdate }: ProjectDetail
                         )}
                     </section>
 
+                    {/* Task List */}
+                    <section>
+                        <TaskList projectId={project.id} />
+                    </section>
+
                     {/* AI Insight */}
                     <section>
                         <h3 className="text-[10px] font-black text-slate-600 uppercase tracking-widest mb-3 flex items-center gap-2">
@@ -266,7 +317,7 @@ export const ProjectDetailPanel = ({ project, onClose, onUpdate }: ProjectDetail
                             </div>
                         ) : insight ? (
                             <div className="bg-violet-500/10 border border-violet-500/20 rounded-xl p-4">
-                                <p className="text-sm text-violet-300 leading-relaxed">{insight}</p>
+                                <SimpleMd text={insight} />
                             </div>
                         ) : (
                             <p className="text-xs text-slate-600 italic">尚無 AI 洞察（需要更多日記資料）</p>

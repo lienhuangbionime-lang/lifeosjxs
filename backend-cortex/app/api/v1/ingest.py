@@ -529,18 +529,7 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
         # ---------------------------------------------------------------
         if not request.skipAi and ai_data:
             try:
-                import sys, os as _os
-                # Resolve scoring_engine path (tools/ or sync_brain/)
-                _base = _os.path.abspath(_os.path.join(_os.path.dirname(__file__), "../../../.."))
-                for _spath in [
-                    _os.path.join(_base, "tools"),
-                    _os.path.join(_base, "sync_brain"),
-                    _os.path.join(_base, "app", "services"),
-                ]:
-                    if _spath not in sys.path:
-                        sys.path.insert(0, _spath)
-
-                from scoring_engine import engine as scoring_engine
+                from app.services.scoring_engine import scoring_engine
 
                 # Build proxy facts from AI output (graph_seeds + task count)
                 proxy_facts = []

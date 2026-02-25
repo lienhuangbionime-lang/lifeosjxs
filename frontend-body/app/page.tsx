@@ -34,6 +34,10 @@ export default function Home() {
   const [contextNode, setContextNode] = useState<any>(null);
   const [confirmState, setConfirmState] = useState({ isOpen: false, title: '', message: '', action: null as any });
 
+  // [P4-3] Cross-module bindings
+  const [globalSelectedProject, setGlobalSelectedProject] = useState<any>(null);
+  const [highlightTag, setHighlightTag] = useState<string | null>(null);
+
   // Mount effect
   useEffect(() => {
     setIsMounted(true);
@@ -109,6 +113,10 @@ export default function Home() {
         logs={logs}
         onClose={() => setContextNode(null)}
         onOpenEntry={setSelectedEntry}
+        onOpenProject={(proj) => {
+          setActiveTab('project');
+          setGlobalSelectedProject(proj);
+        }}
       />
 
       {/* [NEW] Create Project Modal */}
@@ -182,6 +190,7 @@ export default function Home() {
           {activeTab === 'graph' && (
             <NeuralGraph
               logs={logs}
+              highlightTag={highlightTag}
               onNodeClick={(node) => {
                 if (node.group === 1) setSelectedEntry(node.raw);
                 else setContextNode(node);
@@ -199,6 +208,11 @@ export default function Home() {
           {activeTab === 'project' && (
             <ProjectBoard
               onCreateProject={() => setIsCreateProjectOpen(true)}
+              incomingProject={globalSelectedProject}
+              onJumpToGraph={(projectName) => {
+                setActiveTab('graph');
+                setHighlightTag(projectName);
+              }}
             />
           )}
 
@@ -220,7 +234,7 @@ export default function Home() {
       {/* Dock (Navigation) */}
       <Dock
         activeTab={activeTab}
-        onTabChange={(tab: string) => setActiveTab(tab as any)}
+        onTabChange={(tab: string) => { setActiveTab(tab as any); setHighlightTag(null); }}
         onMenuToggle={() => setIsMenuOpen(!isMenuOpen)}
       />
 

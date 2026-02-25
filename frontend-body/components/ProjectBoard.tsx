@@ -9,9 +9,11 @@ import { cortex } from '@/lib/api/client';
 
 interface ProjectBoardProps {
     onCreateProject?: () => void;
+    incomingProject?: Project | null;
+    onJumpToGraph?: (projectName: string) => void;
 }
 
-export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
+export const ProjectBoard = ({ onCreateProject, incomingProject, onJumpToGraph }: ProjectBoardProps) => {
     const supabase = createClientComponentClient();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
@@ -59,6 +61,12 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
             supabase.removeChannel(channel);
         };
     }, [supabase]);
+
+    useEffect(() => {
+        if (incomingProject) {
+            setSelectedProject(incomingProject);
+        }
+    }, [incomingProject]);
 
     const filteredProjects = projects.filter(p => filter === 'all' || p.status === filter);
     const rootProjects = filteredProjects.filter(p => !p.parent_id || !filteredProjects.some(parent => parent.id === p.parent_id));
@@ -228,6 +236,7 @@ export const ProjectBoard = ({ onCreateProject }: ProjectBoardProps) => {
                 project={selectedProject}
                 onClose={() => setSelectedProject(null)}
                 onUpdate={handleUpdate}
+                onJumpToGraph={onJumpToGraph}
             />
 
             {/* Hierarchical Grid */}

@@ -20,8 +20,12 @@ class Task(BaseModel):
     id: str
     title: str
     status: str
-    project_id: Optional[str]
+    project_id: Optional[str] = None
     created_at: str
+
+class TaskCreate(BaseModel):
+    title: str
+    project_id: Optional[str] = None
 
 # --- Endpoints ---
 
@@ -35,6 +39,23 @@ async def get_tasks(project_id: Optional[str] = None):
         
     res = query.order("created_at", desc=True).execute()
     return res.data
+
+@router.post("/")
+async def create_task(task: TaskCreate):
+    """Create a new task."""
+    data = {
+        "title": task.title,
+        "status": "todo",
+        "created_at": get_today_str_taipei(),
+        "updated_at": get_today_str_taipei()
+    }
+    if task.project_id:
+        data["project_id"] = task.project_id
+        
+    res = supabase.table("tasks").insert(data).execute()
+    if not res.data:
+        raise HTTPException(status_code=500, detail="Failed to create task")
+    return res.data[0]
 
 @router.post("/{task_id}/complete")
 async def complete_task(task_id: str, background_tasks: BackgroundTasks):

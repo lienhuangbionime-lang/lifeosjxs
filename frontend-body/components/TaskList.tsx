@@ -1,7 +1,7 @@
 
 'use client';
-import React, { useEffect, useState } from 'react';
-import { CheckCircle, Circle, Loader2 } from 'lucide-react';
+import React, { useEffect, useState, useRef } from 'react';
+import { CheckCircle, Circle, Loader2, Plus } from 'lucide-react';
 import { cortex } from '@/lib/api/client';
 
 interface Task {
@@ -19,6 +19,9 @@ interface TaskListProps {
 export const TaskList = ({ projectId, lastUpdate }: TaskListProps) => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
+    const [newTaskTitle, setNewTaskTitle] = useState('');
+    const [isAdding, setIsAdding] = useState(false);
+    const inputRef = useRef<HTMLInputElement>(null);
 
     const fetchTasks = async () => {
         try {
@@ -48,6 +51,24 @@ export const TaskList = ({ projectId, lastUpdate }: TaskListProps) => {
         }
     };
 
+    const handleCreateTask = async (e?: React.FormEvent) => {
+        if (e) e.preventDefault();
+        const title = newTaskTitle.trim();
+        if (!title) return;
+
+        setIsAdding(true);
+        try {
+            await cortex.createTask(title, projectId);
+            setNewTaskTitle('');
+            fetchTasks();
+        } catch (error) {
+            console.error("Failed to create task", error);
+            alert("新增任務失敗，請稍後再試。");
+        } finally {
+            setIsAdding(false);
+        }
+    };
+
     if (loading) return <div className="p-4 flex justify-center"><Loader2 className="animate-spin text-indigo-500" size={16} /></div>;
 
     if (tasks.length === 0) return null; // Don't show if empty
@@ -67,6 +88,25 @@ export const TaskList = ({ projectId, lastUpdate }: TaskListProps) => {
                     </div>
                 ))}
             </div>
+
+            <form onSubmit={handleCreateTask} className="mt-2 flex items-center gap-2 px-1">
+                <input
+                    ref={inputRef}
+                    type="text"
+                    value={newTaskTitle}
+                    onChange={(e) => setNewTaskTitle(e.target.value)}
+                    placeholder="新增任務..."
+                    className="flex-1 bg-transparent border-none outline-none text-sm text-slate-300 placeholder-slate-600 font-medium"
+                    disabled={isAdding}
+                />
+                <button
+                    type="submit"
+                    disabled={!newTaskTitle.trim() || isAdding}
+                    className="p-1.5 text-slate-500 hover:text-indigo-400 disabled:opacity-50 transition-colors"
+                >
+                    {isAdding ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                </button>
+            </form>
         </div>
     );
 };

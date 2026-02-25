@@ -450,7 +450,7 @@ Code is considered **production-ready** when:
 ---
 
 **Last Updated**: 2026-02-24T05:25:00+08:00  
-**Version**: 3.5.6 (Crystallize logic + Import Fixes)  
+**Version**: 3.6.1 (Self-Reflection Implementation)  
 **Maintained By**: AI + Human Collaboration
 
 ---

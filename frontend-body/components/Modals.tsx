@@ -1,9 +1,10 @@
 'use client';
 import React from 'react';
-import { AlertCircle, Network, MapPin, Loader2, Trash2, Sparkles, Hash, Calendar, Link as LinkIcon } from 'lucide-react';
+import { AlertCircle, Network, MapPin, Loader2, Trash2, Sparkles, Hash, Calendar, Link as LinkIcon, FolderOpen } from 'lucide-react';
 import { CoreEngine } from '@/lib/ai/core';
 import { Modal } from '@/components/ui/Modal';
 import { cortex } from '@/lib/api/client';
+import { Project } from '@/lib/types/api-schema';
 
 export const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }: any) => {
     return (
@@ -23,12 +24,13 @@ export const ConfirmModal = ({ isOpen, title, message, onConfirm, onCancel }: an
     );
 };
 
-export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: { mainNode: any, logs: any[], onClose: () => void, onOpenEntry?: (entry: any) => void }) => {
+export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry, onOpenProject }: { mainNode: any, logs: any[], onClose: () => void, onOpenEntry?: (entry: any) => void, onOpenProject?: (project: Project) => void }) => {
     const [dynamicLogs, setDynamicLogs] = React.useState<any[]>([]);
     const [insight, setInsight] = React.useState<string>('');
     const [isLoading, setIsLoading] = React.useState(false);
     const [isInsightLoading, setIsInsightLoading] = React.useState(false);
     const [isDeleting, setIsDeleting] = React.useState(false);
+    const [matchingProject, setMatchingProject] = React.useState<Project | null>(null);
 
     React.useEffect(() => {
         if (!mainNode) {
@@ -38,6 +40,17 @@ export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: { mainNod
         }
 
         const label = mainNode.label || mainNode.id;
+
+        const checkMatchingProject = async () => {
+            try {
+                const projects = await cortex.projects.list();
+                const match = projects.find(p => p.name === label);
+                if (match) setMatchingProject(match);
+                else setMatchingProject(null);
+            } catch (e) {
+                console.warn("Could not check projects for context modal");
+            }
+        };
 
         const fetchContext = async () => {
             setIsLoading(true);
@@ -70,6 +83,7 @@ export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: { mainNod
             }
         };
 
+        checkMatchingProject();
         fetchContext();
         fetchInsight();
     }, [mainNode]);
@@ -110,14 +124,24 @@ export const ContextModal = ({ mainNode, logs, onClose, onOpenEntry }: { mainNod
                             {isLoading ? 'Scanning Synapses...' : `Neural Context (${displayLogs.length})`}
                         </span>
                     </div>
-                    <button
-                        onClick={handleDelete}
-                        disabled={isDeleting}
-                        className="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors"
-                        title="Delete from Brain"
-                    >
-                        {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                    </button>
+                    <div className="flex items-center gap-2">
+                        {matchingProject && onOpenProject && (
+                            <button
+                                onClick={() => { onOpenProject(matchingProject); onClose(); }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50/50 hover:bg-indigo-100 text-indigo-600 rounded-lg text-xs font-bold transition-all shadow-sm border border-indigo-100 hover:shadow-indigo-500/10"
+                            >
+                                <FolderOpen size={14} /> Open Project
+                            </button>
+                        )}
+                        <button
+                            onClick={handleDelete}
+                            disabled={isDeleting}
+                            className="p-1.5 hover:bg-red-50 rounded-lg text-slate-300 hover:text-red-500 transition-colors"
+                            title="Delete from Brain"
+                        >
+                            {isDeleting ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        </button>
+                    </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
