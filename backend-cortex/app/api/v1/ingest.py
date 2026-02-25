@@ -301,13 +301,21 @@ async def auto_link_tasks_projects(content: str, db, http_request: Request) -> d
                 
             # 3.2 Update projects updated_at (to bubble them up as "focused")
             from app.core.utils import get_current_iso_taipei
+            linked_project_names = []
+            
             for p_id in mentioned_ids:
+                # Get the project name for the UI toast
+                p_name = next((p["name"] for p in active_projects if p["id"] == p_id), "未知專案")
+                if p_name != "未知專案":
+                    linked_project_names.append(p_name)
+                    
                 db.table("projects").update({"updated_at": get_current_iso_taipei()}).eq("id", p_id).execute()
-                logger.info(f"Project updated_at bumped via auto-link: {p_id}")
+                logger.info(f"Project updated_at bumped via auto-link: {p_id} ({p_name})")
                 
             return {
                 "completed_tasks": len(completed_ids),
-                "projects_linked": len(mentioned_ids)
+                "projects_linked": len(mentioned_ids),
+                "project_names": linked_project_names
             }
             
     except Exception as e:
@@ -315,7 +323,7 @@ async def auto_link_tasks_projects(content: str, db, http_request: Request) -> d
         traceback.print_exc()
         logging.getLogger("cortex").error(f"Auto-link failed: {e}")
         
-    return {"completed_tasks": 0, "projects_linked": 0}
+    return {"completed_tasks": 0, "projects_linked": 0, "project_names": []}
 
 # 定義請求格式
 class IngestRequest(BaseModel):

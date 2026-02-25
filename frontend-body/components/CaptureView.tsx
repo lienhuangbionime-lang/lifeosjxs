@@ -167,7 +167,16 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
 
       // 3. Show success toast
       if (response.link_result && (response.link_result.completed_tasks > 0 || response.link_result.projects_linked > 0)) {
-        setToastMsg(`✅ 自動完成 ${response.link_result.completed_tasks} 個任務，推進了 ${response.link_result.projects_linked} 項專案`);
+        let msg = '✅ ';
+        if (response.link_result.projects_linked > 0) {
+          const pNames = response.link_result.project_names?.join('、') || '';
+          msg += `你今天推進了『${pNames}』`;
+        }
+        if (response.link_result.completed_tasks > 0) {
+          if (msg !== '✅ ') msg += '，';
+          msg += `完成了 ${response.link_result.completed_tasks} 個任務`;
+        }
+        setToastMsg(msg);
       } else {
         setToastMsg('Neural Capture Complete');
       }

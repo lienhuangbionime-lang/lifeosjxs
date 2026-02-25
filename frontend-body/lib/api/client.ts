@@ -72,6 +72,7 @@ export interface IngestResponse {
   link_result?: {
     completed_tasks: number;
     projects_linked: number;
+    project_names?: string[];
   };
 }
 
