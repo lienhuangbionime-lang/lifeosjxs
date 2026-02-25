@@ -21,6 +21,19 @@ interface TodaySnapshotData {
     focusedProject: Project | null;
 }
 
+const getRelativeTime = (dateStr?: string) => {
+    if (!dateStr) return '';
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days} days ago`;
+    if (hours > 0) return `${hours} hours ago`;
+    if (minutes > 0) return `${minutes} minutes ago`;
+    return 'Just now';
+};
+
 export const TodaySnapshot = () => {
     const [data, setData] = useState<TodaySnapshotData | null>(null);
     const [loading, setLoading] = useState(true);
@@ -205,9 +218,14 @@ export const TodaySnapshot = () => {
                 </div>
 
                 {data?.focusedProject && (
-                    <p className="text-xs text-slate-500 mt-4 border-t border-white/5 pt-3">
-                        Last active or mentioned project.
-                    </p>
+                    <div className="flex justify-between items-center text-xs text-slate-500 mt-4 border-t border-white/5 pt-3">
+                        <span>Active project</span>
+                        <span className="text-cyan-500/80 font-mono">
+                            {data.focusedProject.updated_at
+                                ? `Updated ${getRelativeTime(data.focusedProject.updated_at)}`
+                                : ''}
+                        </span>
+                    </div>
                 )}
             </div>
 

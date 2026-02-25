@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence, PanInfo } from 'framer-motion';
 import {
     Activity, Rocket, Hash, TrendingUp,
-    Calendar, ChevronLeft, ChevronRight, Sparkles, Brain
+    Calendar, ChevronLeft, ChevronRight, Sparkles, Brain, CheckCircle2
 } from 'lucide-react';
 import {
     ComposedChart, Area, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
@@ -89,9 +89,22 @@ export const CardStackDashboard = ({ logs = [], onNavigate }: CardStackDashboard
         }
     }, [logs]);
 
-    // [New] State for Reflection API call
     const [isReflecting, setIsReflecting] = useState(false);
     const [insightText, setInsightText] = useState<string | null>(null);
+    const [allTasks, setAllTasks] = useState<any[]>([]);
+
+    React.useEffect(() => {
+        const loadMetaData = async () => {
+            try {
+                const { cortex } = await import('@/lib/api/client');
+                const t = await cortex.getTasks();
+                if (Array.isArray(t)) setAllTasks(t);
+            } catch (e) {
+                console.error("Failed to load tasks for dashboard", e);
+            }
+        };
+        loadMetaData();
+    }, []);
 
     const triggerReflection = async () => {
         setIsReflecting(true);
@@ -142,8 +155,14 @@ export const CardStackDashboard = ({ logs = [], onNavigate }: CardStackDashboard
             : 5;
         const totalDeepWork = sorted.reduce((sum, l) => sum + (l.metrics?.deepWork || 0), 0);
 
-        return { chartData: sorted, tagCloud, totalEntries, avgMood, totalDeepWork };
-    }, [logs, dashboardMonth]);
+        const completedTasksThisMonth = allTasks.filter(t =>
+            t.status === 'done' &&
+            t.updated_at &&
+            t.updated_at.startsWith(dashboardMonth)
+        ).length;
+
+        return { chartData: sorted, tagCloud, totalEntries, avgMood, totalDeepWork, completedTasksThisMonth };
+    }, [logs, dashboardMonth, allTasks]);
 
     // 滑動處理
     const handleDragEnd = (event: any, info: PanInfo) => {
@@ -173,7 +192,7 @@ export const CardStackDashboard = ({ logs = [], onNavigate }: CardStackDashboard
             case 'overview':
                 return (
                     <div className="space-y-4">
-                        <div className="grid grid-cols-3 gap-3">
+                        <div className="grid grid-cols-2 gap-3">
                             <StatCard
                                 label="Total Entries"
                                 value={processedData.totalEntries.toString()}
@@ -185,6 +204,12 @@ export const CardStackDashboard = ({ logs = [], onNavigate }: CardStackDashboard
                                 value={processedData.avgMood.toFixed(1)}
                                 icon={Activity}
                                 color="emerald"
+                            />
+                            <StatCard
+                                label="Tasks Done"
+                                value={processedData.completedTasksThisMonth.toString()}
+                                icon={CheckCircle2}
+                                color="cyan"
                             />
                             <StatCard
                                 label="Deep Work"
