@@ -39,8 +39,8 @@ Your goal is to help the user manage their projects, clarify their thoughts, and
 - GLASS BOX: Expose your reasoning layer implicitly in your output structure. Use the `log_growth_decision` tool to record significant user choices vs your predictions.
 """
 
-def build_system_prompt(db, memory_context: str = "", growth_context: str = "") -> str:
-    """Builds the system prompt with active projects, pending tasks, growth lessons, memories, and short-term memory injected."""
+def build_system_prompt(db, memory_context: str = "", growth_context: str = "", strategic_context: str = "") -> str:
+    """Builds the system prompt with active projects, pending tasks, growth lessons, memories, and strategic reviews."""
     user_name = "Lien" # Standardizing user name
     
     recent_events = ""
@@ -117,6 +117,9 @@ def build_system_prompt(db, memory_context: str = "", growth_context: str = "") 
 
 【Cortex 近期的學習紀錄 (Growth Logs)】
 {growth_context if growth_context else "無"}
+
+【最近的戰略回顧 (Monthly Review)】
+{strategic_context if strategic_context else "尚未有本月回顧。"}
 
 【最相關的記憶片段】
 {memory_context if memory_context else "無相關紀錄。您可以提議建立一個。"}
@@ -209,7 +212,18 @@ async def stream_chat(request: Request, payload: ChatRequest):
             except Exception as e:
                 logger.warning(f"[WARN] Failed to fetch growth logs: {e}")
 
-        system_instruction = build_system_prompt(db, memory_context, growth_context)
+        # [v3.7.1] Strategic Context Injection (Monthly Review)
+        strategic_context = ""
+        if db:
+            try:
+                # Fetch latest monthly review
+                review_res = db.table("MonthlyReview").select("content").order("year", desc=True).order("month", desc=True).limit(1).execute()
+                if review_res.data:
+                    strategic_context = review_res.data[0].get("content", "")
+            except Exception as e:
+                logger.warning(f"[WARN] Failed to fetch monthly review: {e}")
+
+        system_instruction = build_system_prompt(db, memory_context, growth_context, strategic_context)
         
         # [v3.6] Cortex Function Calling Tools
         def create_task(title: str, priority: int = 1) -> str:
@@ -360,8 +374,10 @@ Type: {url_data.get("type", 'webpage')}
                          yield "\n\n*(Capacity Reached. Switching to High-Efficiency mode...)*\n\n"
                          # Fallback Logic: Try a chain of verified models
                          fallbacks = [
-                             sanitize_model_name("gemini-flash-lite-latest"),
+                             sanitize_model_name("gemini-2.0-flash-lite"),
+                             sanitize_model_name("gemini-2.0-flash"),
                              sanitize_model_name("gemini-1.5-flash-latest"),
+                             sanitize_model_name("gemini-flash-lite-latest"),
                          ]
                          
                          success_fallback = False
@@ -371,7 +387,7 @@ Type: {url_data.get("type", 'webpage')}
                                  
                              try:
                                  logger.warning(f"🔄 Retrying with fallback: {fallback_name}")
-                                 fallback_chat = gemini_client.aio.chats.create(model=fallback_name, config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT))
+                                 fallback_chat = req_gemini.aio.chats.create(model=fallback_name, config=types.GenerateContentConfig(system_instruction=system_instruction))
                                  # We need to send the history manually since we are creating a new chat instance 
                                  # but for simplicity/speed in fallback we just push the full input
                                  fallback_resp = await fallback_chat.send_message_stream(full_input)

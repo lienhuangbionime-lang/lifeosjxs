@@ -13,16 +13,10 @@ def test_chat():
         response = requests.post(
             f"{BASE_URL}/api/v1/chat/message",
             json={
-                "message": "這篇文章在說什麼",
+                "message": "總結我二月的表現以及核心目標",
                 "history": [],
                 "model": "models/gemini-flash-lite-latest",
-                "url_context": {
-                    "url": "https://example.com/ai-research",
-                    "type": "webpage",
-                    "title": "AI in Research",
-                    "content": "This is a short article about AI accelerating research.",
-                    "summary": "AI accelerates research."
-                }
+                "url_context": None
             },
             stream=True
         )
