@@ -17,8 +17,9 @@
 |---|---|
 | `gemini-3-pro-preview` | 深度思考、潛意識反思 |
 | `gemini-flash-lite-latest` | Ingest、Crystallize、基本 Chat |
-| `gemini-2.5-flash` | 情境感知 Capture Prompts (deprecated: switch to Flash Lite) |
+| `gemini-2.0-flash` | 最高速情境感知 (verified stable) |
 | `text-embedding-004` | 向量嵌入 (3072 dim) |
+| `BAAI/bge-reranker-v2-m3` | RAG 重排序 (HF Cross-Encoder) |
 
 ---
 
@@ -52,6 +53,20 @@
 - `chat.py` 中 `build_system_prompt()` 每次 Chat 注入 `evolution_log.json` 最後 5 筆
 - AI 每次對話都帶著「最近發生了什麼」的上下文
 
+### Phase P6: Agent Skills Infrastructure
+- **Orchestrator**: `app/services/skills.py` 實作動態解析 `skills/` 目錄。
+- **動態注入**: 僅在檢測到關鍵字（如「反思」、「搜尋」）時注入完整 SKILL.md，降低 Token 浪費。
+
+### Phase P8: Web Search Integration
+- **服務**: `app/services/search.py` 使用 `duckduckgo-search`。
+- **Tool**: 在 `chat.py` 註冊 `search_web_tool`。
+- **協議**: `skills/research/SKILL.md` 指導 AI 在 RAG 失效時上網。
+
+### Phase P10: Memory & Document Isolation
+- **決策背景**: 外部資料（網頁、PDF）混入 `memories` 會稀釋使用者的真實日記，造成 RAG 檢索雜訊。
+- **方案**: 啟用獨立的 `documents` 表。
+- **規則**: 感性記憶歸 `memories`，硬性知識歸 `documents`。雙方在 `nodes` 表透過語義關聯。
+
 ---
 
 ## 🚨 已知問題 & 陷阱
@@ -77,6 +92,10 @@
 - **Trap**: 直接在程式碼寫 `gemini-1.5-flash` 可能導致 404，因為 SDK v1beta 可能不支援。
 - **Fix**: 必須使用 `app.core.gemini.get_model("fast")` 或 `get_model("smart")` 來獲取已經經過 `sanitize_model_name()` 處理過的正確 ID。
 - 模型版本號必須與 `soul_manager.py` 的 `drift_check()` 保持同步。
+
+### 🚫 FATAL ERROR: Windows Encoding & Emojis
+- **Problem**: Windows (cp950) 終端機對 Emoji 極度敏感，會導致 Python 程序崩潰 (UnicodeEncodeError)。
+- **Rule**: 所有正式代碼、測試腳本、print() logs 絕對禁止出現 Emoji。
 
 ### 🚫 FATAL ERROR: Premature Documentation
 - **NEVER** write a rule in `SYSTEM_CONTEXT` or commit a "fix" claiming it resolves an issue before actually testing it in the real application flow.
@@ -130,5 +149,5 @@
 
 ---
 
-**最後更新**: 2026-02-25  
-**狀態**: v3.5.3 完成（三層串接 + AI Context 注入）| 下一步: Phase A ~ D (Dev Intelligence)
+**最後更新**: 2026-02-27  
+**狀態**: v3.7.6 完成（技能引擎 + Web Search 開通）| 下一步: Phase P10 Isolation Engineering

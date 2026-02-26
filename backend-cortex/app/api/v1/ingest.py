@@ -329,6 +329,7 @@ async def auto_link_tasks_projects(content: str, db, http_request: Request) -> d
 class IngestRequest(BaseModel):
     content: str
     date: Optional[str] = None  # YYYY-MM-DD
+    source: Optional[str] = "web_terminal" # NEW: capture, chat, web_terminal, etc.
     habits: Optional[List[str]] = []
     skipAi: bool = False
     mode: str = "append"
@@ -336,6 +337,13 @@ class IngestRequest(BaseModel):
 @router.post("")
 @router.post("/")
 async def ingest_log(http_request: Request, request: IngestRequest, background_tasks: BackgroundTasks):
+    # Determine target table based on source
+    target_table = "memories"
+    if request.source and request.source != "capture":
+        target_table = "documents"
+    
+    logger.info(f"📥 Received INGEST request. Source: {request.source} -> Target: {target_table}")
+
     # Default date if missing
     ingest_date = request.date or get_today_str_taipei()
     habits_list = request.habits or []
@@ -684,16 +692,30 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
             db_payload["embedding"] = embedding
             logger.info(f"[OK] Generated {len(embedding)}-dim embedding")
 
-        # 4. 寫入 Supabase (UPSERT - 一天一筆)
+        # 4. 寫入 Supabase (UPSERT - 一天一筆 for memories, standard insert for documents)
         if db:
             try:
-                # Upsert: 如果日期已存在則更新，否則新增
-                response = db.table("memories").upsert(
-                    db_payload,
-                    on_conflict="date"  # 以 date 為唯一鍵
-                ).execute()
+                if target_table == "memories":
+                    # Upsert for memories (one entry per day)
+                    response = db.table(target_table).upsert(
+                        db_payload,
+                        on_conflict="date"
+                    ).execute()
+                else:
+                    # Generic Insert for documents
+                    # Ensure metadata and title are handled for documents
+                    doc_payload = {
+                        "content": full_memory["combined_content"],
+                        "title": ai_data.get("title") or f"Document {ingest_date}",
+                        "url": ai_data.get("url"),
+                        "doc_type": ai_data.get("doc_type", "note"),
+                        "metadata": ai_data.get("meta", {}),
+                        "embedding": embedding,
+                        "tags": ai_data.get("tags", [])
+                    }
+                    response = db.table(target_table).insert(doc_payload).execute()
                 
-                logger.info(f"[OK] Upserted memory to Supabase for date: {ingest_date}")
+                logger.info(f"[OK] Stored in Supebase table: {target_table}")
                 
             except Exception as e:
                 logger.error(f"[ERROR] Supabase upsert failed: {e}")

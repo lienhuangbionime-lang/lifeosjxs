@@ -26,3 +26,5 @@ google-auth-httplib2
 google-auth-oauthlib
 pytz
 httpx
+duckduckgo-search
+pyyaml

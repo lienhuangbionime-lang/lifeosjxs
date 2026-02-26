@@ -413,6 +413,60 @@
                 }
             ],
             "rls_enabled": true
+        },
+        "documents": {
+            "description": "外部文獻與搜尋結果儲存表（隔離個人記憶）",
+            "columns": {
+                "id": {
+                    "type": "UUID",
+                    "primary_key": true,
+                    "default": "gen_random_uuid()"
+                },
+                "content": {
+                    "type": "TEXT",
+                    "nullable": false
+                },
+                "title": {
+                    "type": "TEXT",
+                    "nullable": true
+                },
+                "url": {
+                    "type": "TEXT",
+                    "nullable": true,
+                    "description": "資料來源連結"
+                },
+                "doc_type": {
+                    "type": "TEXT",
+                    "default": "'web_page'",
+                    "description": "文件類型 (web_page, pdf, search_result)"
+                },
+                "summary": {
+                    "type": "TEXT",
+                    "description": "Crystallize 2.0 生成的摘要"
+                },
+                "metadata": {
+                    "type": "JSONB",
+                    "default": "'{}'"
+                },
+                "created_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()"
+                },
+                "embedding": {
+                    "type": "VECTOR(768)",
+                    "description": "向量嵌入（用於雙軌檢索）"
+                }
+            },
+            "indexes": [
+                {
+                    "name": "idx_documents_created_at",
+                    "columns": [
+                        "created_at"
+                    ],
+                    "order": "DESC"
+                }
+            ],
+            "rls_enabled": true
         }
     },
     "metadata_tracking": {

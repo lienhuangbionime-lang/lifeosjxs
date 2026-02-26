@@ -91,3 +91,27 @@ class ProjectUpdate(BaseModel):
 
 class ProjectMergeRequest(BaseModel):
     target_project_id: str
+
+# --- Document Schemas ---
+
+class DocumentSchema(BaseModel):
+    id: Optional[str] = None
+    title: Optional[str] = None
+    url: Optional[str] = None
+    content: str
+    doc_type: str = "webpage"
+    tags: List[str] = []
+    metadata: Dict[str, Any] = {}
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class DocumentCreate(BaseModel):
+    title: Optional[str] = None
+    url: Optional[str] = None
+    content: str
+    doc_type: str = "webpage"
+    tags: List[str] = []
+    metadata: Dict[str, Any] = {}

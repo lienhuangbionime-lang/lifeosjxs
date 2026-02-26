@@ -54,40 +54,73 @@ class RAGService:
     def __init__(self):
         if not supabase or not embeddings:
             logger.warning("RAG Service Disabled: Missing Supabase or Gemini Config")
-            self.vector_store = None
+            self.memories_store = None
+            self.documents_store = None
             return
 
-        self.vector_store = SupabaseVectorStore(
+        self.memories_store = SupabaseVectorStore(
             client=supabase,
             embedding=embeddings,
             table_name="memories",
             query_name="match_memories",
         )
+        self.documents_store = SupabaseVectorStore(
+            client=supabase,
+            embedding=embeddings,
+            table_name="documents",
+            query_name="match_documents",
+        )
         self.llm = llm
 
-    async def ingest_text(self, text: str, meta: Dict[str, Any] = {}):
-        """Chunk text and store in Supabase Vector Store"""
-        logger.info(f"Ingesting text... {meta}")
+    async def check_duplicate(self, url: str) -> bool:
+        """Check if a URL already exists in the documents table."""
+        if not supabase:
+            return False
+        try:
+            res = supabase.table("documents").select("id").eq("url", url).execute()
+            return len(res.data) > 0
+        except Exception as e:
+            logger.error(f"Error checking duplicate URL: {e}")
+            return False
+    async def ingest_text(self, text: str, meta: Dict[str, Any] = {}, target: str = "memories"):
+        """Chunk text and store in the specified Supabase Vector Store"""
+        logger.info(f"Ingesting text into {target}... {meta}")
         
         # 1. Check for URL/YouTube
         url_content = self._try_fetch_url_content(text)
         if url_content:
-            text = f"Source URL: {text}\n\nContent:\n{url_content}"
-            meta["original_url"] = text.strip()
+            url = text.strip()
+            # De-duplication check
+            if await self.check_duplicate(url):
+                logger.info(f"URL {url} already exists in documents. Skipping duplicate ingestion.")
+                return 0
+                
+            text = f"Source URL: {url}\n\nContent:\n{url_content}"
+            meta["url"] = url
+            # Auto-route URLs to documents if target is memories but it's clearly an external link
+            if target == "memories" and meta.get("source") != "capture":
+                target = "documents"
 
-        # 2. Split
+        # 2. Crystallize 2.0: Generate summary for documents
+        if target == "documents" and len(text) > 500:
+            summary = await self._crystallize_document(text)
+            meta["summary"] = summary
+            logger.info(f"Crystallize 2.0: Generated summary ({len(summary)} chars)")
+
+        # 3. Split
         text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         docs = text_splitter.create_documents([text], metadatas=[meta])
         
-        # 3. Store
-        if self.vector_store:
-            self.vector_store.add_documents(docs)
-            logger.info(f"Ingested {len(docs)} chunks.")
+        # 4. Store
+        store = self.documents_store if target == "documents" else self.memories_store
+        if store:
+            store.add_documents(docs)
+            logger.info(f"Ingested {len(docs)} chunks into {target}.")
             return len(docs)
         return 0
 
-    async def ingest_file(self, file: UploadFile):
-        """Process file (PDF/Text/Image)"""
+    async def ingest_file(self, file: UploadFile, target: str = "memories"):
+        """Process file (PDF/Text/Image) and store in the specified target"""
         logger.info(f"Processing file: {file.filename} ({file.content_type})")
         
         # 1. Handle Image
@@ -113,9 +146,13 @@ class RAGService:
             for doc in docs:
                 doc.metadata["source"] = file.filename
                 
-            if self.vector_store:
-                self.vector_store.add_documents(docs)
-                logger.info(f"Ingested {len(docs)} chunks from {file.filename}")
+            if target == "documents" and self.documents_store:
+                self.documents_store.add_documents(docs)
+                logger.info(f"Ingested {len(docs)} chunks from {file.filename} into documents")
+                return len(docs)
+            elif self.memories_store:
+                self.memories_store.add_documents(docs)
+                logger.info(f"Ingested {len(docs)} chunks from {file.filename} into memories")
                 return len(docs)
             return 0
             
@@ -207,21 +244,77 @@ class RAGService:
         except Exception as e:
             return f"Failed to fetch YouTube transcript: {e}"
 
+    async def _crystallize_document(self, text: str) -> str:
+        """Crystallize 2.0: Generate a high-signal technical summary for a document"""
+        if not self.llm:
+            return "Summary unavailable."
+            
+        prompt = ChatPromptTemplate.from_template("""
+        [PROTOCOL: CRYSTALLIZE 2.0]
+        Analyze the following external content and generate a highly structured, high-signal summary.
+        
+        Guidelines:
+        1. [CORE]: Extract the primary purpose and technical architecture.
+        2. [BINDING]: Suggest how this connects to LifeOS (Projects, Systems).
+        3. [ACTION]: Identify 2-3 immediate actionable insights or upgrades.
+        4. [DIAGRAM]: If applicable, describe a Mermaid chart structure.
+        
+        Content:
+        {content}
+        
+        Output format: Concise Markdown with GitHub alerts.
+        """)
+        
+        chain = prompt | self.llm | StrOutputParser()
+        try:
+            # Take only first 10k chars for summary to avoid bloat
+            summary = await chain.ainvoke({"content": text[:10000]})
+            return summary
+        except Exception as e:
+            logger.error(f"Crystallization failed: {e}")
+            return "Crystallization failed."
+
+    async def unified_search(self, question: str, limit: int = 5) -> Dict[str, str]:
+        """
+        Dual-Track Retrieval: Search both memories and documents.
+        Returns a dictionary with formatted context for both.
+        """
+        mem_context = ""
+        doc_context = ""
+        
+        try:
+            if self.memories_store:
+                mem_matches = await self.memories_store.asimilarity_search(question, k=limit)
+                mem_context = "\n\n".join([d.page_content for d in mem_matches])
+                
+            if self.documents_store:
+                doc_matches = await self.documents_store.asimilarity_search(question, k=limit)
+                doc_context = "\n\n".join([d.page_content for d in doc_matches])
+                
+            return {
+                "memories": mem_context,
+                "documents": doc_context
+            }
+        except Exception as e:
+            logger.error(f"Unified Search failed: {e}")
+            return {"memories": "", "documents": ""}
+
     async def query(self, question: str, history: List[Dict[str, str]] = []):
-        """RAG Query with History and System Context"""
+        """RAG Query with History and System Context (Dual-Track Awareness)"""
         logger.info(f"Querying: {question} with history of {len(history)} messages")
         
-        if not self.vector_store:
-            yield "Cortex Error: Vector Store Unavailable"
+        if not self.memories_store and not self.documents_store:
+            yield "Cortex Error: Vector Stores Unavailable"
             return
 
         try:
             # 1. Fetch System Context (Projects & Recent Memories)
             system_context = await self._get_system_context()
             
-            # 2. Prepare Context from Vector Store (RAG)
-            docs = await self.vector_store.asimilarity_search(question, k=5)
-            doc_context = "\n\n".join([d.page_content for d in docs])
+            # 2. Dual-Track Search
+            search_results = await self.unified_search(question)
+            mem_context = search_results["memories"]
+            doc_context = search_results["documents"]
             
             # 3. Load System Persona from Markdown
             persona_path = Path(__file__).parent.parent.parent / "prompts" / "system_cortex.md"
@@ -238,10 +331,14 @@ class RAGService:
                 --- SYSTEM CONTEXT (CURRENT STATE) ---
                 {system_context}
                 
-                --- RETRIEVED KNOWLEDGE (RAG) ---
-                {doc_context}
+                --- PERSONAL MEMORIES (RAG) ---
+                {mem_context if mem_context else "No related personal memories."}
                 
-                Current Task: Assist 蒼禾 with his request while adhering to the Value Weights and Operational Directives.
+                --- EXTERNAL DOCUMENTS & KNOWLEDGE (RAG) ---
+                {doc_context if doc_context else "No related external documents."}
+                
+                Current Task: Assist the user with his request while adhering to the Value Weights and Operational Directives. 
+                Synthesize insights from both personal memories and external knowledge where relevant.
                 """)
             ]
 
@@ -278,7 +375,12 @@ class RAGService:
             # Fetch recent memories
             mem_res = supabase.table("memories").select("content, date").order("date", desc=True).limit(5).execute()
             memories = mem_res.data if mem_res.data else []
-            mem_str = "\n".join([f"[{m['date']}] {m['content'][:100]}..." for m in memories])
+            mem_lines = []
+            for m in memories:
+                content = m.get('content') or ""
+                date = m.get('date') or "Unknown"
+                mem_lines.append(f"[{date}] {content[:100]}...")
+            mem_str = "\n".join(mem_lines)
             
             return f"Active Projects:\n{proj_str}\n\nRecent Memories:\n{mem_str}"
         except Exception as e:
