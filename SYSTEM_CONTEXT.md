@@ -6,10 +6,10 @@
 
 ## 🎯 Project Identity
 
-**Name**: LifeOS v3.6  
+**Name**: LifeOS v3.7  
 **Philosophy**: Personal Operating System for Life Management  
-**Architecture**: Symbiotic AI + Human Intelligence + Self-Reflection  
-**Status**: Production-ready with Autonomous Growth Engine (v3.6.3)
+**Architecture**: Symbiotic AI + Agent Skills + RAG Reranking + Knowledge Isolation  
+**Status**: Production-ready with Unified Awareness & Isolated Document Store (v3.7.7)
 
 ---
 
@@ -20,8 +20,9 @@
 - **Database**: Supabase (PostgreSQL)
 - **AI**: Gemini 3 Pro (Smart) & Gemini Flash Lite (Fast)
 - **SDK**: `google-generativeai` (Legacy wrapper, required for current implementation)
-- **Vector Search**: pgvector (3072 dimensions)
+- **Vector Search**: pgvector (3072 dimensions) + HF Cross-Encoder Reranking
 - **Schema**: Pydantic v2 (strict typing required)
+- **Tooling**: uv (Modern dependency management)
 
 ### Frontend
 - **Framework**: Next.js 14+ (App Router)
@@ -63,6 +64,14 @@ User Request → AI Analysis → Generate Options → User Approval → Execute 
 ### 3. AI-First Design
 ```
 Raw Input → Gemini Analysis → Structured Output → Storage
+
+### 4. Knowledge & Memory Isolation
+```
+Input Type → Routing logic
+        ├─ Personal Diary/Reflection → memories table
+        └─ External Info/Tech Docs/Web Search → documents table
+```
+**Rule**: NEVER mix external bulk data into the `memories` table. Keep the primary diary pure for high-signal reflection.
 ```
 
 **Rule**: All user input goes through AI analysis (SorterAgent) before storage.
@@ -335,6 +344,11 @@ See `schemas/registry.json` for complete definitions.
 **Solution**: Always use `memories` table  
 **Files**: `app/api/v1/memories.py`
 
+### Issue 5: ModuleNotFoundError on Startup
+**Cause**: Feature-Dependency Drift. New modules/tools added without updating `requirements.txt`.
+**Solution**: Always run `pip install` and verify `requirements.txt` when adding new imports.
+**Files**: `requirements.txt`, `app/api/v1/chat.py`
+
 ### Issue 3: Table Not Found
 **Cause**: Supabase schema not initialized  
 **Solution**: Run `infra/supabase_reset_and_init.sql`  
@@ -428,16 +442,57 @@ Code is considered **production-ready** when:
 - ✅ Context-Aware UI prompts (`api/v1/crystallize.py`)
 - 🔄 Project-memory linking
 
-### Phase 3 (Current): Knowledge Crystallization
+### Phase 3 (Current): Knowledge Crystallization & Precision
 - ✅ Knowledge Crystallization Engine (`services/crystallizer.py`)
 - ✅ Bulk historical processing script (`tools/bulk_crystallize.py`)
-- ✅ AI-generated Brain Insights in ContextModal
+- ✅ RAG Reranker Implementation (BAAI/bge-reranker-v2-m3)
 - ✅ Standardized Gemini model registry via `get_model()`
 
-### Phase 4 (Future): Autonomous System
-- 📋 Self-optimizing schema
-- 📋 Predictive task generation
-- 📋 Cross-memory pattern detection
+### Phase 4 (Current): Modular Intelligence & External Search
+- ✅ Agent Skills Infrastructure (SKILL.md dynamic loading)
+- ✅ SkillOrchestrator for intent-based routing
+- ✅ Session Handoff Protocol (Developer AI Support)
+- ✅ Web Search Integration (duckduckgo-search)
+- ✅ Role Boundary Alignment (System vs. Developer)
+- ✅ Phase P10: Knowledge & Memory Isolation (Implemented)
+- 🔄 Phase P11: Strategic Reranking v2 & Multimodal Skills (Planned)
+
+---
+
+## 🧪 Experimental Sandbox (Verified v3.7.6)
+
+### 1. RAG Reranker (Phase P5)
+- **Path**: `tools/rag_experiment.py`
+- **Model**: `BAAI/bge-reranker-v2-m3`
+- **Result**: Successfully achieved 0.98 relevance score on Real-LifeOS data, effectively filtering semantic noise that vector search alone missed.
+
+### 2. Web Search Integration (Phase P8)
+- **Path**: `app/services/search.py`
+- **Driver**: `duckduckgo-search` (ddgs)
+- **Status**: Functional. Verified retrieval of 2026 AI tech trends. 
+- **Note**: Terminal encoding (cp950) may garble print output, but logic is baseline-stable.
+
+---
+
+## 🧠 Skills Usage & Handoff Guide
+
+Specific capabilities are encapsulated in `skills/{name}/SKILL.md`.
+
+### 1. Reflection (反思)
+- **Trigger**: "反思", "分析", "reflection".
+- **Usage**: Activates deep analysis of recent memories/mistakes.
+
+### 2. Research (調研)
+- **Trigger**: "搜尋", "news", "查一下", "上網".
+- **Usage**: Invokes `search_web_tool`. Injects external context into the prompt.
+
+### 3. Handoff (交接)
+- **Trigger**: "交接", "handoff", "進度", "dev".
+- **Usage**: STRICT technical recording of module status and next actions. **Mandatory at session end.**
+
+### 4. Database Optimization (優化)
+- **Trigger**: "優化", "optimize".
+- **Usage**: Schema analysis and technical refinement protocol.
 
 ---
 
@@ -451,8 +506,8 @@ Code is considered **production-ready** when:
 
 ---
 
-**Last Updated**: 2026-02-25T22:25:00+08:00  
-**Version**: 3.6.3 (Autonomous Reflection & Project Synthesis)  
+**Last Updated**: 2026-02-27T05:22:00+08:00  
+**Version**: 3.7.8 (Dependency Fixed & Reflection Logged)  
 **Maintained By**: AI + Human Collaboration
 
 ---

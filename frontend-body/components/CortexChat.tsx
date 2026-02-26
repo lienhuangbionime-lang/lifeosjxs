@@ -209,7 +209,10 @@ export const CortexChat = () => {
             const decoder = new TextDecoder();
             let aiMsg = '';
 
-            setMessages(prev => [...prev, { role: 'assistant', content: '' }]);
+            if (currentUrlContext) {
+                // Subtle indicator that background archiving started
+                setMessages(prev => [...prev, { role: 'assistant', content: `*Integrating external knowledge: ${currentUrlContext.title}...*` }]);
+            }
 
             while (true) {
                 const { done, value } = await reader.read();
@@ -218,6 +221,10 @@ export const CortexChat = () => {
                 aiMsg += chunk;
                 setMessages(prev => {
                     const newMsgs = [...prev];
+                    // If we just added the "Integrating..." message, we need to handle the index correctly
+                    const targetIndex = currentUrlContext ? newMsgs.length - 1 : newMsgs.length - 1;
+                    // Actually, if currentUrlContext exists, newMsgs[length-2] is prompt, newMsgs[length-1] is current AI response
+                    // Let's just use the last one.
                     newMsgs[newMsgs.length - 1].content = aiMsg;
                     return newMsgs;
                 });

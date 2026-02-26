@@ -67,5 +67,20 @@
         "type": "FIX",
         "description": "Fixed 'embedder' name import error in brain.py. Resolved Gemini 404 version errors in crystallizer/brain by standardizing on get_model() factory. Updated SYSTEM_CONTEXT to v3.5.6.",
         "impact": "High - Restored semantic search and AI insight generation stability."
+    },
+    {
+        "timestamp": "2026-02-27T05:21:00Z",
+        "event": "Dependency Drift Fix & Reflection",
+        "type": "FIX",
+        "description": "Resolved ModuleNotFoundError for 'duckduckgo_search'. Identified 'Feature-Dependency Drift' where new tool logic was enabled without requirements.txt parity.",
+        "impact": "High - Restored server startup. Optimized requirements.txt sync protocol.",
+        "reflection": "When migrating tools (like web search) into the core chat loop, the dependency must be verified in the same commit. Relying on local pre-installed packages in a development environment is a blind spot."
+    },
+    {
+        "timestamp": "2026-02-27T05:20:00Z",
+        "event": "Knowledge & Memory Isolation",
+        "type": "ARCH",
+        "description": "Implemented physical isolation between 'memories' and 'documents' tables. Enabled Dual-Track RAG (Unified Awareness) and automated search archiving. Updated SYSTEM_CONTEXT to v3.7.7.",
+        "impact": "Critical - Established architectural purity and scalable knowledge management."
     }
 ]

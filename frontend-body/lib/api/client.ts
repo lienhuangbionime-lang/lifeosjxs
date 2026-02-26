@@ -183,10 +183,10 @@ export const cortex = {
   },
 
   // 4. 感知輸入 (Sensory Ingest)
-  async ingestLog(date: string, text: string): Promise<IngestResponse> {
+  async ingestLog(date: string, text: string, source?: string): Promise<IngestResponse> {
     return await fetchProxy<IngestResponse>("/api/v1/ingest", {
       method: "POST",
-      body: JSON.stringify({ date, text }),
+      body: JSON.stringify({ date, content: text, source }),
     });
   },
 
@@ -251,9 +251,8 @@ export const cortex = {
     });
   },
 
-  // [New] Ingest with Habits Support
   ingest: {
-    submit: async (data: { content: string; habits: string[]; skipAi?: boolean; date?: string; mode?: 'overwrite' | 'append' }): Promise<IngestResponse> => {
+    submit: async (data: { content: string; habits: string[]; skipAi?: boolean; date?: string; mode?: 'overwrite' | 'append'; source?: string }): Promise<IngestResponse> => {
       return await fetchProxy<IngestResponse>("/api/v1/ingest", {
         method: "POST",
         body: JSON.stringify({
@@ -261,7 +260,8 @@ export const cortex = {
           content: data.content,
           habits: data.habits,
           skipAi: data.skipAi,
-          mode: data.mode || 'append'
+          mode: data.mode || 'append',
+          source: data.source || 'web_terminal'
         }),
       });
     }

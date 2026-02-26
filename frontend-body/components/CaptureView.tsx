@@ -148,7 +148,8 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
         content: text,
         habits: habitLabels,
         skipAi: skipAi, // [New] Pass skipAi flag
-        mode: mode      // [New] Pass overwrite/append mode
+        mode: mode,      // [New] Pass overwrite/append mode
+        source: "capture" // [NEW] Identify as diary
       });
 
       // 2.5. Check Status

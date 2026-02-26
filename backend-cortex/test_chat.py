@@ -13,9 +13,10 @@ def test_chat():
         response = requests.post(
             f"{BASE_URL}/api/v1/chat/message",
             json={
-                "message": "測試後端連線",
+                "message": "總結我二月的表現以及核心目標",
                 "history": [],
-                "model": "models/gemini-flash-lite-latest"
+                "model": "models/gemini-flash-lite-latest",
+                "url_context": None
             },
             stream=True
         )

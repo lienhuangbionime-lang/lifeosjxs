@@ -1,17 +1,58 @@
-
-from fastapi import APIRouter, HTTPException, Depends, Request
+from fastapi import APIRouter, HTTPException, Body, File, UploadFile, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
-from typing import List, Dict, Optional
+from typing import List, Dict, Any, Optional
 import logging
 import json
 import asyncio
 from pathlib import Path
 from app.core.gemini import get_model, gemini_client, get_request_gemini_client
+from app.services.skills import orchestrator
+from app.services.search import search_web, format_search_results
 from google import genai
 
 router = APIRouter()
 logger = logging.getLogger("cortex.chat")
+
+@router.post("/ingest")
+async def chat_ingest(file: UploadFile = File(...)):
+    """
+    Ingest a file uploaded through the chat interface.
+    These are routed to the 'documents' table.
+    """
+    from app.services.rag_service import rag_service
+    
+    logger.info(f"[CHAT] Received file for ingestion: {file.filename}")
+    
+    try:
+        # Save temporary file
+        temp_dir = Path("data/uploads")
+        temp_dir.mkdir(parents=True, exist_ok=True)
+        temp_path = temp_dir / file.filename
+        
+        with open(temp_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+            
+        # Ingest into documents store using UploadFile directly
+        doc_id = await rag_service.ingest_file(
+            file=file,
+            target="documents"
+        )
+        
+        # Cleanup
+        if temp_path.exists():
+            temp_path.unlink()
+            
+        return {
+            "success": True,
+            "filename": file.filename,
+            "doc_id": doc_id,
+            "target": "documents"
+        }
+    except Exception as e:
+        logger.error(f"[ERROR] Chat ingestion failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 class ChatMessage(BaseModel):
     role: str
@@ -27,21 +68,35 @@ class ChatRequest(BaseModel):
 # [Phase C] Short-Term Memory: inject last 5 evolution_log entries
 # ---------------------------------------------------------------------------
 _BASE_SYSTEM_PROMPT = """
-[SYSTEM PROTOCOL: CodeSpeak Paradigm Active]
-You are Cortex, the digital extension of the user's mind (LifeOS).
-Your goal is to help the user manage their projects, clarify their thoughts, and retrieve memories with zero boilerplate.
+## Cognitive Awakening Protocol (Actionability)
+As a LifeOS Assistant, you are not just a librarian; you are a Co-Pilot.
+1. **Analyze**: Compare the retrieved RAG context with the user's current goal/projects.
+2. **Identify**: Spot gaps, missed tasks, or progress that needs updating based on the unified awareness.
+3. **Act**: Proactively suggest or use Core Skills (`create_task`, `update_project_progress`, `log_growth_decision`) to synchronize reality with your digital knowledge.
+If the context says "I need to do X", do not just say "Okay", but ask "Should I create a task for X in Project Y?".
 
-- OUTPUT: High-signal, intentional, and concise. No conversational filler.
-- FORMAT: Use structured Markdown.
-- MEMORY ACCESS: You have access to the user's Memory Bank via the "## Relevant Context" section below.
-- HALLUCINATION CONTROL: If the context is empty or says "NO MEMORIES FOUND", state exactly: "No relevant records found. Ask to create one."
-- GLASS BOX: Expose your reasoning layer implicitly in your output structure. Use the `log_growth_decision` tool to record significant user choices vs your predictions.
+## Visual Cues (Glass Box Protocol)
+When you perform an action (e.g., creating a task, archiving a document), mention it concisely using:
+- `> [Action] Created task: [title]`
+- `> [Awareness] Synced external knowledge from [Source]`
+
+---
+[SYSTEM PROTOCOL: High-Intent Strategic Catalyst Active]
+You are Cortex, the Strategic Technical Lead and digital extension of the user's mind (LifeOS).
+Your goal is to proactively manage the LifeOS architecture, clarify complex technical concepts, and ensure all inputs (Memories, Projects, URLs) are synthesized into actionable growth.
+
+- OUTPUT: Expert-level, proactive, and intentional. Avoid conversational filler or generic summaries.
+- PERSONA: A mix of a Senior Systems Architect and a Database Administrator. Be direct, opinionated, and insightful.
+- PROACTIVE ENGAGEMENT: Do not wait for explicit instructions. If the user provides a URL or data, analyze it against the LifeOS architecture (SYSTEM_CONTEXT.md) and propose upgrades.
+- MEMORY & CONTEXT: Use Active Projects, Tasks, Growth Logs, and Strategic Reviews (Monthly Review) to anchor all insights.
+- GLASS BOX: Use the `log_growth_decision` tool to record significant user choices vs your strategic predictions.
 """
 
-def build_system_prompt(db, memory_context: str = "", growth_context: str = "") -> str:
-    """Builds the system prompt with active projects, pending tasks, growth lessons, memories, and short-term memory injected."""
+def build_system_prompt(db, memory_context: str = "", document_context: str = "", growth_context: str = "", strategic_context: str = "", skills_context: str = "") -> str:
+    """Builds the system prompt with active projects, pending tasks, growth lessons, memories, documents, and strategic reviews."""
     user_name = "Lien" # Standardizing user name
     
+    # ... (recent_events code) ...
     recent_events = ""
     try:
         # Try both relative path and absolute fallback
@@ -117,13 +172,24 @@ def build_system_prompt(db, memory_context: str = "", growth_context: str = "") 
 【Cortex 近期的學習紀錄 (Growth Logs)】
 {growth_context if growth_context else "無"}
 
-【最相關的記憶片段】
-{memory_context if memory_context else "無相關紀錄。您可以提議建立一個。"}
+【最近的戰略回顧 (Monthly Review)】
+{strategic_context if strategic_context else "尚未有本月回顧。"}
+
+【個人日記摘要 (Personal Memories)】
+{memory_context if memory_context else "無相關日記紀錄。"}
+
+【外部文獻與知識 (External Documents)】
+{document_context if document_context else "無相關外部文獻。"}
 
 ---
 ## System Short-Term Memory (Last 5 Events)
 {recent_events}
 ---
+[SKILLS DISCOVERY]
+You have access to specialized Skill Protocols. If a relevant protocol is loaded below, follow its directives strictly.
+Available Skills (Metadata Only):
+{skills_context or "No specialized skills loaded."}
+
 {_BASE_SYSTEM_PROMPT}
 """
 
@@ -132,16 +198,17 @@ def build_system_prompt(db, memory_context: str = "", growth_context: str = "") 
 SYSTEM_PROMPT = _BASE_SYSTEM_PROMPT
 
 URL_DISCUSSION_PROMPT = """
-[SYSTEM PROTOCOL: URL CodeSpeak Extraction Active]
-You are Cortex. The user has injected an external context node (URL).
+[SYSTEM PROTOCOL: Proactive Technical Catalyst Active]
+You are Cortex, the Strategic Technical Lead for LifeOS. The user has provided an external knowledge node (URL).
 
-Your Role:
-1. [SYNTHESIS]: Extract raw signal / key ideas.
-2. [MEMORY BINDING]: Connect to user context provided below.
-3. [PROVOKATION]: Generate 2-3 sharp, tension-exposing questions.
-4. [CONVERGENCE]: Output a concrete, actionable angle.
+Your Directive:
+1. [DESTRUCTION]: Deconstruct the technical core of the URL content. No generic summaries.
+2. [ARCHITECTURAL BINDING]: Maps these concepts directly to the LifeOS architecture (e.g., SYSTEM_CONTEXT.md, RAG pillars, or specific bottlenecks like prompt bloat).
+3. [PROACTIVE PROPOSAL]: Instead of asking "do you want me to...", provide a concrete, opinionated upgrade strategy. 
+   - Example: "This directly solves our [X] problem. We should implement [Y] by doing [Z]."
+4. [ANALOGY]: Use high-signal analogies to clarify technical impact (e.g., "MCP is hands, this is the brain handbook").
 
-Constraint: Zero boilerplate. Direct reference. No generic summaries.
+Constraint: Never output "Action Required: None". Always find a strategic tension or opportunity. Zero boilerplate.
 """
 
 @router.post("/message")
@@ -174,18 +241,18 @@ async def stream_chat(request: Request, payload: ChatRequest):
              role = "user" if msg.role == "user" else "model"
              gemini_history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg.content)]))
              
-        # [v3.5 Phase 2] RAG Memory Injection
-        from app.services.rag import hybrid_search, format_memories_for_context
+        # [v3.5 Phase 2] RAG Memory & Document Injection (Unified Awareness)
+        from app.services.rag_service import rag_service
         from app.core.database import get_request_client
         db = get_request_client(request)
         
-        # Search for relevant memories before creating chat instance
-        relevant_memories = await hybrid_search(
-            query=payload.message,
-            limit=5,
-            similarity_threshold=0.4
+        # Search for relevant contexts from both Diary and Knowledge
+        search_results = await rag_service.unified_search(
+            question=payload.message,
+            limit=5
         )
-        memory_context = format_memories_for_context(relevant_memories)
+        memory_context = search_results["memories"]
+        document_context = search_results["documents"]
 
         # [v3.6 P3] Semantic Growth Logs Injection
         growth_context = ""
@@ -208,7 +275,41 @@ async def stream_chat(request: Request, payload: ChatRequest):
             except Exception as e:
                 logger.warning(f"[WARN] Failed to fetch growth logs: {e}")
 
-        system_instruction = build_system_prompt(db, memory_context, growth_context)
+        # [v3.7.2] Strategic Context Injection (Monthly Review - Structured Schema)
+        strategic_context = ""
+        if db:
+            try:
+                # Fetch latest monthly review
+                review_res = db.table("MonthlyReview").select("year,month,summary,highlights,next_steps").order("year", desc=True).order("month", desc=True).limit(1).execute()
+                if review_res.data:
+                    rev = review_res.data[0]
+                    strategic_context = f"【{rev['year']}/{rev['month']} Review Summary】\n{rev.get('summary', '')}\n\nHighlights:\n{rev.get('highlights', '')}\n\nNext Steps:\n{rev.get('next_steps', '')}"
+            except Exception as e:
+                logger.warning(f"[WARN] Failed to fetch monthly review: {e}")
+
+        # [Phase P6] Skills Discovery & Activation
+        all_skills = orchestrator.get_available_skills()
+        skills_summary = "\n".join([f"- {s['name']}: {s['description']}" for s in all_skills])
+        
+        # Heuristic Activation (Level 3 Dynamic Loading)
+        active_skill_ids = orchestrator.find_relevant_skills(payload.message)
+        active_skills_content = []
+        for sid in active_skill_ids:
+            protocol = orchestrator.get_skill_protocol(sid)
+            if protocol:
+                active_skills_content.append(f"### [ACTIVATED SKILL: {sid.upper()}]\n{protocol}")
+                logger.info(f"[SKILLS] Activated protocol: {sid}")
+        
+        active_skills_str = "\n\n".join(active_skills_content)
+
+        system_instruction = build_system_prompt(
+            db, 
+            memory_context=memory_context, 
+            document_context=document_context, # Added P10 Document Context
+            growth_context=growth_context, 
+            strategic_context=strategic_context,
+            skills_context=f"{skills_summary}\n\n{active_skills_str}"
+        )
         
         # [v3.6] Cortex Function Calling Tools
         def create_task(title: str, priority: int = 1) -> str:
@@ -272,7 +373,14 @@ async def stream_chat(request: Request, payload: ChatRequest):
             except Exception as e:
                 return f"Failed to log decision: {str(e)}"
 
-        cortex_tools = [create_task, mark_task_done, update_project_progress, log_growth_decision] if db else []
+        async def search_web_tool(query: str, limit: int = 5) -> str:
+            """Search the web for real-time information, news, or technical research."""
+            results = await search_web(query, limit, archive=True)
+            if not results:
+                return f"No results found for '{query}'."
+            return format_search_results(results)
+
+        cortex_tools = [create_task, mark_task_done, update_project_progress, log_growth_decision, search_web_tool] if db else []
 
         chat = req_gemini.aio.chats.create(
             model=model_name, 
@@ -284,28 +392,41 @@ async def stream_chat(request: Request, payload: ChatRequest):
         
         async def event_generator():
             try:
-                if payload.url_context:
+                if payload.url_context is not None:
                     # URL Discussion Mode
-                    url_data = payload.url_context
+                    url_data: Dict[str, Any] = payload.url_context
                     url_content_block = f"""
 ## Shared Content
-Title: {url_data.get('title')}
-URL: {url_data.get('url')}
-Type: {url_data.get('type')}
+Title: {url_data.get("title", 'Unknown')}
+URL: {url_data.get("url", 'Unknown')}
+Type: {url_data.get("type", 'webpage')}
 
 ### Content:
-{url_data.get('content')}
+{url_data.get("content", 'No content available.')}
 """
-                    full_input = f"{URL_DISCUSSION_PROMPT}\n{url_content_block}\n\nUser: {payload.message}"
-                    logger.info(f"[OK] URL Discussion Mode: {url_data.get('title')}")
+                    # [P10] Auto-Archiving to Knowledge Base in Background
+                    try:
+                        asyncio.create_task(rag_service.ingest_text(
+                            text=url_data.get("url"), 
+                            meta={
+                                "title": url_data.get("title"),
+                                "source": "chat_auto_archive",
+                                "type": url_data.get("type")
+                            },
+                            target="documents"
+                        ))
+                    except Exception as arch_err:
+                        logger.warning(f"Auto-archive failed: {arch_err}")
+
+                    url_directive = "[Directive: Analyze the above technical content proactively. Connect it to LifeOS architecture and propose strategic upgrades.]"
+                    message_part = payload.message.strip() if payload.message else url_directive
+                    full_input = f"{URL_DISCUSSION_PROMPT}\n{url_content_block}\n\nUser Message: {message_part}"
+                    logger.info(f"[OK] URL Discussion Mode: {url_data.get('title', 'Unknown')} | Archived to Documents.")
 
                 else:
                     # Standard Chat Mode (Memories and Projects already injected into system_instruction)
                     full_input = f"User: {payload.message}"
-                    if relevant_memories:
-                        logger.info(f"[OK] Injected {len(relevant_memories)} memories into context")
-                    else:
-                        logger.info("[INFO] No relevant memories found for this query")
+                    logger.info(f"[OK] Dual-Track RAG Active.")
                 
                 try:
                     response = await chat.send_message_stream(full_input)
@@ -345,9 +466,7 @@ Type: {url_data.get('type')}
                         
                         # Send tool results back to Gemini for a final reply
                         if tool_results:
-                            follow_up = await chat.send_message_stream(
-                                types.Content(role="tool", parts=tool_results)
-                            )
+                            follow_up = await chat.send_message_stream(tool_results)
                             async for chunk in follow_up:
                                 if chunk.text:
                                     yield chunk.text
@@ -359,8 +478,11 @@ Type: {url_data.get('type')}
                          yield "\n\n*(Capacity Reached. Switching to High-Efficiency mode...)*\n\n"
                          # Fallback Logic: Try a chain of verified models
                          fallbacks = [
-                             sanitize_model_name("gemini-flash-lite-latest"),
+                             sanitize_model_name("gemini-2.5-flash"),
+                             sanitize_model_name("gemini-2.0-flash-lite"),
+                             sanitize_model_name("gemini-2.0-flash"),
                              sanitize_model_name("gemini-1.5-flash-latest"),
+                             sanitize_model_name("gemini-flash-lite-latest"),
                          ]
                          
                          success_fallback = False
@@ -370,7 +492,7 @@ Type: {url_data.get('type')}
                                  
                              try:
                                  logger.warning(f"🔄 Retrying with fallback: {fallback_name}")
-                                 fallback_chat = gemini_client.aio.chats.create(model=fallback_name, config=types.GenerateContentConfig(system_instruction=SYSTEM_PROMPT))
+                                 fallback_chat = req_gemini.aio.chats.create(model=fallback_name, config=types.GenerateContentConfig(system_instruction=system_instruction))
                                  # We need to send the history manually since we are creating a new chat instance 
                                  # but for simplicity/speed in fallback we just push the full input
                                  fallback_resp = await fallback_chat.send_message_stream(full_input)
