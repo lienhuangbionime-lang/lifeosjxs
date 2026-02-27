@@ -1,4 +1,7 @@
 // database-hippocampus/prisma/schema.prisma
+// Version: v3.8.1 "Cortex" Ground Truth
+// 🚨 NOTE: This is a static reference schema. Actual DB is Supabase PostgreSQL.
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,21 +11,119 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model LogEntry {
-  id        String   @id @default(cuid())
-  date      DateTime @unique
-  content   String   // Markdown body
-  mood      Int?
-  focus     Int?
-  energy    Int?
-  // V3.1 新增：思考軌跡
-  aiModel   String?  @default("gemini-flash") 
-  isAi      Boolean  @default(false)
-  createdAt DateTime @default(now())
+/// 核心記憶與日記表
+model memories {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  content      String
+  date         DateTime @unique @db.Date @default(now())
+  created_at   DateTime @default(now()) @db.Timestamptz
+  updated_at   DateTime @default(now()) @db.Timestamptz
   
-  // V7.1 新增：結構化資料
-  tags      String[] @default([])
-  habits    Json?    @default("{}")
-  meta      Json?    @default("{}")
-  updatedAt DateTime @updatedAt
+  // Metrics (0-10)
+  mood         Int      @default(5)
+  focus        Int      @default(5)
+  energy       Int      @default(5)
+  
+  // AI Metadata
+  tags         String[] @default([])
+  category     String   @default("Life")
+  is_ai        Boolean  @default(false)
+  ai_model     String?
+  
+  // Vector search (3072 dims)
+  // embedding  Unsupported("vector(3072)")? 
+  
+  // Forensic Data (v3.8.1)
+  local_path   String?
+  content_hash String?
+  ai_insights  String?
+}
+
+/// 外部文獻與搜尋結果表
+model documents {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title        String?
+  url          String?  @unique
+  content      String
+  doc_type     String   @default("webpage")
+  tags         String[] @default([])
+  metadata     Json     @default("{}")
+  created_at   DateTime @default(now()) @db.Timestamptz
+  updated_at   DateTime @default(now()) @db.Timestamptz
+  
+  // embedding  Unsupported("vector(3072)")?
+}
+
+/// AI 生成的月度回顧表
+model MonthlyReview {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  year         Int
+  month        Int
+  summary      String
+  metadata     Json     @default("{}")
+  created_at   DateTime @default(now()) @db.Timestamptz
+  updated_at   DateTime @default(now()) @db.Timestamptz
+
+  @@unique([year, month], name: "MonthlyReview_year_month_key")
+}
+
+/// 專案管理表
+model projects {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name         String
+  description  String?
+  status       String   @default("active")
+  progress     Int      @default(0)
+  start_date   DateTime? @db.Date
+  due_date     DateTime? @db.Date
+  parent_id    String?   @db.Uuid
+  meta         Json      @default("{}")
+  created_at   DateTime  @default(now()) @db.Timestamptz
+  updated_at   DateTime  @default(now()) @db.Timestamptz
+  
+  tasks        tasks[]
+}
+
+/// 任務管理表
+model tasks {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  title            String
+  status           String   @default("todo")
+  project_id       String?  @db.Uuid
+  source_memory_id String?  @db.Uuid
+  due_date         DateTime? @db.Date
+  priority         Int      @default(1)
+  created_at       DateTime  @default(now()) @db.Timestamptz
+  updated_at       DateTime  @default(now()) @db.Timestamptz
+  
+  project          projects? @relation(fields: [project_id], references: [id])
+}
+
+/// 知識圖譜節點
+model nodes {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  label        String   @unique
+  type         String   @default("concept")
+  metadata     Json     @default("{}")
+  created_at   DateTime @default(now()) @db.Timestamptz
+}
+
+/// 知識圖譜邊界
+model edges {
+  id           String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  source_id    String   @db.Uuid
+  target_id    String   @db.Uuid
+  relation     String   @default("related")
+  weight       Float    @default(1.0)
+  created_at   DateTime @default(now()) @db.Timestamptz
+}
+
+/// 系統配額追蹤
+model system_usage {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  date            DateTime @unique @db.Date @default(now())
+  request_count   Int      @default(0)
+  token_usage     Int      @default(0)
+  created_at      DateTime @default(now()) @db.Timestamptz
+  updated_at      DateTime @default(now()) @db.Timestamptz
 }

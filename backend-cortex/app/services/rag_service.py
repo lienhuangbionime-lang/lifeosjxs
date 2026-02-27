@@ -1,390 +1,227 @@
 import os
 import logging
-import tempfile
-import shutil
-from pathlib import Path
-from typing import List, Dict, Any, Optional
-from fastapi import UploadFile
-
-from langchain_community.document_loaders import PyPDFLoader, TextLoader
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_google_genai import GoogleGenerativeAIEmbeddings, ChatGoogleGenerativeAI
-from langchain_community.vectorstores import SupabaseVectorStore
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough, RunnableParallel
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
-from supabase.client import Client, create_client
-
-# For Upgrade Features
-from PIL import Image
-import io
 import re
-import requests
-from bs4 import BeautifulSoup
-from youtube_transcript_api import YouTubeTranscriptApi
+from datetime import datetime
+from typing import List, Dict, Any, Optional
+from app.core.database import supabase
+from app.core.gemini import get_model, gemini_client
+from app.services.embedder import generate_embedding
 
-# Init Logger
-logger = logging.getLogger("cortex.rag")
+logger = logging.getLogger("cortex.rag_service")
 
-# Init Supabase
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY")
-supabase: Optional[Client] = None
+class Memory:
+    """Standardized memory data structure for the system."""
+    def __init__(self, id: str, content: str, date: str, similarity: float, metadata: Optional[Dict] = None):
+        self.id = id
+        self.content = content
+        self.date = date
+        self.similarity = similarity
+        self.metadata = metadata or {}
 
-if SUPABASE_URL and SUPABASE_KEY:
-    try:
-        supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
-    except Exception as e:
-        logger.error(f"Failed to init Supabase: {e}")
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "content": self.content,
+            "date": self.date,
+            "similarity": self.similarity,
+            "metadata": self.metadata
+        }
 
-# Init Gemini
-try:
-    from app.core.gemini import get_model
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/gemini-embedding-001")
-    smart_config = get_model("smart")
-    llm = ChatGoogleGenerativeAI(model=smart_config["model"], temperature=0)
-    logger.info(f"RAG Service initialized with model: {smart_config['model']}")
-except Exception as e:
-    logger.warning(f"Failed to init Gemini: {e}")
-    embeddings = None
-    llm = None
-
-class RAGService:
+class UnifiedRAGService:
+    """
+    [PROTOCOL: ACTIVE INTELLIGENCE]
+    Unified RAG Service v3.8.5
+    Consolidates atomic memory retrieval (hybrid search) and document-track knowledge.
+    """
     def __init__(self):
-        if not supabase or not embeddings:
-            logger.warning("RAG Service Disabled: Missing Supabase or Gemini Config")
-            self.memories_store = None
-            self.documents_store = None
-            return
+        self.enabled = bool(supabase)
+        if not self.enabled:
+            logger.warning("UnifiedRAGService disabled: Supabase not configured.")
 
-        self.memories_store = SupabaseVectorStore(
-            client=supabase,
-            embedding=embeddings,
-            table_name="memories",
-            query_name="match_memories",
-        )
-        self.documents_store = SupabaseVectorStore(
-            client=supabase,
-            embedding=embeddings,
-            table_name="documents",
-            query_name="match_documents",
-        )
-        self.llm = llm
+    async def hybrid_search_memories(
+        self, 
+        query: str, 
+        limit: int = 5, 
+        similarity_threshold: float = 0.5
+    ) -> List[Memory]:
+        """
+        Hybrid search for 'memories' table: Vector + Fallback (Keyword/Date).
+        Optimized for atomic daily entries.
+        """
+        if not self.enabled:
+            return []
 
-    async def check_duplicate(self, url: str) -> bool:
-        """Check if a URL already exists in the documents table."""
-        if not supabase:
-            return False
         try:
-            res = supabase.table("documents").select("id").eq("url", url).execute()
-            return len(res.data) > 0
-        except Exception as e:
-            logger.error(f"Error checking duplicate URL: {e}")
-            return False
-    async def ingest_text(self, text: str, meta: Dict[str, Any] = {}, target: str = "memories"):
-        """Chunk text and store in the specified Supabase Vector Store"""
-        logger.info(f"Ingesting text into {target}... {meta}")
-        
-        # 1. Check for URL/YouTube
-        url_content = self._try_fetch_url_content(text)
-        if url_content:
-            url = text.strip()
-            # De-duplication check
-            if await self.check_duplicate(url):
-                logger.info(f"URL {url} already exists in documents. Skipping duplicate ingestion.")
-                return 0
-                
-            text = f"Source URL: {url}\n\nContent:\n{url_content}"
-            meta["url"] = url
-            # Auto-route URLs to documents if target is memories but it's clearly an external link
-            if target == "memories" and meta.get("source") != "capture":
-                target = "documents"
+            # 1. Vector Search
+            query_embedding = await generate_embedding(query, task_type="retrieval_query")
+            if not query_embedding:
+                return await self._fallback_search(query, limit)
 
-        # 2. Crystallize 2.0: Generate summary for documents
-        if target == "documents" and len(text) > 500:
-            summary = await self._crystallize_document(text)
-            meta["summary"] = summary
-            logger.info(f"Crystallize 2.0: Generated summary ({len(summary)} chars)")
-
-        # 3. Split
-        text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-        docs = text_splitter.create_documents([text], metadatas=[meta])
-        
-        # 4. Store
-        store = self.documents_store if target == "documents" else self.memories_store
-        if store:
-            store.add_documents(docs)
-            logger.info(f"Ingested {len(docs)} chunks into {target}.")
-            return len(docs)
-        return 0
-
-    async def ingest_file(self, file: UploadFile, target: str = "memories"):
-        """Process file (PDF/Text/Image) and store in the specified target"""
-        logger.info(f"Processing file: {file.filename} ({file.content_type})")
-        
-        # 1. Handle Image
-        if file.content_type and file.content_type.startswith("image/"):
-            return await self._process_image(file)
-
-        # 2. Handle Documents (PDF/Text)
-        suffix = Path(file.filename).suffix
-        with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-            shutil.copyfileobj(file.file, tmp)
-            temp_path = tmp.name
+            rpc_params = {
+                "query_embedding": query_embedding,
+                "match_threshold": similarity_threshold,
+                "match_count": limit
+            }
             
+            response = supabase.rpc("match_memories", rpc_params).execute()
+            results = response.data
+
+            # 2. Process Vector Results
+            memories = []
+            if results:
+                for item in results:
+                    mem = Memory(
+                        id=item.get("id"),
+                        content=item.get("content", ""),
+                        date=item.get("metadata", {}).get("date", "unknown"),
+                        similarity=item.get("similarity", 0.0),
+                        metadata=item.get("metadata", {})
+                    )
+                    memories.append(mem)
+                return memories
+
+            # 3. Fallback to Keyword/Date if vector returns nothing
+            return await self._fallback_search(query, limit)
+
+        except Exception as e:
+            logger.error(f"Hybrid search failed: {e}")
+            return []
+
+    async def _fallback_search(self, query: str, limit: int) -> List[Memory]:
+        """Simple keyword and date fallback logic."""
+        logger.info(f"RAG Fallback triggered for: '{query}'")
+        
+        # Detect date patterns (YYYY-MM-DD or MM/DD)
+        date_match = re.search(r'(\d{4})[-/](\d{1,2})[-/](\d{1,2})|(\d{1,2})[-/](\d{1,2})', query)
+        
+        query_builder = supabase.table("memories").select("*")
+        
+        if date_match:
+            groups = date_match.groups()
+            if groups[3] and groups[4]: # MM/DD
+                m, d = groups[3].zfill(2), groups[4].zfill(2)
+                curr_y = datetime.now().year
+                query_builder = query_builder.in_("date", [f"{curr_y}-{m}-{d}", f"{curr_y-1}-{m}-{d}"])
+            elif groups[0] and groups[1] and groups[2]: # YYYY-MM-DD
+                y, m, d = groups[0], groups[1].zfill(2), groups[2].zfill(2)
+                query_builder = query_builder.eq("date", f"{y}-{m}-{d}")
+        else:
+            query_builder = query_builder.ilike("content", f"%{query}%")
+
+        res = query_builder.limit(limit).execute()
+        
+        memories = []
+        for item in (res.data or []):
+            memories.append(Memory(
+                id=item.get("id"),
+                content=item.get("content", ""),
+                date=item.get("date", "unknown"),
+                similarity=0.9, # High score for direct match
+                metadata=item.get("metadata", {})
+            ))
+        return memories
+
+    async def search_documents(self, query: str, limit: int = 5) -> List[Dict]:
+        """Search 'documents' table for external knowledge."""
+        if not self.enabled: return []
+        
         try:
-            if file.filename.lower().endswith(".pdf"):
-                loader = PyPDFLoader(temp_path)
-            else:
-                loader = TextLoader(temp_path)
-            
-            raw_docs = loader.load()
-            text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
-            docs = text_splitter.split_documents(raw_docs)
-            
-            for doc in docs:
-                doc.metadata["source"] = file.filename
-                
-            if target == "documents" and self.documents_store:
-                self.documents_store.add_documents(docs)
-                logger.info(f"Ingested {len(docs)} chunks from {file.filename} into documents")
-                return len(docs)
-            elif self.memories_store:
-                self.memories_store.add_documents(docs)
-                logger.info(f"Ingested {len(docs)} chunks from {file.filename} into memories")
-                return len(docs)
-            return 0
-            
-        except Exception as e:
-            logger.error(f"Error ingesting file: {e}")
-            raise e
-        finally:
-            if os.path.exists(temp_path):
-                os.remove(temp_path)
+            query_embedding = await generate_embedding(query, task_type="retrieval_query")
+            if not query_embedding: return []
 
-    async def _process_image(self, file: UploadFile) -> int:
-        """Analyze image with Gemini Vision and store description"""
-        try:
-            content = await file.read()
-            image_data = {"mime_type": file.content_type, "data": content}
+            rpc_params = {
+                "query_embedding": query_embedding,
+                "match_threshold": 0.3, 
+                "match_count": limit
+            }
             
-            # Use LLM to describe image
-            prompt = "Describe this image in detail. Extract any text, charts, or key information."
-            message = HumanMessage(
-                content=[{"type": "text", "text": prompt}, {"type": "image_url", "image_url": f"data:{file.content_type};base64,{image_data}"}] # Langchain format varies, checking docs
-            )
-            # Actually LangChain Google GenAI supports passing image bytes directly or base64
-            # Simplified: Use PIL and pass to model if strictly typed, but simpler approach:
-            
-            import base64
-            b64_data = base64.b64encode(content).decode("utf-8")
-            
-            message = HumanMessage(
-                content=[
-                    {"type": "text", "text": "Describe this image in detail."},
-                    {"type": "image_url", "image_url": f"data:{file.content_type};base64,{b64_data}"}
-                ]
-            )
-            
-            response = await self.llm.ainvoke([message])
-            description = response.content
-            
-            logger.info(f"Image analysis complete: {description[:50]}...")
-            
-            # Store description
-            return await self.ingest_text(description, {"source": file.filename, "type": "image_description"})
-            
+            response = supabase.rpc("match_documents", rpc_params).execute()
+            return response.data or []
         except Exception as e:
-            logger.error(f"Image processing failed: {e}")
-            return 0
-
-    def _try_fetch_url_content(self, text: str) -> Optional[str]:
-        """Detect if text is a URL and fetch content"""
-        text = text.strip()
-        url_pattern = re.compile(r'https?://\S+')
-        if not url_pattern.match(text):
-            return None
-            
-        try:
-            # YouTube
-            if "youtube.com" in text or "youtu.be" in text:
-                return self._fetch_youtube_transcript(text)
-            
-            # General Web
-            response = requests.get(text, timeout=10)
-            soup = BeautifulSoup(response.content, 'html.parser')
-            
-            # Remove script/style
-            for script in soup(["script", "style"]):
-                script.decompose()
-                
-            return soup.get_text(separator='\n', strip=True)
-            
-        except Exception as e:
-            logger.warning(f"Failed to fetch URL {text}: {e}")
-            return None
-
-    def _fetch_youtube_transcript(self, url: str) -> str:
-        """Fetch YouTube transcript"""
-        try:
-            video_id = ""
-            if "v=" in url:
-                video_id = url.split("v=")[1].split("&")[0]
-            elif "youtu.be/" in url:
-                video_id = url.split("youtu.be/")[1].split("?")[0]
-            
-            if not video_id:
-                return "Could not extract Video ID"
-                
-            transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
-            full_text = " ".join([t['text'] for t in transcript_list])
-            return f"YouTube Transcript ({video_id}):\n{full_text}"
-            
-        except Exception as e:
-            return f"Failed to fetch YouTube transcript: {e}"
-
-    async def _crystallize_document(self, text: str) -> str:
-        """Crystallize 2.0: Generate a high-signal technical summary for a document"""
-        if not self.llm:
-            return "Summary unavailable."
-            
-        prompt = ChatPromptTemplate.from_template("""
-        [PROTOCOL: CRYSTALLIZE 2.0]
-        Analyze the following external content and generate a highly structured, high-signal summary.
-        
-        Guidelines:
-        1. [CORE]: Extract the primary purpose and technical architecture.
-        2. [BINDING]: Suggest how this connects to LifeOS (Projects, Systems).
-        3. [ACTION]: Identify 2-3 immediate actionable insights or upgrades.
-        4. [DIAGRAM]: If applicable, describe a Mermaid chart structure.
-        
-        Content:
-        {content}
-        
-        Output format: Concise Markdown with GitHub alerts.
-        """)
-        
-        chain = prompt | self.llm | StrOutputParser()
-        try:
-            # Take only first 10k chars for summary to avoid bloat
-            summary = await chain.ainvoke({"content": text[:10000]})
-            return summary
-        except Exception as e:
-            logger.error(f"Crystallization failed: {e}")
-            return "Crystallization failed."
+            logger.error(f"Document search failed: {e}")
+            return []
 
     async def unified_search(self, question: str, limit: int = 5) -> Dict[str, str]:
         """
-        Dual-Track Retrieval: Search both memories and documents.
-        Returns a dictionary with formatted context for both.
+        The Master Search Entrance.
+        Retrieves from both Memories (Atomic) and Documents (Bulk Knowledge).
         """
-        mem_context = ""
-        doc_context = ""
+        memories = await self.hybrid_search_memories(question, limit=limit)
+        documents = await self.search_documents(question, limit=limit)
+
+        mem_text = "\n\n".join([f"[{m.date}] {m.content}" for m in memories])
+        doc_text = "\n\n".join([f"[{d.get('title', 'Doc')}] {d.get('content', '')}" for d in documents])
+
+        return {
+            "memories": mem_text,
+            "documents": doc_text
+        }
+
+    async def ingest_text(self, text: str, meta: Dict[str, Any] = {}, target: str = "documents") -> int:
+        """Ingest raw text into the specified table."""
+        if not self.enabled: return 0
         
         try:
-            if self.memories_store:
-                mem_matches = await self.memories_store.asimilarity_search(question, k=limit)
-                mem_context = "\n\n".join([d.page_content for d in mem_matches])
-                
-            if self.documents_store:
-                doc_matches = await self.documents_store.asimilarity_search(question, k=limit)
-                doc_context = "\n\n".join([d.page_content for d in doc_matches])
-                
-            return {
-                "memories": mem_context,
-                "documents": doc_context
+            # Unified Architecture: All tables target 3072 (Gemini Embedding v1)
+            embedding = await generate_embedding(text, dimensionality=3072)
+            payload = {
+                "content": text,
+                "metadata": meta,
+                "embedding": embedding,
+                "created_at": datetime.now().isoformat()
             }
+            if target == "documents":
+                payload["title"] = meta.get("title", f"Note {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+                # Ensure doc_type is set
+                payload["doc_type"] = meta.get("type", "webpage")
+            
+            supabase.table(target).insert(payload).execute()
+            return 1
         except Exception as e:
-            logger.error(f"Unified Search failed: {e}")
-            return {"memories": "", "documents": ""}
+            logger.error(f"Text ingest failed for target {target}: {e}")
+            return 0
 
-    async def query(self, question: str, history: List[Dict[str, str]] = []):
-        """RAG Query with History and System Context (Dual-Track Awareness)"""
-        logger.info(f"Querying: {question} with history of {len(history)} messages")
-        
-        if not self.memories_store and not self.documents_store:
-            yield "Cortex Error: Vector Stores Unavailable"
-            return
-
-        try:
-            # 1. Fetch System Context (Projects & Recent Memories)
-            system_context = await self._get_system_context()
-            
-            # 2. Dual-Track Search
-            search_results = await self.unified_search(question)
-            mem_context = search_results["memories"]
-            doc_context = search_results["documents"]
-            
-            # 3. Load System Persona from Markdown
-            persona_path = Path(__file__).parent.parent.parent / "prompts" / "system_cortex.md"
-            try:
-                cortex_persona = persona_path.read_text(encoding="utf-8")
-            except Exception as e:
-                logger.warning(f"Could not load cortex_brain.md: {e}")
-                cortex_persona = "You are Cortex, a Senior Tech Lead AI Assistant."
-
-            # 4. Build Messages
-            messages = [
-                SystemMessage(content=f"""{cortex_persona}
-                
-                --- SYSTEM CONTEXT (CURRENT STATE) ---
-                {system_context}
-                
-                --- PERSONAL MEMORIES (RAG) ---
-                {mem_context if mem_context else "No related personal memories."}
-                
-                --- EXTERNAL DOCUMENTS & KNOWLEDGE (RAG) ---
-                {doc_context if doc_context else "No related external documents."}
-                
-                Current Task: Assist the user with his request while adhering to the Value Weights and Operational Directives. 
-                Synthesize insights from both personal memories and external knowledge where relevant.
-                """)
-            ]
-
-            
-            # Add History
-            for h in history:
-                if h["role"] == "user":
-                    messages.append(HumanMessage(content=h["content"]))
-                else:
-                    messages.append(AIMessage(content=h["content"]))
-            
-            # Add Current Question
-            messages.append(HumanMessage(content=question))
-            
-            # 4. Stream Response
-            async for chunk in self.llm.astream(messages):
-                 yield chunk.content
-
-        except Exception as e:
-            logger.error(f"RAG Error: {e}")
-            yield f"Error: {str(e)}"
-
-    async def _get_system_context(self) -> str:
-        """Fetch current projects and recent memories for prompt context"""
-        if not supabase:
-            return "No system connection."
+    async def ingest_file(self, file: Any, target: str = "documents") -> int:
+        """
+        [NEW] Ingest a file into the knowledge base.
+        If it's an image, use Gemini Vision to interpret it.
+        """
+        if not self.enabled: return 0
         
         try:
-            # Fetch active projects
-            proj_res = supabase.table("projects").select("name, status, progress").eq("status", "active").limit(5).execute()
-            projects = proj_res.data if proj_res.data else []
-            proj_str = "\n".join([f"- {p['name']} ({p['status']}, {p['progress']}%)" for p in projects])
+            filename = file.filename
+            content_type = file.content_type
+            data = await file.read()
             
-            # Fetch recent memories
-            mem_res = supabase.table("memories").select("content, date").order("date", desc=True).limit(5).execute()
-            memories = mem_res.data if mem_res.data else []
-            mem_lines = []
-            for m in memories:
-                content = m.get('content') or ""
-                date = m.get('date') or "Unknown"
-                mem_lines.append(f"[{date}] {content[:100]}...")
-            mem_str = "\n".join(mem_lines)
-            
-            return f"Active Projects:\n{proj_str}\n\nRecent Memories:\n{mem_str}"
-        except Exception as e:
-            logger.warning(f"Failed to fetch system context: {e}")
-            return "Context unavailable."
+            # 1. Handle Multimodal Content (Images, PDFs)
+            multimodal_mimes = ["image/", "application/pdf"]
+            if any(content_type.startswith(m) for m in multimodal_mimes):
+                logger.info(f"🔮 Multimodal content detected: {filename} ({content_type}). Using Gemini for interpretation...")
+                from app.core.gemini import multimodal_interpret
+                
+                interpretation = await multimodal_interpret(data, content_type)
+                text_content = f"### Multimodal Interpretation: {filename}\n\n{interpretation}"
+                logger.info(f"[OK] Gemini generated interpretation.")
+            else:
+                # 2. Handle Text/PDF (Simplified for now - Title only)
+                # TODO: Implement full PDF/Doc parsing
+                text_content = f"Document File: {filename}\nContent Type: {content_type}\n(Binary content stored, but text extraction pending implementation)"
 
-rag_service = RAGService()
+            # 3. Ingest the generated text description
+            return await self.ingest_text(
+                text=text_content,
+                meta={
+                    "source": "file_upload",
+                    "filename": filename,
+                    "content_type": content_type,
+                    "title": f"Upload: {filename}"
+                },
+                target=target
+            )
+            
+        except Exception as e:
+            logger.error(f"File ingest failed: {e}")
+            return 0
+
+# Singleton instance
+rag_service = UnifiedRAGService()

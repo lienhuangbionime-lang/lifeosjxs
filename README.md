@@ -1,97 +1,133 @@
-# LifeOS v3.1 "Autopoiesis" System Architecture
+# LifeOS v3.8.5 "Cortex: Actionable Intelligence"
 
-## 1. 專案願景
-我們正在開發 LifeOS v3.1，這是一個「生物化」的個人作業系統。
-核心概念是 **Autopoiesis (自生系統)**，系統具備感知、記憶、執行與自我進化的能力。
+> **自生系統 (Autopoietic OS)**：一個具備自我感知、長期記憶與主動執行能力的個人數位生命體。
 
-## 2. 系統架構 (The Anatomy)
-採用 **Monorepo** 結構，分為四個視窗 (Windows)：
-
-### * **Window 1: The Body (Frontend)**
-* **路徑**: `frontend-body/`
-* **技術**: Next.js 15, Tailwind CSS (Dark Mode), Lucide Icons.
-* **狀態**: 已完成 UI 修復 (Hydration, CSS)、圖譜引擎 (D3 Dynamic Import) 與專案板 (Tag Aggregation)。已植入 `SystemStatus` 元件。
-* **部署**: Vercel (已連線 Railway).
-
-### * **Window 2 & 3: The Cortex (Backend)**
-* **路徑**: `backend-cortex/`
-* **技術**: FastAPI, Python 3.11+, Google Gemini SDK (Pro/Flash), APScheduler.
-* **核心功能**:
-    * **Sorter Agent**: 負責快速分類輸入。
-    * **Architect Agent**: 負責深度思考與對話 (需符合 Pydantic 結構化輸出)。
-    * **Evolution Agent**: 負責掃描 Google Model Garden 並自動修改 `.env` 升級模型。
-* **部署**: Railway (Docker).
-
-### * **Window 4: The Hippocampus (Database)**
-* **技術**: Supabase (PostgreSQL + pgvector).
-* **資料**: 存放 Logs (日誌), Tasks (任務), Thoughts (思考軌跡).
-
-## 3. 目前進度 (Current Status)
-1. **前端 (Body)**: 已完成重構。`page.tsx` 已整合 Capture, Graph, Project, SystemStatus。解決了 Hydration 與 TypeScript 錯誤。
-2. **後端 (Brain)**: 定義了 `backend-cortex` 目錄結構。
-3. **進化協議 (Evolution)**:
-    * 後端 `api/v1/system.py` 已實作 `POST /upgrade` (修改 .env)。
-    * 前端 `SystemStatus.tsx` 已實作 UI 與 API 串接。
-
-## 4. 關鍵準則 (Guidelines)
-1. **Gemini API 分層**: 使用 Flash 模型處理感知，Pro 模型處理思考。
-2. **結構化輸出**: 所有 Agent 必須透過 Pydantic 定義 `response_schema`。
-3. **思考簽名**: AI 回應必須包含 `thought_signature` (觀察、情緒、記憶連結)。
-
-## 5. 下一步任務 (Next Steps)
-我們需要開始實作 `backend-cortex` 的核心 Agent 邏輯：
-1. 完善 `app/core/gemini.py` (Client 封裝)。
-2. 實作 `Architect Agent` 的 Prompt 與邏輯。
-3. 讓前端的 `CaptureView` 真正打通到 FastAPI 的 `ingest` 端點。
-
-## 檔案結構 (File Structure)
-
+```mermaid
+graph TD
+    User((使用者)) <--> Body[The Body: Frontend-Body]
+    Body <--> Cortex[The Cortex: Backend-Cortex]
+    Cortex <--> Hippocampus[(The Hippocampus: Supabase)]
+    Cortex <--> Brain[The Brain: Sync-Brain]
+    
+    subgraph "Intelligence Loop"
+    Cortex -- "RAG" --> Hippocampus
+    Cortex -- "Self-Awareness" --> Brain
+    end
 ```
-Life-os-v3/
-├── README.md                # 📜 [系統宣言] Evolution Protocol 說明
+
+---
+
+## 🏗️ 系統層次架構 (System Architecture)
+
+### 1. 🔲 The Body (視覺與交互層) - `frontend-body/`
+*   **核心組件**: 
+    *   `CaptureView.tsx`: 原始數據採集器，對接後端 Ingest 引擎。
+    *   `CortexChat.tsx`: AI 交互中樞，支援即時 RAG 與工具呼叫。
+    *   `NeuralGraph.tsx`: 基於 D3.js 的神經網絡視圖，展現記憶關聯。
+    *   `ProjectBoard.tsx`: 專案看板，將 AI 洞察轉化為可視化的進度條。
+
+### 2. 🧠 The Cortex (處理與調度層) - `backend-cortex/`
+*   **API 核心 (`app/api/v1/`)**:
+    *   `ingest.py`: Sorter Agent 邏輯，負責解析、結構化與存儲日記。
+    *   `chat.py`: 支援串流回應、檢索與技能動態注入。
+    *   `brain.py`: 圖譜數據聚合，提供 nodes 與 edges 的關聯檢索。
+*   **服務層 (`app/services/`)**:
+    *   `rag_service.py`: 雙軌檢索核心，負責 `memories` 與 `documents` 的統一調度。
+    *   `subconscious.py`: 潛意識引擎，負責背景反思與長期洞察生成。
+    *   `skills.py`: 技能編排器，依語境自動擴展 AI 能力。
+
+---
+
+## 🗺️ 功能對應矩陣 (Correspondence Map)
+
+| 功能模組 (Module) | 前端組件 (Frontend) | 後端端點 (Backend API) | 資料庫表 (Database) | AI 核心 (AI Engine) |
+| :--- | :--- | :--- | :--- | :--- |
+| **日記感知** | `CaptureView.tsx` | `POST /ingest` | `memories` | Sorter Agent |
+| **智慧對話** | `CortexChat.tsx` | `POST /chat/message` | `memories`, `documents` | RAG & Skill Orchestrator |
+| **知識圖譜** | `NeuralGraph.tsx` | `GET /brain/graph` | `nodes`, `edges` | Crystallizer Engine |
+| **專案管理** | `ProjectBoard.tsx` | `GET /projects` | `projects`, `tasks` | Actionable Protocol |
+| **潛意識反思** | `CardStackDashboard` | `POST /reflect` | `memories` (type: reflection) | Subconscious Engine |
+
+---
+
+## 📂 檔案結構 (Detailed File Tree v3.8.5)
+
+```text
+lifeosjxs/
+├── README.md                # 📜 [系統宣言] 完整架構與協助能力說明
 │
 ├── 📂 frontend-body/        # 🟦 Window 1: The Body (Next.js 15)
-│   ├── next.config.js       # ⚙️ 前端運行配置
-│   ├── tailwind.config.ts   # 🎨 樣式配置
 │   ├── package.json         # 📦 前端依賴管理
 │   ├── 📂 app/              # 🚀 [路由中樞]
-│   │   ├── globals.css      # 🎨 全域樣式
+│   │   ├── globals.css      # 🎨 全域樣式 (Neon UI Tokens)
 │   │   ├── layout.tsx       # 🏗️ UI 佈局骨架
-│   │   └── page.tsx         # 🏠 系統首頁入口
+│   │   └── page.tsx         # 🏠 系統首頁入口 (Dashboard 載入器)
 │   ├── 📂 components/       # 🎨 [視覺模組] 系統交互器官
-│   │   ├── CaptureView.tsx  # 📝 AI Terminal (快取輸入)
-│   │   ├── ContextModal.tsx # 🗔 上下文彈窗
-│   │   ├── Dashboard.tsx    # 📊 主控面板
-│   │   ├── GraphView.tsx    # 🕸️ 圖譜視圖
-│   │   ├── HistoryView.tsx  # 📜 歷史回溯 (接軌 Memories API)
-│   │   ├── NeuralGraph.tsx  # 🧠 神經關聯圖
+│   │   ├── CaptureView.tsx  # 📝 AI Terminal (日記採集器)
+│   │   ├── CortexChat.tsx   # 💬 智慧對話中樞 (RAG & Tools)
+│   │   ├── NeuralGraph.tsx  # 🧠 神經圖譜 (D3.js 力導向圖)
 │   │   ├── ProjectBoard.tsx # 🏗️ 專案管理面板
-│   │   ├── SettingsView.tsx # ⚙️ 系統調節
-│   │   └── SystemStatus.tsx # 🧬 系統進化 (接軌 System API)
-│   └── 📂 lib/              # 🔌 [神經傳導]
-│       ├── 📂 ai/           # 🧠 前端 AI 核心函數 (core.ts)
-│       └── 📂 api/          # 🌐 API Client (client.ts)
+│   │   └── TodaySnapshot.tsx# 📅 今日摘要 (API 快照)
+│   └── 📂 lib/api/          # 🔌 [神經傳導]
+│       └── client.ts        # 🌐 API Client (cortex.ingest / cortex.chat)
 │
 ├── 📂 backend-cortex/       # 🟧 & 🟪 Window 2 & 3: The Cortex (FastAPI)
 │   ├── main.py              # 🚪 應用程式入口 (掛載 Routers & Scheduler)
-│   ├── requirements.txt     # 📦 Python 核心依賴 (fastapi, uvicorn, supabase, google-genai)
-│   ├── .env                 # 🔑 [私鑰] GEMINI_API_KEY, SUPABASE_URL/KEY
-│   └── 📂 app/              # 🧠 [大腦邏輯層]
-│       ├── 📂 core/         # ⚙️ [核心基礎設施]
-│       │   ├── config.py    # 🔧 環境變數管理
-│       │   ├── database.py  # 💾 Database Client (supabase-py 單例)
-│       │   └── gemini.py    # 🤖 Model Factory (Client 初始化 & get_model)
-│       ├── 📂 models/       # 📐 [資料結構]
-│       │   └── schemas.py   # 📝 Pydantic Models (LogEntry, API Response)
-│       ├── 📂 api/          # 🌐 [皮質接口] (Routers)
-│       │   └── 📂 v1/
-│       │       ├── ingest.py    # 📥 感知輸入 (處理 CaptureView)
-│       │       ├── memories.py  # 💾 記憶檢索 (處理 HistoryView)
-│       │       └── system.py    # 🧬 系統狀態 (處理 SystemStatus)
-│       └── 📂 subconscious/ # 🌑 [潛意識循環]
-│           └── scheduler.py # ⏰ 生物時鐘 (APScheduler 心跳與排程)
+│   ├── requirements.txt     # 📦 Python 核心依賴框架
+│   ├── .env                 # 🔑 [私鑰] API Keys & Database Secrets
+│   ├── 📂 app/              # 🧠 [大腦邏輯層]
+│   │   ├── 📂 core/         # ⚙️ [核心基礎設施]
+│   │   │   ├── database.py  # 💾 Supabase Client (單例模式)
+│   │   │   └── gemini.py    # 🤖 Model Factory (模型選型與清理)
+│   │   ├── 📂 models/       # 📐 [資料結構]
+│   │   │   └── schemas.py   # 📝 Pydantic Models (v3.8.1 對齊)
+│   │   ├── 📂 api/v1/       # 🌐 [皮質接口] (Routers)
+│   │   │   ├── ingest.py    # 📥 感知輸入 (處理 CaptureView)
+│   │   │   ├── chat.py      # 💬 智慧對話 (處理 CortexChat)
+│   │   │   └── brain.py     # 🕸️ 圖譜與成長端點
+│   │   ├── 📂 services/     # 🧪 [功能實作層]
+│   │   │   ├── rag_service.py   # 🔎 雙軌檢索 (Unified RAG Engine)
+│   │   │   ├── subconscious.py  # 🌑 潛意識自主反思引擎
+│   │   │   └── skills.py        # 🛠️ 技能編排器 (Dynamic Skill Loading)
+│   ├── 📂 schemas/         # 🧬 [系統基因]
+│   │   ├── registry.json    # 📜 DB Schema 絕對對齊 (Supabase Ground Truth)
+│   │   └── evolution_log.json # 📈 系統演化歷史紀錄
+│   └── 📂 skills/          # 🛠️ [技能手冊]
+│       ├── core/           # 任務與專案主動執行技能
+│       └── research/       # Web Search 與外部調研技能
 │
-└── 📂 database-hippocampus/ # 🟩 Window 4: The Hippocampus
-    └── 📂 prisma/           # 📐 [核心記憶模板]
-        └── schema.prisma    # 📝 唯一記憶真理來源 (Schema Definition Only)
+├── 📂 sync_brain/           # 🧠 The Brain (AI 靈魂中樞 - 開發者必讀)
+│   ├── START_HERE.md       # 🌟 AI 開發交接第一站
+│   ├── SYSTEM_CONTEXT.md   # 📖 系統架構真理文件
+│   └── 📂 prompts/         # 📜 指令集模板 (Cortex/Daily/Review)
+│
+├── 📂 tools/                # 🔧 開發者工具箱
+│   ├── session_start.py     # 🌅 開工日誌啟動
+│   ├── session_end.py       # 🌇 收工演化交接
+│   └── batch_embed.py       # 補填歷史向量工具
+│
+└── 📂 database-hippocampus/  # 🟩 Window 4: The Hippocampus
+    └── 📂 infra/            # 📐 SQL 初始化與 Migration 指令
 ```
+
+---
+
+## 💡 系統調整指南 (Adjustment Guide)
+
+如果您想要對系統進行特定深度調整，請參考以下路徑：
+
+### 1. 資料結構 (Data Schema)
+*   **修改定義**: 編輯 [schema.prisma](file:///C:/Users/lien.huang/AppData/lifeosjxs/database-hippocampus/prisma/schema.prisma)。
+*   **同步 AI**: 更新 [registry.json](file:///C:/Users/lien.huang/AppData/lifeosjxs/backend-cortex/schemas/registry.json) 以確保後端與 AI 識別最新欄位。
+
+### 2. AI 邏輯與人格 (AI Logic & Personality)
+*   **技能擴展**: 調整 `backend-cortex/skills/` 下的對應 `SKILL.md`（例如：變更「反思」邏輯）。
+*   **核心人格**: 修改 [system_cortex.md](file:///C:/Users/lien.huang/AppData/lifeosjxs/sync_brain/prompts/system_cortex.md) 更改 AI 的語氣與執行準則。
+
+### 3. 前端介面 (Frontend UI)
+*   **視覺微調**: 直接在 `frontend-body/components/` 下找到對應組件。系統採用原生 CSS 以確保最大靈活性。
+
+---
+---
+**協作協議**: 本系統遵守 [人機協作協議 (HUMAN_AI_AGREEMENT.md)](file:///C:/Users/lien.huang/AppData/lifeosjxs/sync_brain/HUMAN_AI_AGREEMENT.md) 進行演化。
+**Status**: v3.8.5 | **Commanding**: 蒼禾 | **Dev AI**: Antigravity

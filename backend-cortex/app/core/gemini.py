@@ -141,3 +141,24 @@ def get_request_gemini_client(request: "Request"):
         except Exception as e:
             logger.warning(f"[WARN] Could not create per-request Gemini client: {e}")
     return gemini_client  # fallback to global
+    
+async def multimodal_interpret(file_data: bytes, mime_type: str, prompt: str = "Describe this content in detail and extract all key information. If it's a document, provide a structured summary. Language: Traditional Chinese.") -> str:
+    """
+    [NEW] Unified Multimodal Helper.
+    Interpret an image or document (PDF/Text) using Gemini 2.0 Flash.
+    """
+    if not gemini_client:
+        return "[Error: Gemini Multimodal not configured]"
+        
+    try:
+        response = await gemini_client.aio.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[
+                prompt,
+                types.Part.from_bytes(data=file_data, mime_type=mime_type)
+            ]
+        )
+        return response.text
+    except Exception as e:
+        logger.error(f"Multimodal interpret failed: {e}")
+        return f"[Error interpreting file: {str(e)}]"

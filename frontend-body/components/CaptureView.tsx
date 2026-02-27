@@ -232,20 +232,38 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
     }
   };
 
-  const handleImageUpload = (file: File) => {
+  const handleFileUpload = (file: File) => {
     if (!file) return;
 
-    // 1. Convert image to Base64/DataURL for immediate preview/text integration
-    // (In a production app, we would upload to Supabase Storage and get a URL)
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const result = e.target?.result as string;
-      // Insert markdown image syntax into text area
-      const imageMarkdown = `\n![${file.name}](${result})\n`;
-      setText(prev => prev + imageMarkdown);
-      alert("Image added to log!");
-    };
-    reader.readAsDataURL(file);
+    // 1. Special Handling for Markdown/Text (Direct extraction)
+    if (file.type === 'text/markdown' || file.name.endsWith('.md') || file.type === 'text/plain') {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        const divider = `\n\n--- [Attachment: ${file.name}] ---\n`;
+        setText(prev => prev + divider + result + '\n---\n');
+        alert(`${file.name} content extracted into log!`);
+      };
+      reader.readAsText(file);
+      return;
+    }
+
+    // 2. Multimodal Handling (Base64/DataURL) for Images, PDF
+    const supportedMultimodal = ['image/', 'application/pdf'];
+    if (supportedMultimodal.some(m => file.type.startsWith(m))) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const result = e.target?.result as string;
+        // Insert markdown-style syntax into text area
+        const fileMarkdown = `\n![${file.name}](${result})\n`;
+        setText(prev => prev + fileMarkdown);
+        const typeLabel = file.type.startsWith('image/') ? 'Image' : 'PDF';
+        alert(`${typeLabel} added for interpretation!`);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      alert(`Unsupported file type: ${file.type}. Currently supporting MD, PDF, and Images.`);
+    }
   };
 
   return (
@@ -295,8 +313,8 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
           onDrop={(e) => {
             e.preventDefault();
             const file = e.dataTransfer.files?.[0];
-            if (file && file.type.startsWith('image/')) {
-              handleImageUpload(file);
+            if (file) {
+              handleFileUpload(file);
             }
           }}
           onDragOver={(e) => e.preventDefault()}
@@ -310,10 +328,8 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
             onClick={() => {
               if (isRecording) {
                 setIsRecording(false);
-                // Stop logic handled by effect
               } else {
                 setIsRecording(true);
-                // Start logic handled by effect
               }
             }}
             className={`p-3 rounded-full transition-all ${isRecording ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}`}
@@ -322,17 +338,18 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
           </button>
           <input
             type="file"
-            accept="image/*"
+            accept="image/*,.md,.txt,application/pdf"
             className="hidden"
-            id="image-upload"
+            id="file-upload"
             onChange={(e) => {
               const file = e.target.files?.[0];
-              if (file) handleImageUpload(file);
+              if (file) handleFileUpload(file);
             }}
           />
           <button
-            onClick={() => document.getElementById('image-upload')?.click()}
+            onClick={() => document.getElementById('file-upload')?.click()}
             className="p-3 rounded-full bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-all"
+            title="Upload Image, MD, or PDF"
           >
             <ImageIcon size={20} />
           </button>

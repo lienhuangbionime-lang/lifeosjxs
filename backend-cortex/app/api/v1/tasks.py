@@ -30,9 +30,14 @@ class TaskCreate(BaseModel):
 # --- Endpoints ---
 
 @router.get("/", response_model=List[Task])
-async def get_tasks(project_id: Optional[str] = None):
-    """List tasks, optionally filtered by project."""
-    query = supabase.table("tasks").select("*").neq("status", "archived")
+async def get_tasks(project_id: Optional[str] = None, all: bool = False):
+    """List tasks. Defaults to 'todo' status unless 'all=true'."""
+    query = supabase.table("tasks").select("*")
+    
+    if not all:
+        query = query.eq("status", "todo")
+    else:
+        query = query.neq("status", "archived")
     
     if project_id:
         query = query.eq("project_id", project_id)

@@ -386,6 +386,36 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
     db = get_request_client(http_request)
     req_gemini = get_request_gemini_client(http_request)
     
+    # [NEW Phase P17] Multimodal Interpretation (Images, PDFs) for CaptureView
+    # Target: ![filename](data:mime/type;base64,...)
+    import re as _re_vision
+    import base64
+    from app.core.gemini import multimodal_interpret
+    
+    # Updated regex to support multiple mime-types (image, application/pdf)
+    multimodal_matches = _re_vision.findall(r'!\[(.*?)\]\((data:(image/.*?|application/pdf);base64,.*?)\)', request.content)
+    if multimodal_matches:
+        logger.info(f"🔮 Detected {len(multimodal_matches)} multimodal items in content. Processing interpretation...")
+        modified_content = request.content
+        for filename, data_url, mime_type in multimodal_matches:
+            try:
+                # Extract base64
+                encoded = data_url.split(",", 1)[1]
+                file_bytes = base64.b64decode(encoded)
+                
+                # Interpret
+                interpretation = await multimodal_interpret(file_bytes, mime_type)
+                
+                # Replace the blob with interpretation + link
+                type_label = "📸 Image" if "image" in mime_type else "📄 Document"
+                replacement = f"\n> **[{type_label} Interpretation: {filename}]**\n> {interpretation}\n"
+                modified_content = modified_content.replace(f"![{filename}]({data_url})", replacement)
+                logger.info(f"[OK] Interpreted {filename} ({mime_type})")
+            except Exception as ve:
+                logger.error(f"Multimodal processing failed for {filename}: {ve}")
+        
+        request.content = modified_content
+    
     # Debug info
     logger.info(f"📥 Received INGEST request. Mode: {request.mode}, skipAi: {request.skipAi}")
     

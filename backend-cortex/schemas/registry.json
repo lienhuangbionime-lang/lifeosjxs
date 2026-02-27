@@ -1,8 +1,58 @@
 {
-    "schema_version": "3.5",
-    "last_updated": "2026-02-11T03:16:19+08:00",
+    "schema_version": "3.8",
+    "last_updated": "2026-02-27T20:50:00+08:00",
     "database": "supabase",
     "tables": {
+        "MonthlyReview": {
+            "description": "AI 生成的月度回顧表",
+            "columns": {
+                "id": {
+                    "type": "BIGINT",
+                    "primary_key": true,
+                    "identity": "ALWAYS"
+                },
+                "year": {
+                    "type": "INT",
+                    "nullable": false
+                },
+                "month": {
+                    "type": "INT",
+                    "nullable": false
+                },
+                "summary": {
+                    "type": "TEXT"
+                },
+                "highlights": {
+                    "type": "JSONB",
+                    "default": "'[]'"
+                },
+                "challenges": {
+                    "type": "JSONB",
+                    "default": "'[]'"
+                },
+                "lessons": {
+                    "type": "JSONB",
+                    "default": "'[]'"
+                },
+                "next_steps": {
+                    "type": "JSONB",
+                    "default": "'[]'"
+                },
+                "created_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()"
+                }
+            },
+            "unique_constraints": [
+                {
+                    "name": "MonthlyReview_year_month_key",
+                    "columns": [
+                        "year",
+                        "month"
+                    ]
+                }
+            ]
+        },
         "cortex_growth_logs": {
             "description": "AI 決策與演化日誌表（玻璃盒協議核心）",
             "columns": {
@@ -13,35 +63,72 @@
                 },
                 "decision_context": {
                     "type": "TEXT",
-                    "nullable": false,
-                    "description": "決策背景與面臨的問題"
+                    "nullable": false
                 },
                 "options_provided": {
                     "type": "JSONB",
-                    "nullable": false,
-                    "description": "系統給出的選項矩陣 (A vs B)"
+                    "nullable": false
                 },
                 "user_choice": {
                     "type": "TEXT",
-                    "nullable": false,
-                    "description": "指揮官最終的選擇"
+                    "nullable": false
                 },
                 "ai_prediction": {
-                    "type": "TEXT",
-                    "nullable": true,
-                    "description": "系統原先預測的選擇"
+                    "type": "TEXT"
                 },
                 "prediction_match": {
-                    "type": "BOOLEAN",
-                    "nullable": true,
-                    "description": "預測是否命中 (用於計算誤判率)"
+                    "type": "BOOLEAN"
                 },
                 "lessons_learned": {
-                    "type": "TEXT",
-                    "nullable": true,
-                    "description": "從此次決策中提取的新偏好權重"
+                    "type": "TEXT"
                 },
                 "created_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()"
+                },
+                "embedding": {
+                    "type": "VECTOR(3072)",
+                    "description": "決策向量空間位點"
+                }
+            }
+        },
+        "documents": {
+            "description": "外部文獻與搜尋結果儲存表（隔離個人記憶）",
+            "columns": {
+                "id": {
+                    "type": "UUID",
+                    "primary_key": true,
+                    "default": "gen_random_uuid()"
+                },
+                "content": {
+                    "type": "TEXT"
+                },
+                "metadata": {
+                    "type": "JSONB"
+                },
+                "embedding": {
+                    "type": "VECTOR(3072)"
+                },
+                "title": {
+                    "type": "TEXT"
+                },
+                "url": {
+                    "type": "TEXT",
+                    "unique": true
+                },
+                "doc_type": {
+                    "type": "TEXT",
+                    "default": "'webpage'"
+                },
+                "tags": {
+                    "type": "TEXT[]",
+                    "default": "'{}'"
+                },
+                "created_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()"
+                },
+                "updated_at": {
                     "type": "TIMESTAMPTZ",
                     "default": "NOW()"
                 }
@@ -56,25 +143,21 @@
                     "default": "gen_random_uuid()"
                 },
                 "content": {
-                    "type": "TEXT",
-                    "nullable": false
+                    "type": "TEXT"
                 },
                 "date": {
                     "type": "DATE",
                     "nullable": false,
-                    "default": "CURRENT_DATE",
-                    "indexed": true
+                    "unique": true,
+                    "default": "CURRENT_DATE"
                 },
                 "created_at": {
                     "type": "TIMESTAMPTZ",
-                    "nullable": false,
                     "default": "NOW()"
                 },
                 "updated_at": {
                     "type": "TIMESTAMPTZ",
-                    "nullable": false,
-                    "default": "NOW()",
-                    "auto_update": true
+                    "default": "NOW()"
                 },
                 "mood": {
                     "type": "INT",
@@ -89,13 +172,11 @@
                 "energy": {
                     "type": "INT",
                     "default": 5,
-                    "check": "energy >= 0 AND energy <= 10"
+                    "check": "focus >= 0 AND focus <= 10"
                 },
                 "tags": {
                     "type": "TEXT[]",
-                    "nullable": false,
-                    "default": "'{}'",
-                    "indexed": true
+                    "default": "'{}'"
                 },
                 "category": {
                     "type": "TEXT",
@@ -103,34 +184,81 @@
                 },
                 "is_ai": {
                     "type": "BOOLEAN",
-                    "nullable": false,
                     "default": false
                 },
                 "ai_model": {
                     "type": "TEXT"
                 },
                 "embedding": {
-                    "type": "VECTOR(768)",
-                    "description": "向量嵌入（用於語義搜索）"
-                }
-            },
-            "indexes": [
-                {
-                    "name": "idx_memories_date",
-                    "columns": [
-                        "date"
-                    ],
-                    "order": "DESC"
+                    "type": "VECTOR(3072)"
                 },
-                {
-                    "name": "idx_memories_tags",
-                    "columns": [
-                        "tags"
-                    ],
-                    "type": "GIN"
+                "local_path": {
+                    "type": "TEXT"
+                },
+                "content_hash": {
+                    "type": "TEXT"
+                },
+                "ai_insights": {
+                    "type": "TEXT"
                 }
-            ],
-            "rls_enabled": true
+            }
+        },
+        "nodes": {
+            "description": "知識圖譜節點表",
+            "columns": {
+                "id": {
+                    "type": "UUID",
+                    "primary_key": true,
+                    "default": "gen_random_uuid()"
+                },
+                "label": {
+                    "type": "TEXT",
+                    "unique": true
+                },
+                "type": {
+                    "type": "TEXT",
+                    "default": "'concept'",
+                    "check": "type IN ('concept', 'tag', 'person', 'tool', 'project')"
+                },
+                "metadata": {
+                    "type": "JSONB",
+                    "default": "'{}'"
+                },
+                "created_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()"
+                }
+            }
+        },
+        "edges": {
+            "description": "知識圖譜連結表",
+            "columns": {
+                "id": {
+                    "type": "UUID",
+                    "primary_key": true,
+                    "default": "gen_random_uuid()"
+                },
+                "source_id": {
+                    "type": "UUID",
+                    "references": "nodes.id"
+                },
+                "target_id": {
+                    "type": "UUID",
+                    "references": "nodes.id"
+                },
+                "relation": {
+                    "type": "TEXT",
+                    "default": "'related'"
+                },
+                "weight": {
+                    "type": "FLOAT",
+                    "default": 1.0
+                },
+                "created_at": {
+                    "type": "TIMESTAMPTZ",
+                    "default": "NOW()"
+                }
+            }
         },
         "projects": {
             "description": "專案管理表",
@@ -165,11 +293,7 @@
                 },
                 "parent_id": {
                     "type": "UUID",
-                    "references": {
-                        "table": "projects",
-                        "column": "id",
-                        "on_delete": "CASCADE"
-                    }
+                    "references": "projects.id"
                 },
                 "created_at": {
                     "type": "TIMESTAMPTZ",
@@ -177,22 +301,16 @@
                 },
                 "updated_at": {
                     "type": "TIMESTAMPTZ",
-                    "default": "NOW()",
-                    "auto_update": true
+                    "default": "NOW()"
+                },
+                "meta": {
+                    "type": "JSONB",
+                    "default": "'{}'"
                 }
-            },
-            "indexes": [
-                {
-                    "name": "idx_projects_status",
-                    "columns": [
-                        "status"
-                    ]
-                }
-            ],
-            "rls_enabled": true
+            }
         },
         "tasks": {
-            "description": "任務清單表",
+            "description": "任務管理表",
             "columns": {
                 "id": {
                     "type": "UUID",
@@ -210,19 +328,11 @@
                 },
                 "project_id": {
                     "type": "UUID",
-                    "references": {
-                        "table": "projects",
-                        "column": "id",
-                        "on_delete": "CASCADE"
-                    }
+                    "references": "projects.id"
                 },
                 "source_memory_id": {
                     "type": "UUID",
-                    "references": {
-                        "table": "memories",
-                        "column": "id",
-                        "on_delete": "SET NULL"
-                    }
+                    "references": "memories.id"
                 },
                 "due_date": {
                     "type": "DATE"
@@ -238,102 +348,12 @@
                 },
                 "updated_at": {
                     "type": "TIMESTAMPTZ",
-                    "default": "NOW()",
-                    "auto_update": true
-                }
-            },
-            "indexes": [
-                {
-                    "name": "idx_tasks_status",
-                    "columns": [
-                        "status"
-                    ]
-                }
-            ],
-            "rls_enabled": true
-        },
-        "nodes": {
-            "description": "知識圖譜節點表",
-            "columns": {
-                "id": {
-                    "type": "UUID",
-                    "primary_key": true,
-                    "default": "gen_random_uuid()"
-                },
-                "label": {
-                    "type": "TEXT",
-                    "nullable": false,
-                    "unique": true
-                },
-                "type": {
-                    "type": "TEXT",
-                    "default": "'concept'",
-                    "check": "type IN ('concept', 'tag', 'person', 'tool', 'project')"
-                },
-                "metadata": {
-                    "type": "JSONB",
-                    "default": "'{}'"
-                },
-                "created_at": {
-                    "type": "TIMESTAMPTZ",
                     "default": "NOW()"
                 }
-            },
-            "rls_enabled": true
-        },
-        "edges": {
-            "description": "知識圖譜連線表",
-            "columns": {
-                "id": {
-                    "type": "UUID",
-                    "primary_key": true,
-                    "default": "gen_random_uuid()"
-                },
-                "source_id": {
-                    "type": "UUID",
-                    "nullable": false,
-                    "references": {
-                        "table": "nodes",
-                        "column": "id",
-                        "on_delete": "CASCADE"
-                    }
-                },
-                "target_id": {
-                    "type": "UUID",
-                    "nullable": false,
-                    "references": {
-                        "table": "nodes",
-                        "column": "id",
-                        "on_delete": "CASCADE"
-                    }
-                },
-                "relation": {
-                    "type": "TEXT",
-                    "default": "'related'"
-                },
-                "weight": {
-                    "type": "FLOAT",
-                    "default": 1.0
-                },
-                "created_at": {
-                    "type": "TIMESTAMPTZ",
-                    "default": "NOW()"
-                }
-            },
-            "unique_constraints": [
-                {
-                    "name": "unique_edge",
-                    "columns": [
-                        "source_id",
-                        "target_id",
-                        "relation"
-                    ]
-                }
-            ],
-            "rls_enabled": true
+            }
         },
         "system_usage": {
-            "description": "API Usage Tracking",
+            "description": "系統配額追蹤表",
             "columns": {
                 "id": {
                     "type": "UUID",
@@ -342,7 +362,6 @@
                 },
                 "date": {
                     "type": "DATE",
-                    "nullable": false,
                     "unique": true,
                     "default": "CURRENT_DATE"
                 },
@@ -354,46 +373,6 @@
                     "type": "INT",
                     "default": 0
                 },
-                "updated_at": {
-                    "type": "TIMESTAMPTZ",
-                    "default": "NOW()",
-                    "auto_update": true
-                }
-            },
-            "indexes": [
-                {
-                    "name": "idx_usage_date",
-                    "columns": [
-                        "date"
-                    ]
-                }
-            ],
-            "rls_enabled": true
-        },
-        "MonthlyReview": {
-            "description": "AI 生成的月度回顧表",
-            "columns": {
-                "id": {
-                    "type": "UUID",
-                    "primary_key": true,
-                    "default": "gen_random_uuid()"
-                },
-                "year": {
-                    "type": "INT",
-                    "nullable": false
-                },
-                "month": {
-                    "type": "INT",
-                    "nullable": false
-                },
-                "summary": {
-                    "type": "TEXT",
-                    "nullable": false
-                },
-                "metadata": {
-                    "type": "JSONB",
-                    "default": "'{}'"
-                },
                 "created_at": {
                     "type": "TIMESTAMPTZ",
                     "default": "NOW()"
@@ -402,127 +381,7 @@
                     "type": "TIMESTAMPTZ",
                     "default": "NOW()"
                 }
-            },
-            "unique_constraints": [
-                {
-                    "name": "unique_monthly_review",
-                    "columns": [
-                        "year",
-                        "month"
-                    ]
-                }
-            ],
-            "rls_enabled": true
-        },
-        "documents": {
-            "description": "外部文獻與搜尋結果儲存表（隔離個人記憶）",
-            "columns": {
-                "id": {
-                    "type": "UUID",
-                    "primary_key": true,
-                    "default": "gen_random_uuid()"
-                },
-                "content": {
-                    "type": "TEXT",
-                    "nullable": false
-                },
-                "title": {
-                    "type": "TEXT",
-                    "nullable": true
-                },
-                "url": {
-                    "type": "TEXT",
-                    "nullable": true,
-                    "description": "資料來源連結"
-                },
-                "doc_type": {
-                    "type": "TEXT",
-                    "default": "'web_page'",
-                    "description": "文件類型 (web_page, pdf, search_result)"
-                },
-                "summary": {
-                    "type": "TEXT",
-                    "description": "Crystallize 2.0 生成的摘要"
-                },
-                "metadata": {
-                    "type": "JSONB",
-                    "default": "'{}'"
-                },
-                "created_at": {
-                    "type": "TIMESTAMPTZ",
-                    "default": "NOW()"
-                },
-                "embedding": {
-                    "type": "VECTOR(768)",
-                    "description": "向量嵌入（用於雙軌檢索）"
-                }
-            },
-            "indexes": [
-                {
-                    "name": "idx_documents_created_at",
-                    "columns": [
-                        "created_at"
-                    ],
-                    "order": "DESC"
-                }
-            ],
-            "rls_enabled": true
-        }
-    },
-    "metadata_tracking": {
-        "memories": {
-            "experimental_fields": [],
-            "promoted_fields": [],
-            "common_patterns": {}
-        }
-    },
-    "extensions": [
-        {
-            "name": "vector",
-            "description": "向量搜索支持"
-        },
-        {
-            "name": "uuid-ossp",
-            "description": "UUID 生成"
-        }
-    ],
-    "triggers": [
-        {
-            "name": "update_memories_updated_at",
-            "table": "memories",
-            "event": "BEFORE UPDATE",
-            "function": "update_updated_at_column()"
-        },
-        {
-            "name": "update_projects_updated_at",
-            "table": "projects",
-            "event": "BEFORE UPDATE",
-            "function": "update_updated_at_column()"
-        },
-        {
-            "name": "update_tasks_updated_at",
-            "table": "tasks",
-            "event": "BEFORE UPDATE",
-            "function": "update_updated_at_column()"
-        }
-    ],
-    "ai_instructions": {
-        "when_user_wants_new_metric": [
-            "1. Read this registry.json to understand current schema",
-            "2. Analyze the metric type (simple numeric, complex tracking, etc.)",
-            "3. Check metadata_tracking.memories.experimental_fields for similar fields",
-            "4. Generate 2-3 options with pros/cons",
-            "5. Present to user for approval",
-            "6. Generate migration script if needed",
-            "7. Update this registry.json",
-            "8. Update Python Pydantic models",
-            "9. Log to evolution_log.json"
-        ],
-        "decision_tree": {
-            "simple_numeric": "Use JSONB metadata first, promote to column if used frequently",
-            "complex_tracking": "Create related table with foreign key to memories",
-            "boolean_flag": "Add column directly (cheap)",
-            "time_series": "Create dedicated timeseries table"
+            }
         }
     }
 }

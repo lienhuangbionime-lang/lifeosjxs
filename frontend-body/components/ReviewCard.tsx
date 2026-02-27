@@ -21,17 +21,12 @@ export const ReviewCard = ({ month }: ReviewCardProps) => {
         setLoading(true);
         setError(null);
         try {
+            const { cortex } = await import('@/lib/api/client');
             const [y, m] = month.split('-');
-            const apiUrl = process.env.NEXT_PUBLIC_PYTHON_API_URL || 'http://localhost:8000';
-            const res = await fetch(`${apiUrl}/api/v1/memories/review/${y}/${parseInt(m)}`);
+            const data = await cortex.getMonthlyReview(parseInt(y), parseInt(m));
 
-            if (res.ok) {
-                const data = await res.json();
-                if (data && data.summary) {
-                    setReview(data.summary);
-                } else {
-                    setReview(null);
-                }
+            if (data && data.summary) {
+                setReview(data.summary);
             } else {
                 setReview(null);
             }
@@ -46,36 +41,29 @@ export const ReviewCard = ({ month }: ReviewCardProps) => {
     const handleGenerate = async () => {
         setGenerating(true);
         try {
+            const { cortex } = await import('@/lib/api/client');
             const [y, m] = month.split('-');
-            const apiUrl = process.env.NEXT_PUBLIC_PYTHON_API_URL || 'http://localhost:8000';
-            const res = await fetch(`${apiUrl}/api/v1/memories/review/${y}/${parseInt(m)}/generate`, {
-                method: 'POST'
-            });
+            const res = await cortex.generateMonthlyReview(parseInt(y), parseInt(m));
 
-            if (res.ok) {
-                // Background task started
-                // Poll for result or just show message
+            if (res && res.status === 'started') {
                 setError(null);
                 // Start polling
                 const pollInterval = setInterval(async () => {
-                    const checkRes = await fetch(`${apiUrl}/api/v1/memories/review/${y}/${parseInt(m)}`);
-                    if (checkRes.ok) {
-                        const data = await checkRes.json();
-                        if (data && data.summary) {
-                            setReview(data.summary);
-                            setGenerating(false);
-                            clearInterval(pollInterval);
-                        }
+                    const data = await cortex.getMonthlyReview(parseInt(y), parseInt(m));
+                    if (data && data.summary) {
+                        setReview(data.summary);
+                        setGenerating(false);
+                        clearInterval(pollInterval);
                     }
                 }, 5000); // Check every 5s
 
                 // Timeout after 2 minutes
                 setTimeout(() => {
                     clearInterval(pollInterval);
-                    if (generating) {
-                        setGenerating(false);
-                        setError("Generation is taking longer than expected. Please check back later.");
-                    }
+                    setGenerating(prev => {
+                        if (prev) setError("Generation is taking longer than expected. Please check back later.");
+                        return false;
+                    });
                 }, 120000);
             } else {
                 setError("Failed to start generation");

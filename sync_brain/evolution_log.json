@@ -1,12 +1,5 @@
 [
     {
-        "timestamp": "2026-02-27T04:30:00+08:00",
-        "event": "Phase P5-P8 Intelligence Upgrade Baseline",
-        "type": "ARCH",
-        "description": "Implemented Agent Skills architecture, Handoff protocol, and Web Search integration (duckduckgo-search). Verified Reranker sandbox. Updated SYSTEM_CONTEXT/HANDOFF/ROADMAP to v3.7.6.",
-        "impact": "Critical - Enabled modular skill orchestration and external information retrieval for LifeOS."
-    },
-    {
         "timestamp": "2026-02-14T01:55:00Z",
         "event": "Protocol Alignment",
         "type": "ARCH",
@@ -76,274 +69,25 @@
         "impact": "High - Restored semantic search and AI insight generation stability."
     },
     {
-        "timestamp": "2026-02-25T02:03:00+08:00",
-        "event": "Project Board Redesign + Embedding System Fix",
-        "type": "EVOLUTION",
-        "description": "Nomads.com-style ProjectCard + ProjectDetailPanel (AI insights, related memories, status switcher). Fixed deprecated text-embedding-004 → gemini-embedding-001. Fixed brain.py context fallback. Created batch_embed.py for retroactive vectorization. Updated ROADMAP with P3/P4 long-term plan.",
-        "impact": "High - Project Board now has visual identity and AI associations. Embedding pipeline unblocked."
+        "timestamp": "2026-02-27T05:21:00Z",
+        "event": "Dependency Drift Fix & Reflection",
+        "type": "FIX",
+        "description": "Resolved ModuleNotFoundError for 'duckduckgo_search'. Identified 'Feature-Dependency Drift' where new tool logic was enabled without requirements.txt parity.",
+        "impact": "High - Restored server startup. Optimized requirements.txt sync protocol.",
+        "reflection": "When migrating tools (like web search) into the core chat loop, the dependency must be verified in the same commit. Relying on local pre-installed packages in a development environment is a blind spot."
     },
     {
-        "timestamp": "2026-02-25T04:23:48+08:00",
-        "event": "Combined Projects hierarchy functionality into client.ts and UI with TodaySnapsh",
-        "type": "SESSION",
-        "description": "Combined Projects hierarchy functionality into client.ts and UI with TodaySnapshot.",
-        "impact": "Logged by session_end.py"
-    },
-    {
-        "timestamp": "2026-02-25T04:33:19+08:00",
-        "event": "Completed Phase D future planning: Injected Pending Tasks into AI context, imple",
-        "type": "SESSION",
-        "description": "Completed Phase D future planning: Injected Pending Tasks into AI context, implemented native Function Calling via Cortex models, and verified Historical Embeddings.",
-        "impact": "Logged by session_end.py"
-    },
-    {
-        "timestamp": "2026-02-24T21:07:58Z",
-        "event": "Soul Sync",
-        "type": "SYNC",
-        "description": "Synced 4 files. Missed: []. Drift check: [OK] Versions aligned: **Version**: 3.5.6 (Crystallize logic + Import Fixes) [in_sync]",
-        "impact": "Low"
-    },
-    {
-        "timestamp": "2026-02-25T05:15:00+08:00",
-        "event": "Implemented P3-1 Semantic Growth Logs in chat.py, P3-2 AI Learning Indicators in",
-        "type": "SESSION",
-        "description": "Implemented P3-1 Semantic Growth Logs in chat.py, P3-2 AI Learning Indicators in CortexChat.tsx, and P3-3 Subconscious Persistence in subconscious.py.",
-        "impact": "Logged by session_end.py"
-    },
-    {
-        "timestamp": "2026-02-25T05:21:07+08:00",
-        "event": "Fixed the missing GET /api/v1/projects endpoint and resolved the uncommitted pro",
-        "type": "SESSION",
-        "description": "Fixed the missing GET /api/v1/projects endpoint and resolved the uncommitted project lint warnings from task.md.",
-        "impact": "Logged by session_end.py"
-    },
-    {
-        "timestamp": "2026-02-25T05:27:01+08:00",
-        "event": "Fixed Phase D scoring engine bugs in ingest.py. Replaced 'db' NameError and hard",
-        "type": "SESSION",
-        "description": "Fixed Phase D scoring engine bugs in ingest.py. Replaced 'db' NameError and hardcoded Windows path to relative path for production deployment to work properly. Also suppressed HTTPX logs in main.py.",
-        "impact": "Logged by session_end.py"
-    },
-    {
-        "timestamp": "2026-02-25T05:40:56+08:00",
-        "event": "Completed Phase P3 (AI Autonomy) and Phase D (Scoring Engine) connectivity fixes",
-        "type": "SESSION",
-        "description": "Completed Phase P3 (AI Autonomy) and Phase D (Scoring Engine) connectivity fixes. Resolved critical bugs in memories.py and ingest.py that were blocking the Home Dashboard and Scoring Engine from functioning. Finalized all v3.6.0 handoff documentation.",
-        "impact": "Logged by session_end.py"
-    },
-    {
-        "timestamp": "2026-02-25T20:45:59+08:00",
-        "event": "Implemented P4-1 Diary x Project Auto-link Updates. The Capture UI Toast now ref",
-        "type": "SESSION",
-        "description": "Implemented P4-1 Diary x Project Auto-link Updates. The Capture UI Toast now reflects project names mapped from the auto linkage process instead of just counts.",
-        "impact": "Logged by session_end.py"
-    },
-    {
-        "timestamp": "2026-02-25T20:55:03+08:00",
-        "event": "Implemented P4-2 HOME Dashboard Refactoring. Added relatively timed Project focu",
-        "type": "SESSION",
-        "description": "Implemented P4-2 HOME Dashboard Refactoring. Added relatively timed Project focus to TodaySnapshot and a Tasks Done metric to the CardStackDashboard to visualize Project velocity.",
-        "impact": "Logged by session_end.py"
-    },
-    {
-        "timestamp": "2026-02-25T13:31:21Z",
-        "event": "Soul Sync",
-        "type": "SYNC",
-        "description": "Synced 4 files. Missed: []. Drift check: [OK] Versions aligned: **Version**: 3.5.6 (Crystallize logic + Import Fixes) [in_sync]",
-        "impact": "Low"
-    },
-    {
-        "timestamp": "2026-02-25T13:39:28Z",
-        "event": "Soul Sync",
-        "type": "SYNC",
-        "description": "Synced 6 files. Missed: []. Drift check: [OK] Versions aligned: **Version**: 3.5.6 (Crystallize logic + Import Fixes) [in_sync]",
-        "impact": "Low"
-    },
-    {
-        "timestamp": "2026-02-25T13:40:35Z",
-        "event": "Soul Sync",
-        "type": "SYNC",
-        "description": "Synced 6 files. Missed: []. Drift check: [OK] Versions aligned: **Version**: 3.5.6 (Crystallize logic + Import Fixes) [in_sync]",
-        "impact": "Low"
-    },
-    {
-        "timestamp": "2026-02-25T13:40:56Z",
-        "event": "Soul Sync",
-        "type": "SYNC",
-        "description": "Synced 6 files. Missed: []. Drift check: [OK] Versions aligned: **Version**: 3.6.1 (Self-Reflection Implementation) [in_sync]",
-        "impact": "Low"
-    },
-    {
-        "timestamp": "2026-02-25T22:27:00+08:00",
-        "event": "Project Semantic Synthesis & Async Core Upgrade",
+        "timestamp": "2026-02-27T05:20:00Z",
+        "event": "Knowledge & Memory Isolation",
         "type": "ARCH",
-        "description": "Implemented Phase F: Structured project insights (Themes, Milestones, Observations) + Async Gemini Upgrade (aio.models) across the core. Fixed ECONNRESET server hangs and improved data organization (v3.6.3).",
-        "impact": "High - Established high-performance non-blocking AI architecture and rich project intelligence."
+        "description": "Implemented physical isolation between 'memories' and 'documents' tables. Enabled Dual-Track RAG (Unified Awareness) and automated search archiving. Updated SYSTEM_CONTEXT to v3.7.7.",
+        "impact": "Critical - Established architectural purity and scalable knowledge management."
     },
     {
-        "timestamp": "2026-02-25T14:27:20Z",
-        "event": "Soul Sync",
-        "type": "SYNC",
-        "description": "Synced 6 files. Missed: [].",
-        "impact": "Low",
-        "meta": {
-            "drift_count": 1,
-            "drifted_files": [
-                "SYSTEM_CONTEXT.md"
-            ],
-            "copied_count": 6,
-            "missed_count": 0,
-            "status": "drift_resolved"
-        }
-    },
-    {
-        "timestamp": "2026-02-25T23:45:00Z",
-        "event": "Environment Error Discovery (setup_db.py)",
-        "type": "FIX",
-        "description": "Encountered a UnicodeEncodeError ('cp950' codec can't encode character '\\\\u2705' - emoji) while executing a logic verification script ('test_setup_logic.py') on a Windows terminal. Fixed by substituting emojis with ASCII-safe formatting ('[OK]', '[ERROR]') in the script and future setup files to ensure safe execution natively.",
-        "impact": "Low/Medium - Ensures CLI scripts operate robustly on Windows without specialized encoding settings."
-    },
-    {
-        "timestamp": "2026-02-26T03:00:00+08:00",
-        "event": "Glass Box UI Optimization & Async Core Fix",
-        "type": "PERF/FIX",
-        "description": "Resolved critical server hangs/timeouts by refactoring system API endpoints to use non-blocking asynchronous operations (google-genai aio SDK). Offloaded synchronous Supabase IO in usage.py to background threads via anyio.to_thread. Eliminated circular imports in gemini.py and blocking network checks in database.py.",
-        "impact": "Critical - Restored system responsiveness and successfully unblocked Glass Box (System) UI Dashboards."
-    },
-    {
-        "timestamp": "2026-02-26T03:55:00+08:00",
-        "event": "Header-First Architectural Refinement & Global Sync",
-        "type": "ARCH/SYNC",
-        "description": "Established Header-First configuration as the primary credential injection method. Harmonized vector search, memory ingestion, and background crystallization workers to propagate transient clients. Upgraded all workers to google.genai SDK. Upgraded system to v3.7.0.",
-        "impact": "Critical - Eliminated configuration-dependent 503 errors and ensured seamless operation in credential-less server environments."
-    },
-    {
-        "timestamp": "2026-02-26T05:05:00+08:00",
-        "event": "Fixed Cortex Chat 404 & get_supabase_client error. Implemented Proactive Testing",
-        "type": "SESSION",
-        "description": "Fixed Cortex Chat 404 & get_supabase_client error. Implemented Proactive Testing Protocol in HANDOFF.",
-        "impact": "Logged by session_end.py"
-    },
-    {
-        "timestamp": "2026-02-25T21:06:03Z",
-        "event": "Soul Sync",
-        "type": "SYNC",
-        "description": "Synced 6 files. Missed: [].",
-        "impact": "Low",
-        "meta": {
-            "drift_count": 3,
-            "drifted_files": [
-                "SYSTEM_CONTEXT.md",
-                "registry.json",
-                "AI_MEMORY.md"
-            ],
-            "copied_count": 6,
-            "missed_count": 0,
-            "status": "drift_resolved"
-        }
-    },
-    {
-        "timestamp": "2026-02-26T05:11:26+08:00",
-        "event": "Fixed System Prompt Hallucination Control overriding Task Context.",
-        "type": "SESSION",
-        "description": "Fixed System Prompt Hallucination Control overriding Task Context.",
-        "impact": "Logged by session_end.py"
-    },
-    {
-        "timestamp": "2026-02-25T21:12:51Z",
-        "event": "Soul Sync",
-        "type": "SYNC",
-        "description": "Synced 6 files. Missed: [].",
-        "impact": "Low",
-        "meta": {
-            "drift_count": 0,
-            "drifted_files": [],
-            "copied_count": 6,
-            "missed_count": 0,
-            "status": "in_sync"
-        }
-    },
-    {
-        "timestamp": "2026-02-26T05:13:26+08:00",
-        "event": "Relaxed Hallucination prompts and expanded RAG search to ingest Reviews and Obje",
-        "type": "SESSION",
-        "description": "Relaxed Hallucination prompts and expanded RAG search to ingest Reviews and Objects.",
-        "impact": "Logged by session_end.py"
-    },
-    {
-        "timestamp": "2026-02-25T21:14:14Z",
-        "event": "Soul Sync",
-        "type": "SYNC",
-        "description": "Synced 6 files. Missed: [].",
-        "impact": "Low",
-        "meta": {
-            "drift_count": 0,
-            "drifted_files": [],
-            "copied_count": 6,
-            "missed_count": 0,
-            "status": "in_sync"
-        }
-    },
-    {
-        "timestamp": "2026-02-26T05:16:46+08:00",
-        "event": "Fixed URL context parsing logic to safely extract dictionary keys.",
-        "type": "SESSION",
-        "description": "Fixed URL context parsing logic to safely extract dictionary keys.",
-        "impact": "Logged by session_end.py"
-    },
-    {
-        "timestamp": "2026-02-25T21:17:47Z",
-        "event": "Soul Sync",
-        "type": "SYNC",
-        "description": "Synced 6 files. Missed: [].",
-        "impact": "Low",
-        "meta": {
-            "drift_count": 0,
-            "drifted_files": [],
-            "copied_count": 6,
-            "missed_count": 0,
-            "status": "in_sync"
-        }
-    },
-    {
-        "timestamp": "2026-02-25T21:20:14Z",
-        "event": "Soul Sync",
-        "type": "SYNC",
-        "description": "Synced 6 files. Missed: [].",
-        "impact": "Low",
-        "meta": {
-            "drift_count": 0,
-            "drifted_files": [],
-            "copied_count": 6,
-            "missed_count": 0,
-            "status": "in_sync"
-        }
-    },
-    {
-        "timestamp": "2026-02-26T05:27:36+08:00",
-        "event": "Phase P4-1 Strategic Context & Resilience Upgrade",
-        "type": "SESSION",
-        "description": "Implemented Phase P4-1: Strategic Context Injection (Monthly Reviews) and enhanced Gemini fallback resilience.",
-        "impact": "High - Established high-level strategic awareness in Cortex Chat."
-    },
-    {
-        "timestamp": "2026-02-26T05:28:44+08:00",
-        "event": "Technical Post-Mortem (Self-Correction)",
-        "type": "FIX",
-        "impact": "High - Restored 429 recovery capabilities and established v3.7.1 stability."
-    },
-    {
-        "timestamp": "2026-02-26T21:07:55Z",
-        "event": "Soul Sync",
-        "type": "SYNC",
-        "description": "Synced 6 files. Missed: [].",
-        "impact": "Low",
-        "meta": {
-            "drift_count": 0,
-            "drifted_files": [],
-            "copied_count": 6,
-            "missed_count": 0,
-            "status": "in_sync"
-        }
+        "timestamp": "2026-02-27T14:42:00Z",
+        "event": "Multimodal Ingest & Task Logic Upgrade",
+        "type": "EVOLUTION",
+        "description": "Implemented Phase P17: Enabled Gemini 2.0 Flash Vision/Multimodal for CaptureView and Chat. Successfully integrated support for images, PDFs, and Markdown extraction. Redesigned and implemented default 'todo' filtering for TaskList to resolve UI accumulation.",
+        "impact": "High - Unified multimodal data flow and restored task management clarity."
     }
 ]

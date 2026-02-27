@@ -65,6 +65,9 @@ class LogEntrySchema(BaseModel):
     category: str = "Life"
     is_ai: bool = False
     ai_model: Optional[str] = None
+    local_path: Optional[str] = None
+    content_hash: Optional[str] = None
+    ai_insights: Optional[str] = None
     created_at: Optional[str] = None
     updated_at: Optional[str] = None
     
@@ -115,3 +118,19 @@ class DocumentCreate(BaseModel):
     doc_type: str = "webpage"
     tags: List[str] = []
     metadata: Dict[str, Any] = {}
+
+# --- Review Schemas ---
+
+class MonthlyReviewSchema(BaseModel):
+    id: Optional[int] = None
+    year: int
+    month: int
+    summary: Optional[str] = None
+    highlights: List[Dict[str, Any]] = []
+    challenges: List[Dict[str, Any]] = []
+    lessons: List[Dict[str, Any]] = []
+    next_steps: List[Dict[str, Any]] = []
+    created_at: Optional[str] = None
+
+    class Config:
+        from_attributes = True

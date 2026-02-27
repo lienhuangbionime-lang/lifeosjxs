@@ -197,7 +197,7 @@ export const SettingsView = ({ logs, onImport }: SettingsProps) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-bold text-white flex items-center gap-2">
-                  <Database size={15} className="text-cyan-400" /> Initialize Database
+                  <Database size={15} className="text-cyan-400" /> Initialize Database (v3.8.1)
                 </p>
                 <p className="text-xs text-slate-500 mt-0.5">Automatically create all LifeOS tables in your Supabase. Use <span className="text-yellow-400 font-mono">service_role</span> key for this.</p>
               </div>
@@ -216,6 +216,27 @@ export const SettingsView = ({ logs, onImport }: SettingsProps) => {
                       'Setup DB'}
               </button>
             </div>
+
+            {/* Bootstrap Instruction */}
+            <div className="mt-4 p-4 bg-amber-950/20 border border-amber-500/20 rounded-xl space-y-2">
+              <p className="text-[10px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-2">
+                <AlertCircle size={12} /> Bootstrap Required
+              </p>
+              <p className="text-[11px] text-slate-400 leading-relaxed">
+                If the setup fails with "Missing exec function", please run this SQL once in your Supabase SQL Editor:
+              </p>
+              <div className="relative">
+                <pre className="bg-black/60 p-3 rounded-lg text-[9px] text-indigo-300 font-mono overflow-auto border border-white/5 whitespace-pre">
+                  {`CREATE OR REPLACE FUNCTION public.exec(sql text)
+RETURNS void AS $$
+BEGIN
+  EXECUTE sql;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;`}
+                </pre>
+              </div>
+            </div>
+
             {setupMessage && (
               <p className={`mt-2 text-xs px-3 py-2 rounded-lg ${setupStatus === 'success' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>
                 {setupMessage}

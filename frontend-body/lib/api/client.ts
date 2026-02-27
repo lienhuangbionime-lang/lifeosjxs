@@ -182,7 +182,23 @@ export const cortex = {
     }
   },
 
-  // 4. 感知輸入 (Sensory Ingest)
+  // 4. Monthly Review Endpoints
+  async getMonthlyReview(year: number, month: number): Promise<{ summary: string } | null> {
+    try {
+      return await fetchProxy(`/api/v1/memories/review/${year}/${month}`);
+    } catch (e) {
+      console.warn("Failed to fetch monthly review", e);
+      return null;
+    }
+  },
+
+  async generateMonthlyReview(year: number, month: number): Promise<{ status: string; message: string }> {
+    return await fetchProxy(`/api/v1/memories/review/${year}/${month}/generate`, {
+      method: "POST"
+    });
+  },
+
+  // 5. 感知輸入 (Sensory Ingest)
   async ingestLog(date: string, text: string, source?: string): Promise<IngestResponse> {
     return await fetchProxy<IngestResponse>("/api/v1/ingest", {
       method: "POST",

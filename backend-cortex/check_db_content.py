@@ -26,7 +26,7 @@ def check_data():
     print(f"Latest Monthly Review: {len(reviews.data)}")
     if reviews.data:
         r = reviews.data[0]
-        print(f" - {r['year']}/{r['month']}: {r['content'][:100]}...")
+        print(f" - {r['year']}/{r['month']}: {r['summary'][:100]}...")
     else:
         print(" - No monthly review found.")
 

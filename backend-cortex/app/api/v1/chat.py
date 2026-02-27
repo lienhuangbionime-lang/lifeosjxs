@@ -380,7 +380,24 @@ async def stream_chat(request: Request, payload: ChatRequest):
                 return f"No results found for '{query}'."
             return format_search_results(results)
 
-        cortex_tools = [create_task, mark_task_done, update_project_progress, log_growth_decision, search_web_tool] if db else []
+        async def archive_discussion(title: str, summary: str, tags: List[str] = []) -> str:
+            """
+            Archive a summary of the current strategic discussion into the Knowledge Base (Documents).
+            Use this when a session reaches a significant conclusion or strategic decision.
+            """
+            success = await rag_service.ingest_text(
+                text=summary,
+                meta={
+                    "title": title,
+                    "tags": tags,
+                    "source": "discussion_archive",
+                    "type": "note"
+                },
+                target="documents"
+            )
+            return "Discussion successfully archived to Knowledge Base." if success else "Failed to archive discussion."
+
+        cortex_tools = [create_task, mark_task_done, update_project_progress, log_growth_decision, search_web_tool, archive_discussion] if db else []
 
         chat = req_gemini.aio.chats.create(
             model=model_name, 
@@ -406,10 +423,13 @@ Type: {url_data.get("type", 'webpage')}
 """
                     # [P10] Auto-Archiving to Knowledge Base in Background
                     try:
+                        # Archive the actual content or summary, not just the URL
+                        archive_text = url_data.get("content") or url_data.get("summary") or url_data.get("url")
                         asyncio.create_task(rag_service.ingest_text(
-                            text=url_data.get("url"), 
+                            text=archive_text, 
                             meta={
                                 "title": url_data.get("title"),
+                                "url": url_data.get("url"),
                                 "source": "chat_auto_archive",
                                 "type": url_data.get("type")
                             },

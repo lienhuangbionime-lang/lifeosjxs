@@ -1,5 +1,5 @@
 # app/api/v1/memories.py
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 from typing import List, Optional
 import logging
 import asyncio
@@ -142,16 +142,19 @@ async def get_recent_memories(
 # --- Monthly Review Endpoints ---
 
 @router.get("/review/{year}/{month}")
-async def get_monthly_review(year: int, month: int):
+async def get_monthly_review(year: int, month: int, request: Request):
     """
     Get the monthly review for a specific month.
     """
-    if not supabase:
+    from app.core.database import get_request_client
+    db = get_request_client(request)
+    
+    if not db:
         raise HTTPException(status_code=503, detail="Database unavailable")
     
     try:
         # Table name is "MonthlyReview"
-        res = supabase.table("MonthlyReview").select("*").eq("year", year).eq("month", month).execute()
+        res = db.table("MonthlyReview").select("*").eq("year", year).eq("month", month).execute()
         if res.data and len(res.data) > 0:
             return res.data[0]
         return None
@@ -166,18 +169,27 @@ async def trigger_monthly_review(year: int, month: int):
     """
     try:
         import subprocess
+        from pathlib import Path
         
-        # Run the script as a subprocess
-        # Using sys.executable ensures we use the same python environment
-        # The unified equipment is housed in the root /tools directory now
-        script_path = os.path.join("..", "tools", "generate_monthly_review.py")
+        # [Robust Pathing] Find scripts relative to this file
+        # memories.py is in backend-cortex/app/api/v1/
+        # tools is in project-root/tools/
+        base_dir = Path(__file__).parent.parent.parent.parent.parent
+        script_path = base_dir / "tools" / "generate_monthly_review.py"
         
+        if not script_path.exists():
+            # Fallback for deployments where tools might be in the app root
+            script_path = base_dir / "backend-cortex" / "tools" / "generate_monthly_review.py"
+            if not script_path.exists():
+                logger.error(f"Review script not found at {script_path}")
+                raise HTTPException(status_code=500, detail="Review generation script not found")
+
         # Use Popen to run in background
         process = subprocess.Popen(
-            [sys.executable, script_path, str(year), str(month)],
+            [sys.executable, str(script_path), str(year), str(month)],
             stdout=subprocess.PIPE, 
             stderr=subprocess.PIPE,
-            cwd=os.getcwd() # Run from project root
+            cwd=str(base_dir) # Run from project root
         )
         
         return {"status": "started", "pid": process.pid, "message": "Generation started in background"}
