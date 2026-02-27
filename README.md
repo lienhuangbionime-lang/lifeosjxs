@@ -1,5 +1,6 @@
 # LifeOS v3.8.5 "Cortex: Actionable Intelligence"
 
+
 > **自生系統 (Autopoietic OS)**：一個具備自我感知、長期記憶與主動執行能力的個人數位生命體。
 
 ```mermaid
