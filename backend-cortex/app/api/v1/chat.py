@@ -231,8 +231,8 @@ async def stream_chat(request: Request, payload: ChatRequest):
         # have 1M-2M context windows and proven 'summarization' capability parity 
         # with LifeOSvs-main.
         if payload.url_context and "gemini-3" in model_name:
-            logger.info("🔗 URL Context detected. Routing to proven 1.5 Pro (via latest mapping) for Context Length resilience.")
-            model_name = sanitize_model_name("gemini-1.5-pro")
+            logger.info("🔗 URL Context detected. Routing to verified 2.0 Flash for Context Length resilience.")
+            model_name = sanitize_model_name("gemini-2.0-flash")
             
         # Convert history to Gemini format using new genai.types
         from google.genai import types
@@ -496,12 +496,11 @@ Type: {url_data.get("type", 'webpage')}
                     if "429" in str(e) or "ResourceExhausted" in str(e) or "quota" in str(e).lower():
                          logger.warning(f"⚠️ Quota Exceeded for {model_name}. Attempting fallback to Fast model.")
                          yield "\n\n*(Capacity Reached. Switching to High-Efficiency mode...)*\n\n"
-                         # Fallback Logic: Try a chain of verified models
+                         # Fallback Logic: Try a chain of verified models (v4.2 Ground Truth)
                          fallbacks = [
-                             sanitize_model_name("gemini-2.5-flash"),
                              sanitize_model_name("gemini-2.0-flash-lite"),
+                             sanitize_model_name("gemini-2.5-flash"),
                              sanitize_model_name("gemini-2.0-flash"),
-                             sanitize_model_name("gemini-1.5-flash-latest"),
                              sanitize_model_name("gemini-flash-lite-latest"),
                          ]
                          

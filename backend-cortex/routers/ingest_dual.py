@@ -96,7 +96,7 @@ async def ingest_root(request: IngestRequest):
             try:
                 # Initialize Sorter Agent
                 agent = SorterAgent()
-                result = agent.process(content) # Returns LogEntry (v7.1 structured)
+                result = await agent.process(content) # Returns LogEntry (v7.1 structured)
                 
                 # [FACT-BASED SCORING] Use ScoringEngine for objective metrics
                 objective_focus = scoring_engine.calculate_score("focus", getattr(result, 'facts', []))

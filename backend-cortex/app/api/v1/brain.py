@@ -131,7 +131,7 @@ async def get_brain_graph(http_request: Request, limit: int = 500):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/node/{label}/context")
-async def get_node_context(http_request: Request, label: str):
+async def get_node_context(http_request: Request, label: str, g_client: Any = None):
     """
     Find semantically related memories for a given brain node.
     Uses vector search to find context beyond strict keyword matches.
@@ -159,50 +159,42 @@ async def get_node_context(http_request: Request, label: str):
                 }]
             return []
 
-        from app.services.embedder import generate_embedding
+        from app.services.rag_service import rag_service
         
-        # 1. Generate embedding for the label
-        query_vector = await generate_embedding(label, task_type="retrieval_query")
+        # Use High-Precision Two-Stage RAG with Reranking and Recency Boost
+        # Recall 50 candidates, Rerank to top 10
+        reranked_results = await rag_service.search_and_rerank(
+            query=label,
+            recall_limit=50,
+            top_k=10,
+            alpha=0.6, # Semantic weight
+            beta=0.4,  # Recency weight (slightly increased per user request)
+            client=g_client
+        )
 
         related_memories = []
-
-        # 2. Vector search (only if embedding succeeded)
-        if query_vector:
-            rpc_params = {
-                "query_embedding": query_vector,
-                "match_threshold": 0.3,
-                "match_count": 10
-            }
-            response = db.rpc("match_memories", rpc_params).execute()
-            rpc_results = response.data or []
+        for rpc_mem in reranked_results:
+            m_id = rpc_mem["id"]
+            # Prefer ai_insights, fallback to content
+            content = rpc_mem.get("ai_insights") or rpc_mem.get("content") or ""
+            similarity = rpc_mem.get("_hybrid_score", 0.0)
             
-            # Hydrate full memory data since RPC might return null content / no ai_insights
-            if rpc_results:
-                matched_ids = [m["id"] for m in rpc_results]
-                hydrated = db.table("memories") \
-                    .select("id,date,content,ai_insights,mood,focus,energy") \
-                    .in_("id", matched_ids) \
-                    .execute()
-                
-                # Create a lookup mapping and preserve RPC similarity order
-                mem_map = {m["id"]: m for m in (hydrated.data or [])}
-                
-                for rpc_mem in rpc_results:
-                    m_id = rpc_mem["id"]
-                    if m_id in mem_map:
-                        full_mem = mem_map[m_id]
-                        # Prefer ai_insights, fallback to content
-                        content = full_mem.get("ai_insights") or full_mem.get("content") or ""
-                        
-                        related_memories.append({
-                            "id": m_id,
-                            "date": full_mem.get("date") or rpc_mem.get("metadata", {}).get("date", "Unknown"),
-                            "content": content,
-                            "mood": full_mem.get("mood"),
-                            "focus": full_mem.get("focus"),
-                            "energy": full_mem.get("energy"),
-                            "matchReason": {"type": "semantic", "label": f"Semantic Match ({rpc_mem.get('similarity', 0):.2f})"}
-                        })
+            related_memories.append({
+                "id": m_id,
+                "date": rpc_mem.get("date") or "Unknown",
+                "content": content,
+                "mood": rpc_mem.get("mood"),
+                "focus": rpc_mem.get("focus"),
+                "energy": rpc_mem.get("energy"),
+                "matchReason": {
+                    "type": "neural_hybrid", 
+                    "label": f"Neural Match ({similarity:.2f})",
+                    "scores": {
+                        "semantic": rpc_mem.get("_semantic_relevance", 0.0),
+                        "recency": rpc_mem.get("_recency_boost", 0.0)
+                    }
+                }
+            })
 
         # 3. If no vector results, fallback to keyword search
         if not related_memories:
@@ -214,9 +206,19 @@ async def get_node_context(http_request: Request, label: str):
                 .order("date", desc=True) \
                 .limit(10) \
                 .execute()
-            related_memories = resp.data or []
-            for mem in related_memories:
-                mem["matchReason"] = {"type": "keyword", "label": "Keyword Match"}
+            
+            for m in (resp.data or []):
+                # Standardize fallback schema
+                content = m.get("ai_insights") or m.get("content") or ""
+                related_memories.append({
+                    "id": m["id"],
+                    "date": m.get("date") or "Unknown",
+                    "content": str(content),
+                    "mood": m.get("mood"),
+                    "focus": m.get("focus"),
+                    "energy": m.get("energy"),
+                    "matchReason": {"type": "keyword", "label": "Keyword Match"}
+                })
 
         return related_memories
 
@@ -229,7 +231,17 @@ async def get_node_context(http_request: Request, label: str):
                 .order("date", desc=True) \
                 .limit(10) \
                 .execute()
-            return resp.data or []
+            
+            transformed = []
+            for m in (resp.data or []):
+                content = m.get("ai_insights") or m.get("content") or ""
+                transformed.append({
+                    "id": m["id"],
+                    "date": m.get("date") or "Unknown",
+                    "content": str(content),
+                    "matchReason": {"type": "fallback", "label": "Critical Fallback Match"}
+                })
+            return transformed
         except:
             return []
 
@@ -239,22 +251,31 @@ async def get_node_insight(http_request: Request, label: str):
     Generate an AI-driven observation based on the context of a node.
     Synthesizes why this label is significant across different memories.
     """
-    db = get_request_client(http_request)
-    if not db:
-        raise HTTPException(status_code=503, detail="Database unavailable")
+    from app.core.gemini import get_request_gemini_client, types, safe_generate_content
+    
+    g_client = get_request_gemini_client(http_request)
+    if not g_client:
+        logger.warning(f"No Gemini client available for insight: {label}")
+        return {"insight": "無法產生語意分析 (未配置 API 金鑰)。"}
 
     try:
-        # 1. Fetch related context first
-        memories = await get_node_context(http_request, label)
+        # 1. Fetch related context first (Pass the client)
+        memories = await get_node_context(http_request, label, g_client=g_client)
         if not memories or isinstance(memories, dict): # Check for error dict
              return {"insight": "此節點尚無足夠的上下文供分析。"}
 
         # 2. Prepare context for Gemini (Increased to 10 for better synthesis)
-        context_snippets = "\n".join([f"- [{m.get('date')}] {m.get('content')[:300]}..." for m in memories[:10]])
+        snippets = []
+        for m in memories[:10]:
+            content = m.get('content') or ""
+            date = m.get('date') or "Unknown"
+            snippets.append(f"- [{date}] {str(content)[:300]}...")
+            
+        context_snippets = "\n".join(snippets)
         
         import re
         if re.match(r'^\d{4}-\d{2}-\d{2}$', label):
-            sys_prompt = """You are the LifeOS Insights Engine. 
+            sys_prompt = f"""You are the LifeOS Insights Engine. 
 Review the provided journal entry for the date '{label}'. 
 Generate a short, insightful response in Traditional Chinese summarizing the day.
 """
@@ -276,20 +297,23 @@ FORMAT:
 - Language: Traditional Chinese.
 """
         
-        from app.core.gemini import gemini_client, get_model, types
-        
-        model_conf = get_model("fast")
-        response = await gemini_client.aio.models.generate_content(
-            model=model_conf["model"],
+        # Use the new v4.1 Safe Failover Protocol
+        response = await safe_generate_content(
+            client=g_client,
+            prefer_mode="fast", # Brain insights are usually satisfied by Flash
             contents=f"CONTEXT FOR '{label}':\n{context_snippets}",
             config=types.GenerateContentConfig(
-                system_instruction=sys_prompt,
-                temperature=0.4 # Reduced for more factual organization
-            )
+                temperature=0.4
+            ),
+            system_instruction=sys_prompt
         )
         
+        if not response or not hasattr(response, 'text') or not response.text:
+            return {"insight": "無法產生語意分析 (AI 回應為空或被過濾)。"}
+            
         return {"insight": response.text.strip()}
 
     except Exception as e:
-        logger.error(f"Insight Generation Error ({label}): {e}")
-        return {"insight": "無法產生語意分析。"}
+        logger.error(f"Insight Generation Error ({label}): {str(e)}")
+        # Provide more context in the error for debugging while developing
+        return {"insight": f"無法產生語意分析 (系統錯誤: {str(e)[:50]}...)"}

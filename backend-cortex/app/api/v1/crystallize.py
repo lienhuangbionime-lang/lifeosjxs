@@ -47,51 +47,80 @@ async def trigger_crystallization(background_tasks: BackgroundTasks, days: int =
 async def get_contextual_prompts():
     """
     Agentic Phase 14: Context-Aware Capture.
-    Reads recent memories and generates 3 dynamic questions to guide the user's daily journal.
+    Reads recent memories and the latest Subconscious Reflection to generate 
+    3 dynamic questions that bridge the gap between AI insights and user actions.
     """
     try:
-        # 1. Fetch recent memories covering the last 48 hours for context
-        now = datetime.datetime.now()
+        # 1. Fetch recent memories (last 48h) for temporal context
+        now = datetime.datetime.now(datetime.timezone.utc)
         past = now - datetime.timedelta(hours=48)
         
-        response = supabase.table("memories").select("content, type, date").gte("created_at", past.isoformat()).order("created_at", desc=True).limit(20).execute()
-        memories = response.data
+        # Use 'category' instead of 'type' (Schema Alignment)
+        mem_res = supabase.table("memories").select("content, category, date, ai_insights") \
+            .gte("created_at", past.isoformat()).order("created_at", desc=True).limit(15).execute()
+        memories = mem_res.data or []
         
-        if not memories:
+        # 2. Fetch the absolute latest Subconscious Reflection (The "Insight")
+        ref_res = supabase.table("memories").select("content, ai_insights, date") \
+            .eq("category", "reflection").order("created_at", desc=True).limit(1).execute()
+        latest_ref = ref_res.data[0] if ref_res.data else None
+        
+        if not memories and not latest_ref:
             return {"prompts": ["今天過得好嗎？", "有什麼值得記錄的嗎？", "寫下你現在的想法吧！"]}
             
-        # 2. Prepare Context for Gemini Flash
-        context_text = "\n".join([f"[{m.get('date')}][{m.get('type')}] {m.get('content')}" for m in memories])
+        # 3. Prepare Context
+        context_parts = []
+        if latest_ref:
+            ref_text = latest_ref.get('content') or latest_ref.get('ai_insights')
+            context_parts.append(f"=== LATEST AI INSIGHT ({latest_ref.get('date')}) ===\n{ref_text}")
+            
+        if memories:
+            mem_text = "\n".join([f"[{m.get('date')}][{m.get('category')}] {m.get('content') or m.get('ai_insights')}" for m in memories])
+            context_parts.append(f"=== RECENT ACTIVITY ===\n{mem_text}")
+            
+        full_context = "\n\n".join(context_parts)
         
-        sys_prompt = '''You are the LifeOS context engine. Review the user's recent memories and chat logs.
-Generate exactly 3 short, thought-provoking questions (in Traditional Chinese) to guide their daily journal today.
-Do not ask generic questions. Base them SPECIFICALLY on what they were doing or talking about recently.
-For example, if they worked on "Supabase", ask "Supabase 資料表今天有什麼新進展嗎？"
+        sys_prompt = '''You are the LifeOS context engine. Review the user's recent memories and the latest AI Subconscious Insight.
+Generate exactly 3 short, thought-provoking questions (in Traditional Chinese) to guide their daily journal.
+CRITICAL: If an "AI INSIGHT" is provided, at least 2 questions MUST follow up on the goals, patterns, or suggestions mentioned in that insight (e.g., if the insight mentions "Health focus", ask about their workout).
+Keep questions concise and supportive.
 Output JSON: {"prompts": ["Q1", "Q2", "Q3"]}'''
 
-        # 3. Call fast model
-        model_conf = get_model("fast")
-        
-        if not gemini_client:
-             return {"prompts": ["今天過得好嗎？", "有什麼值得記錄的嗎？", "最近忙碌嗎？"]}
-             
-        ai_res = gemini_client.models.generate_content(
-            model=model_conf["model"],
-            contents=context_text,
-            config=types.GenerateContentConfig(
-                system_instruction=sys_prompt,
-                response_mime_type="application/json",
-                temperature=0.7
+        # 4. Call fast model (Gemini 2.0 Flash) with improved resiliency
+        from app.core.gemini import safe_generate_content
+        try:
+            ai_res = await safe_generate_content(
+                client=gemini_client,
+                prefer_mode="fast",
+                contents=full_context,
+                config=types.GenerateContentConfig(
+                    system_instruction=sys_prompt,
+                    response_mime_type="application/json",
+                    temperature=0.7
+                )
             )
-        )
+            
+            result_json = json.loads(ai_res.text.strip())
+            prompts = result_json.get("prompts", [])
+        except Exception as ai_err:
+            logger.warning(f"AI prompt generation failed (likely 429): {ai_err}")
+            prompts = []
+            
+        # 5. Final Fallback Logic: If AI failed, use recent activity titles or static defaults
+        if not prompts:
+            if latest_ref:
+                prompts = ["還記得早前的深度洞察嗎？點擊回顧...", "關於你的成長模式，有什麼新發現？"]
+            elif memories:
+                # Use a specific recent memory topic if possible
+                latest_m = memories[0].get('content', '')[:20]
+                prompts = [f"關於『{latest_m}...』還有什麼想補充的？", "今天的進度如何？", "有什麼值得紀錄的嗎？"]
+            else:
+                prompts = ["今天過得好嗎？", "有什麼值得記錄的嗎？", "準備好開始新的一天了嗎？"]
         
-        result_json = json.loads(ai_res.text.strip())
-        prompts = result_json.get("prompts", ["今天有什麼特別的發現嗎？"])
-        
-        return {"prompts": prompts[:3]}
+        return {"prompts": [p.replace("✨", "").strip() for p in prompts[:3]]}
         
     except Exception as e:
-        logger.error(f"Failed to generate contextual prompts: {e}")
+        logger.error(f"Failed to generate contextual prompts (outer): {e}")
         return {"prompts": ["今天過得好嗎？", "有什麼值得記錄的嗎？"]}
 
 

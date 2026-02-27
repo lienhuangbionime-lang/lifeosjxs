@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 import logging
 from app.services.subconscious import run_autonomous_reflection
+from app.core.database import supabase
 
 router = APIRouter()
 logger = logging.getLogger("cortex.api.subconscious")
@@ -12,12 +13,15 @@ async def manual_reflection():
     """
     try:
         logger.info("🧠 [API] Manual Subconscious Reflection triggered by user.")
-        result = await run_autonomous_reflection(hours_lookback=48)
+        result = await run_autonomous_reflection(hours_lookback=168)
         
         if result:
             return {"success": True, "data": result, "message": "Reflection completed and stored."}
         else:
-            return {"success": False, "message": "Not enough data or AI failed to reflect."}
+            # Check if there are ANY memories in the database to give a better hint
+            check = supabase.table("memories").select("id").limit(1).execute()
+            hint = " (Note: No memories found in your database. Write a diary entry first!)" if not check.data else ""
+            return {"success": False, "message": f"Not enough data in lookback window or AI failed to reflect.{hint}"}
             
     except Exception as e:
         logger.error(f"Manual reflection error: {e}")

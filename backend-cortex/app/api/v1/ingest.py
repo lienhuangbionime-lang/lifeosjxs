@@ -274,9 +274,11 @@ async def auto_link_tasks_projects(content: str, db, http_request: Request) -> d
 
 僅回傳匹配到的 ID 字串陣列。若無任何匹配，回傳空陣列 []。
 """
-        model = gemini.models.get(model="gemini-2.0-flash")
-        resp = gemini.models.generate_content(
-            model="gemini-2.0-flash",
+        model_name = "gemini-2.0-flash"
+        from app.core.gemini import safe_generate_content
+        resp = await safe_generate_content(
+            client=gemini,
+            prefer_mode="fast",
             contents=prompt,
             config={
                 "response_mime_type": "application/json",
@@ -338,8 +340,9 @@ class IngestRequest(BaseModel):
 @router.post("/")
 async def ingest_log(http_request: Request, request: IngestRequest, background_tasks: BackgroundTasks):
     # Determine target table based on source
+    # NEW: web_terminal and chat are considered user diaries -> memories
     target_table = "memories"
-    if request.source and request.source != "capture":
+    if request.source and request.source not in ["capture", "web_terminal", "chat"]:
         target_table = "documents"
     
     logger.info(f"📥 Received INGEST request. Source: {request.source} -> Target: {target_table}")
@@ -442,11 +445,12 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
             )
             prompt = f"{LIFEOS_V7_PROMPT}\n\n{user_context}[USER LOG - {ingest_date}]:\n{request.content}\n\n[HABITS LOGGED]:\n{', '.join(habits_list) if habits_list else 'None'}"
             
-            # 2. Call Gemini API — using correct google.genai SDK syntax
+            # 2. Call Gemini API via Safe Failover Protocol
             try:
-                # Based on google.genai, we use client.models.generate_content(model=..., contents=...)
-                response = req_gemini.models.generate_content(
-                    model=model_name,
+                from app.core.gemini import safe_generate_content
+                response = await safe_generate_content(
+                    client=req_gemini,
+                    prefer_mode="fast",
                     contents=prompt
                 )
                 

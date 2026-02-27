@@ -5,20 +5,21 @@ Usage: Called by ingest.py and rag.py for semantic search
 """
 
 import logging
-from typing import List, Optional
+from typing import List, Optional, Any
 from app.core.gemini import gemini_client, types
 
 logger = logging.getLogger("cortex.embedder")
 
 
-async def generate_embedding(text: str, task_type: str = "retrieval_document", dimensionality: Optional[int] = 3072) -> Optional[List[float]]:
+async def generate_embedding(text: str, task_type: str = "retrieval_document", dimensionality: Optional[int] = 3072, client: Any = None) -> Optional[List[float]]:
     """
     Generate vector embedding for given text using Gemini
     
     Args:
         text: Input text to embed
         task_type: Task type for embedding
-        dimensionality: Output dimension (e.g., 1536 for older tables, 3072 for new)
+        dimensionality: Output dimension
+        client: Optional transient Gemini client
     
     Returns:
         List of floats, or None if generation fails
@@ -28,35 +29,64 @@ async def generate_embedding(text: str, task_type: str = "retrieval_document", d
         return None
     
     try:
-        if not gemini_client:
-            logger.error("[ERROR] gemini_client not configured")
+        # Use provided client or fallback to global gemini_client
+        target_client = client or gemini_client
+        
+        if not target_client:
+            logger.error("[ERROR] No Gemini client available for embedding")
             return None
 
-        # Generate embedding using google.genai SDK
-        result = await gemini_client.aio.models.embed_content(
-            model="gemini-embedding-001",
-            contents=text,
-            config=types.EmbedContentConfig(
-                task_type="RETRIEVAL_DOCUMENT" if task_type == "retrieval_document" else "RETRIEVAL_QUERY",
-                title="Cortex Memory" if task_type == "retrieval_document" else None,
-                output_dimensionality=dimensionality
-            )
-        )
+        # [v4.1 - v4.2 Resilience] Retry loop for 429 errors with Exponential Backoff
+        models_to_try = ["text-embedding-004", "models/text-embedding-004"]
+        backoff_delays = [0, 1.0, 2.0] # 0, 1s, 2s
+        
+        last_err = None
+        for model_id in models_to_try:
+            for delay in backoff_delays:
+                if delay > 0:
+                    import asyncio
+                    import random
+                    await asyncio.sleep(delay + random.uniform(0, 0.3))
+                    logger.info(f"Retrying embedding {model_id} after {delay}s backoff...")
 
-        if not result.embeddings or len(result.embeddings) == 0:
-            logger.error("[ERROR] No embeddings returned")
-            return None
+                try:
+                    # Generate embedding using google.genai SDK
+                    result = await target_client.aio.models.embed_content(
+                        model=model_id,
+                        contents=text,
+                        config=types.EmbedContentConfig(
+                            task_type="RETRIEVAL_DOCUMENT" if task_type == "retrieval_document" else "RETRIEVAL_QUERY",
+                            title="Cortex Memory" if task_type == "retrieval_document" else None,
+                            output_dimensionality=dimensionality
+                        )
+                    )
 
-        embedding = result.embeddings[0].values
+                    if result.embeddings and len(result.embeddings) > 0:
+                        embedding = result.embeddings[0].values
+                        if dimensionality and len(embedding) != dimensionality:
+                            logger.warning(f"[WARN] Unexpected embedding dimension: {len(embedding)} (expected {dimensionality})")
+                        logger.info(f"[OK] Generated embedding (len={len(text)}, dim={len(embedding)})")
+                        return list(embedding)
+                    
+                    logger.error(f"[ERROR] No embeddings returned from {model_id}")
 
-        if dimensionality and len(embedding) != dimensionality:
-            logger.warning(f"[WARN] Unexpected embedding dimension: {len(embedding)} (expected {dimensionality})")
-
-        logger.info(f"[OK] Generated embedding (len={len(text)}, dim={len(embedding)})")
-        return list(embedding)
+                except Exception as e:
+                    last_err = e
+                    if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
+                        logger.warning(f"Embedding model {model_id} exhausted (429) at delay {delay}s.")
+                        continue # Try next backoff
+                    else:
+                        break # Critical error
+            
+            # If all backoffs for this model failed, try next model in loop
+            continue
+        
+        if last_err:
+            logger.error(f"[ERROR] Failed to generate embedding after all retries: {last_err}")
+        return None
 
     except Exception as e:
-        logger.error(f"[ERROR] Failed to generate embedding: {e}")
+        logger.error(f"[ERROR] Fatal error in generate_embedding: {e}")
         return None
 
 

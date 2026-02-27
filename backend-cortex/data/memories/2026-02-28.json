@@ -1,0 +1,35 @@
+{
+  "id": "b1d256aa-c8f9-41c5-89fb-5b605c24266e",
+  "date": "2026-02-28",
+  "entries": [
+    {
+      "time": "2026-02-28T02:37:01.921303+08:00",
+      "content": "今日測試：LifeOS v3.8.5 正常運作中（2026-02-28）。家庭聚會很開心。",
+      "ai_processed": "# [[2026-02-28]] 日記\n\n今日測試：LifeOS v3.8.5 正常運作中（[[2026-02-28]]）。家庭聚會很開心。",
+      "metadata": {
+        "mood": 5,
+        "focus": 5,
+        "energy": 5,
+        "tags": [],
+        "is_ai": true,
+        "ai_model": "models/gemini-1.5-flash"
+      }
+    },
+    {
+      "time": "2026-02-28T02:37:43.381796+08:00",
+      "content": "今日測試：LifeOS v3.8.5 正常運作中（2026-02-28）。家庭聚會很開心。",
+      "ai_processed": "# [[2026-02-28]] 日記\n\n今日測試：LifeOS v3.8.5 正常運作中（[[2026-02-28]]）。家庭聚會很開心。",
+      "metadata": {
+        "mood": 5,
+        "focus": 5,
+        "energy": 5,
+        "tags": [],
+        "is_ai": true,
+        "ai_model": "models/gemini-2.0-flash-lite"
+      }
+    }
+  ],
+  "combined_content": "今日測試：LifeOS v3.8.5 正常運作中（2026-02-28）。家庭聚會很開心。\n\n---\n\n今日測試：LifeOS v3.8.5 正常運作中（2026-02-28）。家庭聚會很開心。",
+  "created_at": "2026-02-28T02:37:01.921303+08:00",
+  "updated_at": "2026-02-28T02:37:43.381796+08:00"
+}

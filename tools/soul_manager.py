@@ -20,23 +20,17 @@ TOKEN_FILE = os.path.join(BASE_DIR, "backend-cortex", "token.json")
 CLIENT_SECRET_FILE = os.path.join(BASE_DIR, "backend-cortex", "client_secret.json")
 EVOLUTION_LOG = os.path.join(SYNC_DIR, "evolution_log.json")
 
-# 核心靈魂檔案清單 (v3.6.1 - Standardized AI Soul)
+# 核心靈魂檔案清單 (v4.0 - Agentic DNA Edition)
 SOUL_FILES = {
     ".cursorrules":       os.path.join(BASE_DIR, ".cursorrules"),
-    "SYSTEM_CONTEXT.md":  os.path.join(BASE_DIR, "SYSTEM_CONTEXT.md"),
+    "SYSTEM_CONTEXT.md":  os.path.join(SYNC_DIR, "SYSTEM_CONTEXT.md"),
     "registry.json":      os.path.join(BASE_DIR, "backend-cortex", "schemas", "registry.json"),
+    "SKILLS.md":          os.path.join(SYNC_DIR, "SKILLS.md"),
     "evolution_log.json": os.path.join(SYNC_DIR, "evolution_log.json"),
-    "system_daily.md":    os.path.join(SYNC_DIR, "system_daily.md"),
-    "system_cortex.md":   os.path.join(SYNC_DIR, "system_cortex.md"),
-    "soul_manager.py":    os.path.join(SYNC_DIR, "soul_manager.py"),
-    "scoring_engine.py":  os.path.join(BASE_DIR, "backend-cortex", "app", "services", "scoring_engine.py"),
-    # [Phase A+] Dev AI Memory — iterative growth docs
     "task.md":            os.path.join(SYNC_DIR, "task.md"),
     "ROADMAP.md":         os.path.join(SYNC_DIR, "ROADMAP.md"),
-    "HANDOFF.md":         os.path.join(SYNC_DIR, "HANDOFF.md"),
     "QUESTIONS.md":       os.path.join(SYNC_DIR, "QUESTIONS.md"),
-    "AI_MEMORY.md":       os.path.join(BASE_DIR, "tools", "AI_MEMORY.md"),
-    "START_HERE.md":      os.path.join(BASE_DIR, "tools", "START_HERE.md"),
+    "START_HERE.md":      os.path.join(SYNC_DIR, "START_HERE.md"),
 }
 
 
@@ -138,10 +132,15 @@ def get_gdrive_service():
 
 def upload_to_gdrive(service, file_path, folder_id):
     file_name = os.path.basename(file_path)
+    # If file_path is inside a subfolder (like history/), we might want to mirror that.
+    # For now, let's just use the basename to avoid complex folder creation logic
+    # unless we check for the folder first.
     query = f"name = '{file_name}' and '{folder_id}' in parents and trashed = false"
     results = service.files().list(q=query, fields="files(id)").execute()
     files = results.get('files', [])
-    media = MediaFileUpload(file_path, resumable=False)
+    
+    # Handle potentially large files with MediaFileUpload
+    media = MediaFileUpload(file_path, resumable=True)
 
     if files:
         service.files().update(fileId=files[0]['id'], media_body=media).execute()
@@ -150,6 +149,21 @@ def upload_to_gdrive(service, file_path, folder_id):
         file_metadata = {'name': file_name, 'parents': [folder_id]}
         service.files().create(body=file_metadata, media_body=media, fields='id').execute()
         return f"Created: {file_name}"
+
+def get_or_create_folder(service, folder_name, parent_id):
+    query = f"name = '{folder_name}' and '{parent_id}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
+    results = service.files().list(q=query, fields="files(id)").execute()
+    files = results.get('files', [])
+    if files:
+        return files[0]['id']
+    else:
+        file_metadata = {
+            'name': folder_name,
+            'parents': [parent_id],
+            'mimeType': 'application/vnd.google-apps.folder'
+        }
+        folder = service.files().create(body=file_metadata, fields='id').execute()
+        return folder.get('id')
 
 
 # ---------------------------------------------------------------------------
@@ -210,6 +224,20 @@ def main():
                             print(f"[Cloud OK] {msg}")
                         except Exception as e:
                             print(f"[Cloud Error] {name}: {e}")
+                
+                # 2.1 Sync 'history' subdirectory
+                history_dir = os.path.join(SYNC_DIR, "history")
+                if os.path.exists(history_dir):
+                    print("[Cloud] Syncing 'history' directory...")
+                    cloud_history_id = get_or_create_folder(service, "history", folder_id)
+                    for h_file in os.listdir(history_dir):
+                        h_path = os.path.join(history_dir, h_file)
+                        if os.path.isfile(h_path):
+                             try:
+                                msg = upload_to_gdrive(service, h_path, cloud_history_id)
+                                print(f"[Cloud OK] history/{msg}")
+                             except Exception as e:
+                                print(f"[Cloud Error] history/{h_file}: {e}")
         except Exception as e:
             print(f"[Auth Error] {e}")
 

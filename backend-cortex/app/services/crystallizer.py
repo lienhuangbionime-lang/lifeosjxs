@@ -41,10 +41,11 @@ Output ONLY a JSON object:
             return
 
         try:
-            # 1. Prompt Gemini
-            model_conf = get_model("fast")
-            response = gemini_client.models.generate_content(
-                model=model_conf["model"],
+            # 1. Prompt Gemini via Safe Failover
+            from app.core.gemini import safe_generate_content
+            response = await safe_generate_content(
+                client=gemini_client,
+                prefer_mode="fast",
                 contents=f"ENTRY DATE: {date}\nCONTENT: {content}",
                 config=types.GenerateContentConfig(
                     system_instruction=self.SYSTEM_PROMPT,

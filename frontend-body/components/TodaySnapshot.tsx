@@ -70,7 +70,17 @@ export const TodaySnapshot = () => {
                     return dateB - dateA;
                 });
 
-                const focusedProject = activeProjects.length > 0 ? activeProjects[0] : null;
+                let focusedProject = activeProjects.length > 0 ? activeProjects[0] : null;
+
+                // Fallback: If no active projects, show the most recently updated one of any status
+                if (!focusedProject && Array.isArray(projects) && projects.length > 0) {
+                    const sortedAll = [...projects].sort((a, b) => {
+                        const dateA = new Date(a.updated_at || 0).getTime();
+                        const dateB = new Date(b.updated_at || 0).getTime();
+                        return dateB - dateA;
+                    });
+                    focusedProject = sortedAll[0];
+                }
 
                 // Extract tasks for that focused project
                 const focusedProjectTasks = focusedProject && Array.isArray(tasks)
@@ -131,14 +141,14 @@ export const TodaySnapshot = () => {
                         {data?.latestMemory ? (
                             <div>
                                 <p className="text-sm text-slate-300 leading-relaxed line-clamp-3">
-                                    {data.latestMemory.content?.replace(/[#*`]/g, '') || "No content."}
+                                    {(data.latestMemory.content || data.latestMemory.ai_insights || "No text content available.").replace(/[#*`]/g, '')}
                                 </p>
-                                <span className="text-[10px] text-slate-600 font-mono mt-2 block">
-                                    {data.latestMemory.date}
-                                </span>
+                                <p className="text-[10px] text-slate-500 font-mono italic mt-2">
+                                    — {getRelativeTime(data.latestMemory.date)}
+                                </p>
                             </div>
                         ) : (
-                            <p className="text-xs text-slate-600 italic">No recent memories found.</p>
+                            <p className="text-xs text-slate-600 italic">No recent memories found in logs.</p>
                         )}
                     </div>
                 </div>
@@ -200,6 +210,11 @@ export const TodaySnapshot = () => {
                                 <h4 className="text-lg font-black text-white tracking-tight leading-tight truncate">
                                     {data.focusedProject.name}
                                 </h4>
+                                {data.focusedProject.status !== 'active' && (
+                                    <span className="text-[10px] bg-white/5 border border-white/10 px-1.5 py-0.5 rounded text-slate-500 uppercase font-bold">
+                                        {data.focusedProject.status}
+                                    </span>
+                                )}
                             </div>
 
                             <div className="mt-3 space-y-1.5">

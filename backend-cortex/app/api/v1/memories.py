@@ -81,17 +81,23 @@ async def get_recent_memories(
                 mapped_results = []
                 for row in results:
                     meta = row.get("metadata", {}) or {}
+                    # [v4.3 Mapping Fix]
+                    row_content = row.get("content")
+                    row_insights = row.get("ai_insights")
+                    final_content = row_insights if (row_insights and not row_content) else (row_content or "")
+                    
                     mapped_results.append({
                         "id": row.get("id"),
-                        "content": row.get("content"),
+                        "content": final_content,
+                        "ai_insights": row_insights,
                         "date": meta.get("date") or row.get("date"),
                         "tags": meta.get("tags", []) or row.get("tags", []),
                         "category": meta.get("category") or row.get("category"),
                         "mood": meta.get("mood", 5),
                         "focus": meta.get("focus", 5),
                         "energy": meta.get("energy", 5),
-                        "is_ai": False, # Default for search results if not in metadata
-                        "ai_model": None
+                        "is_ai": row.get("is_ai", False),
+                        "ai_model": row.get("ai_model")
                     })
                 return mapped_results
             
@@ -115,20 +121,19 @@ async def get_recent_memories(
         # supabase-py returns a dict-like object or APIResponse object
         if hasattr(result, "data"):
             data = result.data
+            # [v4.3 Mapping Fix] Apply to chronological list
+            if data:
+                for item in data:
+                    if not item.get("content") and item.get("ai_insights"):
+                        item["content"] = item["ai_insights"]
         elif isinstance(result, dict):
             data = result.get("data")
+            if data:
+                for item in data:
+                    if not item.get("content") and item.get("ai_insights"):
+                        item["content"] = item["ai_insights"]
         else:
             data = None
-
-        error = None
-        if hasattr(result, "error"):
-            error = result.error
-        elif isinstance(result, dict):
-            error = result.get("error")
-
-        if error:
-            logger.error("Supabase error while fetching memories: %s", error)
-            raise HTTPException(status_code=500, detail="Database query error")
 
         return data or []
 

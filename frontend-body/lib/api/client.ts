@@ -45,6 +45,7 @@ export interface LogEntry {
   id?: string;        // Supabase ID (UUID)
   date: string;       // YYYY-MM-DD
   content?: string | null; // Markdown content
+  ai_insights?: string | null; // [New] Fallback content
   mood?: number | null;
   focus?: number | null;
   energy?: number | null;

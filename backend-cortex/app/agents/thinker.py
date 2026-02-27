@@ -19,7 +19,7 @@ class ThinkerAgent:
         self.client = genai.Client(api_key=api_key)
         self.model_name = "models/gemini-flash-lite-latest" 
 
-    def process(self, user_input: str) -> ThinkingResult:
+    async def process(self, user_input: str) -> ThinkingResult:
         prompt = f"""
         You are Cortex, a highly advanced AI "Second Brain" designed to help the user think deeper, not just organize data.
         Your goal is to be a reflective mirror, a philosopher, and a strategic coach.
@@ -36,8 +36,10 @@ class ThinkerAgent:
         Output must be in Traditional Chinese (繁體中文), but keep the tone sophisticated and warm.
         """
         
-        response = self.client.models.generate_content(
-            model=self.model_name,
+        from app.core.gemini import safe_generate_content
+        response = await safe_generate_content(
+            client=self.client,
+            prefer_mode="fast",
             contents=prompt,
             config={
                 "response_mime_type": "application/json",

@@ -1,0 +1,21 @@
+{
+  "verified_models": {
+    "fast": [
+      "models/gemini-2.0-flash-lite",
+      "models/gemini-2.5-flash",
+      "models/gemini-flash-lite-latest"
+    ],
+    "smart": [
+      "models/gemini-3.1-pro-preview",
+      "models/gemini-2.5-pro",
+      "models/gemini-3-pro-preview"
+    ]
+  },
+  "pending_models": {
+    "fast": [
+      "models/gemini-3-flash-preview"
+    ],
+    "smart": []
+  },
+  "last_discovery": "2026-02-28T04:02:10.421187"
+}

@@ -35,14 +35,15 @@ export const ProjectBoard = ({ onCreateProject, incomingProject, onJumpToGraph }
     // Fetch Projects
     const fetchProjects = async () => {
         setLoading(true);
-        const { data, error } = await supabase
-            .from('projects')
-            .select('*')
-            .order('progress', { ascending: false });
-
-        if (data) setProjects(data as Project[]);
-        if (error) console.error("Fetch projects error:", error);
-        setLoading(false);
+        try {
+            const data = await cortex.projects.list();
+            if (data) setProjects(data as Project[]);
+        } catch (error) {
+            console.error("Fetch projects error:", error);
+            showToast("Failed to fetch projects", "error");
+        } finally {
+            setLoading(false);
+        }
     };
 
     useEffect(() => {

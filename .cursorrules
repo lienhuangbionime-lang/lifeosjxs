@@ -1,12 +1,10 @@
 # LifeOS AI Constraints & Best Practices
 
-## 🤖 Gemini Model Handling (CRITICAL)
-- **Primary Smart Model**: `models/gemini-3-pro-preview`
-- **Primary Fast/Fallback Model**: `models/gemini-flash-lite-latest`
-- **Identifier Protocol**:
-    - ALWAYS pass model strings through `app.core.gemini.sanitize_model_name()` before use.
-    - NEVER use identifiers like `gemini-1.5`, `gemini-2.0`, or `gemini-3.0` directly.
-    - ALWAYS ensure the `models/` prefix is present when calling the SDK.
+## 🤖 Gemini Model Handling (CRITICAL - v3.9)
+- **Autonomous Discovery**: LifeOS uses `ModelDiscoveryService` to detect verified models.
+- **NEVER Hardcode**: Do not use IDs like `gemini-3.1-pro` directly in code.
+- **Standard Access**: ALWAYS use `app.core.gemini.get_model()` to fetch the current active/verified model ID.
+- **Reporting**: If you suspect a model is failing, refer the user to run `model_report.py`.
 
 ## 🔍 Retrieval & RAG
 - **Embedding Model**: `text-embedding-004` (Dimension: 3072).
@@ -22,7 +20,7 @@
 - **Vanilla CSS**: NO Tailwind CSS unless explicitly requested.
 - **LocalStorage**: Be careful with cached model names. Use the `CHECK_AND_CLEAN_MODELS` logic in `CortexChat.tsx`.
 
-## 🧠 CodeSpeak Developer Onboarding (START HERE)
-- **系統架構分離**: `backend-cortex/app/` = 服務使用者的系統 AI。`tools/` = 開發系統的開發 AI (你現在的位置)。
-- **開發守則**: 本地優先 + Append Mode。資料庫是給 AI 用的 (高訊號、非正規化)，簡潔、清晰、馬上理解！
-- **開發工具箱**: 所有開發/同步腳本 (`soul_manager.py` 等) 均統一在 `tools/`。
+## 🧠 Agentic Protocol (Onboarding - START HERE)
+- **Source of Truth**: Read `sync_brain/task.md` and `sync_brain/SKILLS.md` immediately upon start.
+- **Step Visibility**: Update `sync_brain/task.md` frequently. Every non-trivial task must result in a completion record in `sync_brain/history/[Date]_Task_Name.md`.
+- **System Wisdom**: `sync_brain/SYSTEM_CONTEXT.md` contains the core philosophy. Adhere to it.

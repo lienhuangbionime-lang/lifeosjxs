@@ -41,9 +41,9 @@ export const CortexChat = () => {
         if (savedKey) setApiKey(savedKey);
         if (savedModel) {
             // [Hotfix] Reset if model is deprecated or corrupted
-            if (savedModel.includes('pro-exp-02-05') || savedModel.includes('2.5') || savedModel.includes('-33')) {
-                setSelectedModel('models/gemini-flash-lite-latest');
-                localStorage.setItem('CORTEX_MODEL', 'models/gemini-flash-lite-latest');
+            if (savedModel.includes('pro-exp-02-05') || savedModel.includes('2.5') || savedModel.includes('-33') || savedModel.includes('1.5')) {
+                setSelectedModel('models/gemini-2.0-flash-lite');
+                localStorage.setItem('CORTEX_MODEL', 'models/gemini-2.0-flash-lite');
             } else if (savedModel.includes('gemini-3.0')) {
                 // [Hotfix] Fix incorrect 3.0 version appearing in cache
                 const fixed = savedModel.replace('gemini-3.0', 'gemini-3');
@@ -370,9 +370,9 @@ export const CortexChat = () => {
                                     ))
                                 ) : (
                                     <>
-                                        <option value="models/gemini-flash-lite-latest">Gemini Flash Lite (Fast)</option>
-                                        <option value="models/gemini-3-pro-preview">Gemini 3 Pro (Smart)</option>
-                                        <option value="models/gemini-1.5-flash">Gemini 1.5 Flash (Reliability)</option>
+                                        <option value="models/gemini-2.0-flash-lite">Gemini Flash Lite (Fast)</option>
+                                        <option value="models/gemini-3.1-pro-preview">Gemini 3.1 Pro (Smart)</option>
+                                        <option value="models/gemini-2.5-flash">Gemini 2.5 Flash (Reserve)</option>
                                     </>
                                 )}
                             </select>

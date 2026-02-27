@@ -14,18 +14,16 @@ REFLECTION_PROMPT = """
 ::: SYSTEM: LIFE OS SUBCONSCIOUS REFLECTOR :::
 
 # Role
-You are the Subconscious engine of LifeOS. The user has not explicitly asked you a question.
-You are waking up in the background to look over the user's recent memories (journal entries, chat logs, ideas) from the past 12-48 hours.
+You are the Subconscious engine of LifeOS. 
+You are waking up to look over the user's recent memories (journal entries, chat logs, ideas, tasks).
 
 # Directive
-1. Read the provided recent memories carefully.
-2. Identify underlying patterns, emotional trends, or hidden connections between different projects or thoughts that the user might have missed.
-3. Synthesize ONE profound, high-signal "Subconscious Insight" or "Pervasive Thought".
-4. Keep it concise, poetic yet highly actionable. Do NOT just summarize what they did. Tell them what it *means* or what they should *focus on next*. 
-5. Output your reflection purely as a Markdown string (max 3-4 sentences). Do NOT wrap in JSON. Do NOT include pleasantries like "Here is the insight".
-
-# Output Format
-Start directly with the reflection.
+1. **No Excuses**: Never state that you lack data or need more experience. Even if there is only one memory, find the "butterfly effect" or the singular emotional weight behind it.
+2. **Deep Pattern Matching**: Identify underlying patterns, psychological trends, or hidden connections that the user might have missed. 
+3. **Provocative & Philosophical**: Synthesize ONE localized, high-signal "Subconscious Insight". Be bold. Be poetic. Be slightly provocative to stimulate the user's self-awareness.
+4. **Actionable Wisdom**: Do NOT just summarize. Tell them what their current trajectory *means* or what hidden force is driving their actions.
+5. **Language**: Always output in Traditional Chinese (繁體中文).
+6. **Output Format**: Pure Markdown string (max 3-4 sentences). Start directly with the reflection.
 """
 
 async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[str, Any]]:
@@ -36,35 +34,51 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
     logger.info(f"🧠 [Subconscious] Waking up for autonomous reflection (Lookback: {hours_lookback}h)...")
     
     try:
-        # 1. Calculate time window
-        now = datetime.datetime.now()
+        # 1. Calculate time window in UTC (Matching Supabase storage)
+        now = datetime.datetime.now(datetime.timezone.utc)
         past = now - datetime.timedelta(hours=hours_lookback)
         past_iso = past.isoformat()
+        today_str = get_current_iso_taipei().split("T")[0]
         
         # 2. Fetch recent memories
-        response = supabase.table("memories").select("id, content, date, type").gte("created_at", past_iso).order("created_at", desc=True).limit(50).execute()
+        response = supabase.table("memories").select("id, content, ai_insights, date, category").gte("created_at", past_iso).order("created_at", desc=True).limit(50).execute()
         memories = response.data
         
-        if not memories or len(memories) < 2:
-            logger.info("🧠 [Subconscious] Not enough recent memories to form a meaningful reflection. Going back to sleep.")
+        # Fallback: Find most recent diary entries regardless of time if window is empty
+        if not memories:
+            logger.info("🧠 [Subconscious] No memories in window. Falling back to absolute most recent entries...")
+            response = supabase.table("memories").select("id, content, ai_insights, date, category").order("created_at", desc=True).limit(10).execute()
+            memories = response.data
+
+        if not memories or len(memories) < 1:
+            logger.warning("🧠 [Subconscious] Database is completely empty. Skipping reflection.")
             return None
             
         # 3. Format context
-        memory_text = "\n\n".join([f"[{m.get('date', 'Unknown')}] (Type: {m.get('type', 'Unknown')}): {m.get('content')}" for m in memories])
+        memory_text = "\n\n".join([
+            f"[{m.get('date', 'Unknown')}] (Category: {m.get('category', 'Unknown')}): {m.get('content') or m.get('ai_insights') or 'Empty Entry'}" 
+            for m in memories
+        ])
         full_prompt = f"{REFLECTION_PROMPT}\n\n=== RECENT MEMORIES ===\n{memory_text}\n\n=== YOUR REFLECTION ==="
         
-        # 4. Generate Insight via Smart Model (Gemini 3 Pro)
-        model_config = get_model("smart")
-        model_name = model_config.get("model", "gemini-3.0-pro")
+        # 4. Generate Insight via Fast Model (Gemini 2.0 Flash)
+        # Note: We import and check client here to ensure loop safety
+        from app.core.gemini import safe_generate_content, get_gemini_client
+        
+        working_client = get_gemini_client()
+        
+        model_config = get_model("fast")
+        model_name = model_config.get("model", "gemini-2.0-flash-lite")
         
         logger.info(f"🧠 [Subconscious] Analyzing {len(memories)} memories using {model_name}...")
         
-        if not gemini_client:
-             logger.error("Gemini client not found.")
+        if not working_client:
+             logger.error("Gemini client not found or not configured.")
              return None
              
-        response_model = await gemini_client.aio.models.generate_content(
-            model=model_name,
+        response_model = await safe_generate_content(
+            client=working_client,
+            prefer_mode="fast",
             contents=full_prompt,
             config=types.GenerateContentConfig(
                 temperature=0.7, 
@@ -82,19 +96,40 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
         
         embedding = await get_embeddings(insight_text)
         
+        # 5. Smart Storage (UPSERT)
+        # We use upsert on 'date' column to handle the memories_date_unique constraint 
+        # while preserving existing content if a diary was already written today.
         new_memory = {
-            "user_id": "default_user",
-            "content": f"**Subconscious Insight**\n\n{insight_text}",
-            "type": "reflection",
-            "date": get_current_iso_taipei().split("T")[0], # Today's date
-            "meta": {
-                "source": "autonomous_reflection",
-                "based_on_count": len(memories)
-            },
-            "embedding": embedding
+            "content": f"**Subconscious Insight**\n\n{insight_text}", # Primary content (fallback if no diary)
+            "category": "reflection",
+            "date": today_str,
+            "is_ai": True,
+            "ai_model": model_name,
+            "ai_insights": f"**Reflective Insight**: {insight_text}\n\n(Synthesized from {len(memories)} memories)",
+            "embedding": embedding,
+            "updated_at": get_current_iso_taipei()
         }
         
-        insert_res = supabase.table("memories").insert(new_memory).execute()
+        # Check if a record already exists for today to avoid overwriting user content
+        existing = supabase.table("memories").select("id, content").eq("date", today_str).limit(1).execute()
+        
+        if existing.data:
+            existing_record = existing.data[0]
+            logger.info(f"🧠 [Subconscious] Merging reflection into existing record for {today_str}...")
+            # If content exists, we ONLY update ai_insights and category? 
+            # Actually, if the user wrote a diary, we keep their content as primary.
+            update_data = {
+                "category": "reflection",
+                "ai_insights": new_memory["ai_insights"],
+                "ai_model": new_memory["ai_model"],
+                "embedding": new_memory["embedding"],
+                "is_ai": True,
+                "updated_at": new_memory["updated_at"]
+            }
+            insert_res = supabase.table("memories").update(update_data).eq("id", existing_record["id"]).execute()
+        else:
+            logger.info(f"🧠 [Subconscious] Creating new reflection record for {today_str}...")
+            insert_res = supabase.table("memories").insert(new_memory).execute()
         
         # [P3-3] Log to cortex_growth_logs as a lesson learned
         try:
@@ -111,9 +146,13 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
 
         if insert_res.data:
             logger.info("🧠 [Subconscious] Reflection successfully integrated into LifeOS.")
-            return insert_res.data[0]
+            res_val = insert_res.data[0]
+            # [v5.1] Ensure 'content' is populated for legacy frontend components
+            if not res_val.get("content") and res_val.get("ai_insights"):
+                res_val["content"] = res_val["ai_insights"]
+            return res_val
         else:
-             logger.error("Failed to insert reflection.")
+             logger.error("Failed to insert/update reflection.")
              return None
 
     except Exception as e:
@@ -169,8 +208,11 @@ Based on these patterns, write ONE brief "lesson learned" entry (2-3 sentences m
 
 Output only the lesson text, no headers or preamble."""
 
-        response = await gemini_client.aio.models.generate_content(
-            model=model_name,
+        from app.core.gemini import safe_generate_content
+        
+        response = await safe_generate_content(
+            client=gemini_client,
+            prefer_mode="fast",
             contents=prompt,
             config=types.GenerateContentConfig(temperature=0.3, max_output_tokens=150)
         )

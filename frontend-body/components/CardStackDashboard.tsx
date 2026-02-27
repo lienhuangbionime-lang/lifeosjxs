@@ -251,10 +251,10 @@ export const CardStackDashboard = ({ logs = [], onNavigate }: CardStackDashboard
             case 'reflection':
                 // Find latest reflection in memory for this month if exists
                 const latestReflection = [...logs]
-                    .filter(l => l.type === 'reflection')
+                    .filter(l => l.category === 'reflection' || l.type === 'reflection')
                     .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
 
-                const displayIdea = insightText || (latestReflection ? latestReflection.content : "The subconscious is quiet. Awaiting enough experiences to form a profound insight.");
+                const displayIdea = insightText || (latestReflection ? (latestReflection.ai_insights || latestReflection.content || latestReflection.note) : "The subconscious is quiet. Awaiting enough experiences to form a profound insight.");
 
                 return (
                     <div className="h-full flex flex-col">

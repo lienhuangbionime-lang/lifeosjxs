@@ -61,6 +61,8 @@ export default function Home() {
           habits: log.habits || {},
           // Extract tags from root or meta
           tags: log.tags || log.meta?.tags || [],
+          category: log.category || log.type || 'Life',
+          type: log.category || log.type || 'Life',
           // Ensure graphSeeds exists if possible (or extract from meta if backend puts it there)
           graphSeeds: log.meta?.graphSeeds || undefined
         }));

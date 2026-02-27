@@ -4,16 +4,20 @@ import re
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from app.core.database import supabase
-from app.core.gemini import get_model, gemini_client
+from app.core.gemini import get_model, gemini_client, types
 from app.services.embedder import generate_embedding
+from app.services.reranker import reranker
 
 logger = logging.getLogger("cortex.rag_service")
 
 class Memory:
     """Standardized memory data structure for the system."""
-    def __init__(self, id: str, content: str, date: str, similarity: float, metadata: Optional[Dict] = None):
+    def __init__(self, id: str, content: str, date: str, similarity: float, metadata: Optional[Dict] = None, ai_insights: Optional[str] = None):
         self.id = id
-        self.content = content
+        # [v4.3 Mapping Fix] Prioritize ai_insights if content is empty
+        self.raw_content = content
+        self.ai_insights = ai_insights
+        self.content = ai_insights if (ai_insights and not content) else (content or "")
         self.date = date
         self.similarity = similarity
         self.metadata = metadata or {}
@@ -22,6 +26,7 @@ class Memory:
         return {
             "id": self.id,
             "content": self.content,
+            "ai_insights": self.ai_insights,
             "date": self.date,
             "similarity": self.similarity,
             "metadata": self.metadata
@@ -30,7 +35,7 @@ class Memory:
 class UnifiedRAGService:
     """
     [PROTOCOL: ACTIVE INTELLIGENCE]
-    Unified RAG Service v3.8.5
+    Unified RAG Service v3.8.5 - v4.3
     Consolidates atomic memory retrieval (hybrid search) and document-track knowledge.
     """
     def __init__(self):
@@ -42,18 +47,18 @@ class UnifiedRAGService:
         self, 
         query: str, 
         limit: int = 5, 
-        similarity_threshold: float = 0.5
+        similarity_threshold: float = 0.5,
+        client: Any = None
     ) -> List[Memory]:
         """
         Hybrid search for 'memories' table: Vector + Fallback (Keyword/Date).
-        Optimized for atomic daily entries.
         """
         if not self.enabled:
             return []
 
         try:
             # 1. Vector Search
-            query_embedding = await generate_embedding(query, task_type="retrieval_query")
+            query_embedding = await generate_embedding(query, task_type="retrieval_query", client=client)
             if not query_embedding:
                 return await self._fallback_search(query, limit)
 
@@ -63,6 +68,8 @@ class UnifiedRAGService:
                 "match_count": limit
             }
             
+            # [v4.3] match_memories RPC usually returns fixed columns. 
+            # If it misses ai_insights, we might need a follow-up select or update the RPC.
             response = supabase.rpc("match_memories", rpc_params).execute()
             results = response.data
 
@@ -70,10 +77,12 @@ class UnifiedRAGService:
             memories = []
             if results:
                 for item in results:
+                    # [v4.3 Diagnostic] If RPC doesn't return ai_insights, we attempt to use what's there
                     mem = Memory(
                         id=item.get("id"),
-                        content=item.get("content", ""),
-                        date=item.get("metadata", {}).get("date", "unknown"),
+                        content=item.get("content"),
+                        ai_insights=item.get("ai_insights"),
+                        date=item.get("date") or item.get("metadata", {}).get("date", "unknown"),
                         similarity=item.get("similarity", 0.0),
                         metadata=item.get("metadata", {})
                     )
@@ -87,39 +96,50 @@ class UnifiedRAGService:
             logger.error(f"Hybrid search failed: {e}")
             return []
 
-    async def _fallback_search(self, query: str, limit: int) -> List[Memory]:
-        """Simple keyword and date fallback logic."""
-        logger.info(f"RAG Fallback triggered for: '{query}'")
-        
-        # Detect date patterns (YYYY-MM-DD or MM/DD)
-        date_match = re.search(r'(\d{4})[-/](\d{1,2})[-/](\d{1,2})|(\d{1,2})[-/](\d{1,2})', query)
-        
-        query_builder = supabase.table("memories").select("*")
-        
-        if date_match:
-            groups = date_match.groups()
-            if groups[3] and groups[4]: # MM/DD
-                m, d = groups[3].zfill(2), groups[4].zfill(2)
-                curr_y = datetime.now().year
-                query_builder = query_builder.in_("date", [f"{curr_y}-{m}-{d}", f"{curr_y-1}-{m}-{d}"])
-            elif groups[0] and groups[1] and groups[2]: # YYYY-MM-DD
-                y, m, d = groups[0], groups[1].zfill(2), groups[2].zfill(2)
-                query_builder = query_builder.eq("date", f"{y}-{m}-{d}")
-        else:
-            query_builder = query_builder.ilike("content", f"%{query}%")
+    async def search_and_rerank(
+        self, 
+        query: str, 
+        recall_limit: int = 40, 
+        top_k: int = 10,
+        alpha: float = 0.7,
+        beta: float = 0.3,
+        client: Any = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Two-Stage RAG Entrance:
+        1. Recall (Broad vector search)
+        2. Rerank (HuggingFace Hybrid Semantic-Temporal Reranking)
+        """
+        if not self.enabled: return []
 
-        res = query_builder.limit(limit).execute()
-        
-        memories = []
-        for item in (res.data or []):
-            memories.append(Memory(
-                id=item.get("id"),
-                content=item.get("content", ""),
-                date=item.get("date", "unknown"),
-                similarity=0.9, # High score for direct match
-                metadata=item.get("metadata", {})
-            ))
-        return memories
+        try:
+            # 1. Recall Phase (High recall limit)
+            candidates = await self.hybrid_search_memories(
+                query, 
+                limit=recall_limit, 
+                similarity_threshold=0.3, 
+                client=client
+            )
+            if not candidates:
+                return []
+            
+            # Convert Memory objects to dictionaries for the reranker
+            candidate_dicts = [m.to_dict() for m in candidates]
+
+            # 2. Rerank Phase
+            reranked = reranker.rerank(
+                query=query, 
+                documents=candidate_dicts,
+                alpha=alpha,
+                beta=beta
+            )
+
+            # Return top-K after reranking
+            return reranked[:top_k]
+
+        except Exception as e:
+            logger.error(f"Search and rerank failed: {e}")
+            return []
 
     async def search_documents(self, query: str, limit: int = 5) -> List[Dict]:
         """Search 'documents' table for external knowledge."""
@@ -140,6 +160,43 @@ class UnifiedRAGService:
         except Exception as e:
             logger.error(f"Document search failed: {e}")
             return []
+
+    async def _fallback_search(self, query: str, limit: int) -> List[Memory]:
+        """Simple keyword and date fallback logic."""
+        logger.info(f"RAG Fallback triggered for: '{query}'")
+        
+        # Detect date patterns (YYYY-MM-DD or MM/DD)
+        date_match = re.search(r'(\d{4})[-/](\d{1,2})[-/](\d{1,2})|(\d{1,2})[-/](\d{1,2})', query)
+        
+        # Select both content and ai_insights for mapping
+        query_builder = supabase.table("memories").select("id,content,ai_insights,date,metadata")
+        
+        if date_match:
+            groups = date_match.groups()
+            if groups[3] and groups[4]: # MM/DD
+                m, d = groups[3].zfill(2), groups[4].zfill(2)
+                curr_y = datetime.now().year
+                query_builder = query_builder.in_("date", [f"{curr_y}-{m}-{d}", f"{curr_y-1}-{m}-{d}"])
+            elif groups[0] and groups[1] and groups[2]: # YYYY-MM-DD
+                y, m, d = groups[0], groups[1].zfill(2), groups[2].zfill(2)
+                query_builder = query_builder.eq("date", f"{y}-{m}-{d}")
+        else:
+            # Fallback search both columns
+            query_builder = query_builder.or_(f"content.ilike.%{query}%,ai_insights.ilike.%{query}%")
+
+        res = query_builder.limit(limit).execute()
+        
+        memories = []
+        for item in (res.data or []):
+            memories.append(Memory(
+                id=item.get("id"),
+                content=item.get("content"),
+                ai_insights=item.get("ai_insights"),
+                date=item.get("date", "unknown"),
+                similarity=0.9, # High score for direct match
+                metadata=item.get("metadata", {})
+            ))
+        return memories
 
     async def unified_search(self, question: str, limit: int = 5) -> Dict[str, str]:
         """
@@ -201,7 +258,7 @@ class UnifiedRAGService:
                 
                 interpretation = await multimodal_interpret(data, content_type)
                 text_content = f"### Multimodal Interpretation: {filename}\n\n{interpretation}"
-                logger.info(f"[OK] Gemini generated interpretation.")
+                logger.info(f"[OK] Gemini generated interpretation via Safe Failover.")
             else:
                 # 2. Handle Text/PDF (Simplified for now - Title only)
                 # TODO: Implement full PDF/Doc parsing

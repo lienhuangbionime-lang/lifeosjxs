@@ -15,7 +15,7 @@ class SorterAgent:
         # 優先從環境變數讀取，若無則預設為 Flash Lite
         self.model_name = os.getenv("GEMINI_FAST_MODEL", "gemini-flash-lite-latest")
 
-    def process(self, user_input: str) -> LogEntry:
+    async def process(self, user_input: str) -> LogEntry:
         # Load System Prompt from external file
         prompt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "prompts", "system_daily.md")
         
@@ -46,10 +46,11 @@ class SorterAgent:
         3. 輸出標題格式維持為 # [YYYY-MM-DD] 日記。
         """
         
-        # [MODIFIED] Request Plain Text (Markdown) instead of JSON
-        response = self.client.models.generate_content(
-            model=self.model_name,
-            contents=final_prompt,
+        from app.core.gemini import safe_generate_content
+        response = await safe_generate_content(
+            client=self.client,
+            prefer_mode="fast",
+            contents=final_prompt
             # config removed to allow raw text output
         )
         
