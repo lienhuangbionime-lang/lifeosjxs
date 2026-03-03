@@ -47,7 +47,8 @@ export default function Home() {
     const loadMemories = async () => {
       try {
         const { cortex } = await import('@/lib/api/client');
-        const rawLogs = await cortex.getRecentMemories(50); // Fetch last 50
+        const rawLogs = await cortex.getRecentMemories(500); // Fetch up to 500 to include historical months like Nov/Dec 2025
+
 
         // Map backend schema to frontend LogEntry interface
         const mappedLogs = rawLogs.map((log: any) => ({
