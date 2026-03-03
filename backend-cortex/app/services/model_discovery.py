@@ -16,14 +16,9 @@ class ModelDiscoveryService:
     
     def __init__(self, registry_path: str = "data/model_registry.json"):
         self.registry_path = registry_path
-        self.verified_models: Dict[str, List[str]] = {
-            "fast": [],
-            "smart": []
-        }
-        self.pending_models: Dict[str, List[str]] = {
-            "fast": [],
-            "smart": []
-        }
+        self.verified_models: Dict[str, List[str]] = {"fast": [], "smart": []}
+        self.pending_models: Dict[str, List[str]] = {"fast": [], "smart": []}
+        self.quota_exhausted: Dict[str, List[str]] = {"fast": [], "smart": []}  # [v5.4]
         self.last_discovery: Optional[str] = None
         self._load_registry()
 
@@ -35,6 +30,7 @@ class ModelDiscoveryService:
                     data = json.load(f)
                     self.verified_models = data.get("verified_models", {"fast": [], "smart": []})
                     self.pending_models = data.get("pending_models", {"fast": [], "smart": []})
+                    self.quota_exhausted = data.get("quota_exhausted", {"fast": [], "smart": []})  # [v5.4]
                     self.last_discovery = data.get("last_discovery")
                 logger.info(f"[OK] Loaded model registry: {len(self.verified_models['fast'])} fast, {len(self.verified_models['smart'])} smart. Pending: {len(self.pending_models['fast'])} fast, {len(self.pending_models['smart'])} smart")
             except Exception as e:
@@ -157,13 +153,11 @@ class ModelDiscoveryService:
             return False
 
     def get_best_model(self, mode: Literal["fast", "smart"] = "fast") -> str:
-        """Returns the top verified model for the requested mode."""
+        """Returns the top verified model for the requested mode. Empty string if none available."""
         models = self.verified_models.get(mode, [])
         if models:
             return models[0]
-        
-        # Absolute hardcoded fallbacks if registry is empty
-        return "models/gemini-2.0-flash-lite" if mode == "fast" else "models/gemini-3.1-pro-preview"
+        return ""  # Caller handles fallback; no hardcoded default here
 
 # Singleton instance
 model_discovery = ModelDiscoveryService()

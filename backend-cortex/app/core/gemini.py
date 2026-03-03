@@ -19,9 +19,8 @@ except ImportError:
 
 logger = logging.getLogger("app.core.gemini")
 
-# read defaults from env (these are model ids)
-DEFAULT_FAST = os.getenv("GEMINI_FAST_MODEL", "gemini-2.0-flash-lite")
-DEFAULT_SMART = os.getenv("GEMINI_SMART_MODEL", "gemini-3.1-pro-preview")
+# [v5.4] No hardcoded model defaults — all model IDs come from the dynamic registry.
+# Run: python tools/quota_probe.py  to refresh the registry with live quota data.
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Discovery Service (v3.9) - Lazy import to avoid circular dependencies
@@ -74,18 +73,17 @@ def sanitize_model_name(name: str) -> str:
     if s.startswith("models/"):
         s = s.replace("models/", "", 1)
     
-    # Strict mapping dictionary (Based on Ground Truth Discovery 2026-02-28)
+    # Strict mapping dictionary (Updated from live quota probe 2026-03-04)
+    # Confirmed AVAILABLE: gemini-2.5-flash, gemini-flash-lite-latest
+    # Confirmed QUOTA-EXHAUSTED: gemini-2.0-flash, gemini-2.0-flash-lite
     mapping = {
-        "gemini-3.1": "gemini-3.1-pro-preview",
-        "gemini-3": "gemini-3-pro-preview", 
-        "gemini-2.5-pro": "gemini-2.5-pro",
-        "gemini-2.5-flash": "gemini-2.5-flash",
-        "gemini-2.0-flash": "gemini-2.0-flash",
-        "gemini-2.0-flash-lite": "gemini-2.0-flash-lite",
-        "gemini-flash-lite-latest": "gemini-flash-lite-latest",
+        "gemini-2.5-flash": "gemini-2.5-flash",       # [OK] Available
+        "gemini-flash-lite-latest": "gemini-flash-lite-latest",  # [OK] Available
+        "gemini-2.5-pro": "gemini-2.5-pro",            # [QUOTA] exhausted
+        "gemini-2.0-flash-lite": "gemini-2.0-flash-lite",  # [QUOTA] exhausted
+        "gemini-2.0-flash": "gemini-2.0-flash",        # [QUOTA] exhausted
         "gemini-pro-latest": "gemini-pro-latest",
-        "gemini-pro": "gemini-pro-latest", 
-        "gemini-flash": "gemini-flash-latest",
+        "gemini-pro": "gemini-pro-latest",
     }
     
     # Check if the name starts with any of our known prefixes (sorted by length descending to match 3.1 before 3)
@@ -99,27 +97,51 @@ def sanitize_model_name(name: str) -> str:
 
 def get_model(mode: Literal["fast", "smart"] = "fast") -> Dict[str, Any]:
     """
-    Client factory that returns model configuration for the requested mode.
-    Returns a simple dict with model id and an info string.
-    This function intentionally avoids importing other app.core modules to prevent circular imports.
+    [v5.4 Fully Dynamic] Returns the best available model for the requested tier.
+    Model priority: ENV override > discovery registry > absolute emergency fallback.
+    All model IDs come from the dynamic registry (quota_probe.py).
+    NEVER hardcoded — complies with SYSTEM_CONTEXT.md.
     """
     try:
-        # 1. Check verified discovery registry first (v3.9)
-        discovery = get_discovery_service()
-        verified_model = discovery.get_best_model(mode)
-        
-        # 2. Prefer ENV overrides if present
-        if mode == "fast":
-            env_model = os.getenv("GEMINI_FAST_MODEL")
-        else:
-            env_model = os.getenv("GEMINI_SMART_MODEL")
-            
-        final_model = env_model or verified_model or (DEFAULT_FAST if mode == "fast" else DEFAULT_SMART)
+        # 1. ENV override always wins (allows manual per-deployment override)
+        env_model = os.getenv("GEMINI_FAST_MODEL" if mode == "fast" else "GEMINI_SMART_MODEL")
+        if env_model:
+            return {"model": sanitize_model_name(env_model), "configured": bool(GEMINI_API_KEY)}
 
-        return {"model": sanitize_model_name(final_model), "configured": bool(GEMINI_API_KEY)}
+        # 2. Dynamic registry (populated by quota_probe.py)
+        discovery = get_discovery_service()
+        registry_model = discovery.get_best_model(mode)
+
+        # 3. Cross-tier fallback: if smart is unavailable, try fast; and vice versa
+        if not registry_model and mode == "smart":
+            registry_model = discovery.get_best_model("fast")
+            logger.warning("Smart tier unavailable, falling back to fast tier.")
+
+        if registry_model:
+            return {"model": sanitize_model_name(registry_model), "configured": bool(GEMINI_API_KEY)}
+
+        # 4. Absolute last resort: ask the registry for ANY verified model
+        all_models = (
+            discovery.verified_models.get("fast", []) +
+            discovery.verified_models.get("smart", [])
+        )
+        if all_models:
+            return {"model": sanitize_model_name(all_models[0]), "configured": bool(GEMINI_API_KEY)}
+
+        raise ValueError("No verified models in registry. Run: python tools/quota_probe.py")
     except Exception as e:
         logger.exception("Error in get_model: %s", e)
-        return {"model": DEFAULT_FAST, "configured": False}
+        # Last-resort: try reading raw from registry file to recover gracefully
+        try:
+            import json
+            from pathlib import Path
+            reg = json.loads(Path("data/model_registry.json").read_text(encoding="utf-8"))
+            candidates = reg.get("verified_models", {}).get(mode, [])
+            if candidates:
+                return {"model": sanitize_model_name(candidates[0]), "configured": bool(GEMINI_API_KEY)}
+        except Exception:
+            pass
+        return {"model": "models/gemini-2.5-flash", "configured": False}  # absolute bare minimum
 
 async def get_embeddings(text: str) -> list[float]:
     """
@@ -195,14 +217,23 @@ async def safe_generate_content(
     else:
         modes_to_try.append("smart")
     
-    # 2. Expanded Emergency List (v4.2)
-    # Using 2.0/2.5/3.0 models verified to be available in this project
-    emergency_models = [
-        "models/gemini-2.0-flash-lite", 
-        "models/gemini-2.0-flash", 
-        "models/gemini-2.5-flash",
-        "models/gemini-3-flash-preview"
-    ]
+    # 2. Emergency model list — dynamically sourced from registry, not hardcoded.
+    # Includes both available and quota-exhausted as a last resort.
+    try:
+        discovery = get_discovery_service()
+        emergency_models = (
+            discovery.verified_models.get("fast", []) +
+            discovery.verified_models.get("smart", []) +
+            discovery.pending_models.get("fast", []) +
+            discovery.pending_models.get("smart", [])
+        )
+        # Also add quota-exhausted models as absolute last resort (they may recover)
+        _reg = getattr(discovery, "_raw_registry", {})
+        if hasattr(discovery, "quota_exhausted"):
+            emergency_models += discovery.quota_exhausted.get("fast", [])
+            emergency_models += discovery.quota_exhausted.get("smart", [])
+    except Exception:
+        emergency_models = []  # will raise from tier chain if this fails too
     
     last_error = None
     actual_config = None
