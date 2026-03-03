@@ -17,6 +17,7 @@ import { CreateProjectModal } from '@/components/CreateProjectModal';
 import { ProjectBoard } from '@/components/ProjectBoard';
 import { EntryDetailModal } from '@/components/EntryDetailModal'; // [NEW]
 import { TodaySnapshot } from '@/components/TodaySnapshot';
+import { KeyGate } from '@/components/KeyGate'; // [v5.4] Privacy sandbox
 
 // ... existing code ...
 
@@ -97,7 +98,7 @@ export default function Home() {
 
   const bgClass = activeTab === 'graph' ? 'bg-[#0f172a] text-slate-200' : 'bg-[#f8fafc] text-slate-900';
 
-  return (
+  const appContent = (
 
     <div className={`w-full min-h-screen flex flex-col font-sans relative transition-colors duration-500 ${bgClass} overflow-x-hidden`}>
 
@@ -242,4 +243,6 @@ export default function Home() {
 
     </div>
   );
+
+  return <KeyGate>{appContent}</KeyGate>;
 }

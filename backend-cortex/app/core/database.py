@@ -61,9 +61,17 @@ def get_supabase_client() -> Client:
 
 def get_request_client(request: "Request"):
     """
-    FastAPI dependency: returns a per-request Supabase client.
-    If the caller provides X-Supabase-URL + X-Supabase-Key headers,
-    those are used (per-user isolation). Falls back to global client.
+    [v5.4] Privacy Sandbox — per-request Supabase client.
+
+    ONLY creates a client from user-supplied X-Supabase-URL / X-Supabase-Key headers.
+    Does NOT fall back to the server's own env-var Supabase client.
+
+    This ensures that anonymous visitors (no keys in headers) get None back,
+    and all user-facing endpoints return 503 Database unavailable — protecting
+    the owner's data from being exposed to third parties.
+
+    Background tasks (subconscious scheduler, crystallizer, etc.) use the
+    module-level `supabase` client directly and are unaffected.
     """
     req_url = request.headers.get("X-Supabase-URL")
     req_key = request.headers.get("X-Supabase-Key")
@@ -73,5 +81,9 @@ def get_request_client(request: "Request"):
             return create_client(req_url, req_key)
         except Exception as e:
             logger.warning(f"[WARN] Could not create per-request Supabase client: {e}")
+            return None
 
-    return supabase  # fallback to global client from env
+    # No user headers → return None.
+    # Callers check `if not db: raise HTTPException(503)` — no owner data exposed.
+    logger.debug("[SANDBOX] No X-Supabase headers in request — returning None (sandboxed).")
+    return None
