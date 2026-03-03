@@ -225,6 +225,7 @@ Output only the lesson text, no headers or preamble."""
         import json, os
         from pathlib import Path
         evo_paths = [
+            Path("../sync_brain/evolution_log.json"),
             Path("sync_brain/evolution_log.json"),
             Path(r"c:\Users\lien.huang\AppData\lifeosjxs\sync_brain\evolution_log.json"),
         ]
