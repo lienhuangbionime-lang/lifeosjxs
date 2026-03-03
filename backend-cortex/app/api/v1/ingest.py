@@ -757,56 +757,51 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
                 check_res = db.table("memories").select("id").eq("date", ingest_date).execute()
                 
                 if check_res.data:
-                    # 已存在：更新
                     target_id = check_res.data[0]["id"]
                     logger.info(f"🔄 Entry for {ingest_date} exists (ID: {target_id}). Updating...")
                     update_payload = {k: v for k, v in db_payload.items() if k != "id"}
                     db.table("memories").update(update_payload).eq("id", target_id).execute()
                 else:
-                    # 不存在：新增
                     db.table("memories").insert(db_payload).execute()
                     logger.info(f"✅ New memory stored for {ingest_date}.")
-                        
-                # --- 5. Process Tasks (Action Items) ---
-                # Added in v7.1: Connect AI Tasks to DB
+
+            # --- 5. Process Tasks (Action Items) ---
+            # [v5.4 FIX] Moved OUT of except block — now always runs after any successful DB write
+            try:
                 tasks_list = ai_data.get("tasks", [])
-                if tasks_list:
-                    logger.info(f"📋 Found {len(tasks_list)} actionable items. Processing...")
+                if tasks_list and target_table == "memories":
+                    logger.info(f"📋 Found {len(tasks_list)} actionable items from AI. Processing...")
                     
-                    # 5.1 Pre-fetch Projects for Linking
-                    # optimization: fetch all project names to map (name -> id)
-                    # We use a simple case-insensitive match
-                    logger.info("Fetching existing projects for linking...")
+                    # Pre-fetch Projects for Linking
                     proj_res = db.table("projects").select("id, name").execute()
                     proj_map = {p["name"].lower(): p["id"] for p in (proj_res.data or [])}
                     
-                    # Also need the memory id we just created/updated
+                    # Get memory id for source linking
                     mem_res = db.table("memories").select("id").eq("date", ingest_date).execute()
                     memory_id_db = mem_res.data[0]["id"] if mem_res.data else None
                     
                     inserted_tasks = 0
                     for tk in tasks_list:
-                        if not tk.get("title"): continue
+                        if not tk.get("title"):
+                            continue
                         
-                        # Find project id
                         proj_id = None
-                        if tk.get("project"): # Changed from project_name to project based on original ai_data structure
+                        if tk.get("project"):
                             p_name = tk["project"].lower()
                             if p_name in proj_map:
                                 proj_id = proj_map[p_name]
                             else:
-                                # Create new project
+                                # Auto-create new project referenced in diary
                                 logger.info(f"Creating new project '{tk['project']}'...")
                                 new_p = db.table("projects").insert({"name": tk["project"], "status": "active"}).execute()
                                 if new_p.data:
                                     proj_id = new_p.data[0]["id"]
                                     proj_map[p_name] = proj_id
                                     
-                        # Insert task
                         task_payload = {
                             "title": tk["title"],
                             "status": "todo",
-                            "priority": tk.get("priority", 1), # Assuming priority might be in task dict
+                            "priority": tk.get("priority", 1),
                             "project_id": proj_id,
                             "source_memory_id": memory_id_db
                         }
@@ -816,12 +811,18 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
                         except Exception as te:
                             logger.error(f"❌ Failed to insert task '{tk.get('title')}': {te}")
                     
-                    if inserted_tasks > 0:
-                        logger.info(f"✅ Successfully created {inserted_tasks} tasks in DB.")
-                    else:
-                        logger.info("No new tasks were inserted.")
+                    logger.info(f"✅ Created {inserted_tasks}/{len(tasks_list)} tasks from diary.")
+                else:
+                    memory_id_db = None
+                    if not tasks_list:
+                        logger.info("ℹ️ No actionable tasks extracted from this diary entry.")
 
-                # --- 6. Trigger Crystallization (Background) ---
+            except Exception as task_e:
+                logger.error(f"❌ Task processing failed: {task_e}")
+                memory_id_db = None
+
+            # --- 6. Trigger Crystallization (Background) ---
+            try:
                 if not request.skipAi and memory_id_db:
                     logger.info(f"✨ Queueing crystallization for memory {memory_id_db}...")
                     background_tasks.add_task(
@@ -830,9 +831,9 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
                         ai_data.get("markdown_body", request.content), 
                         ingest_date
                     )
+            except Exception as cryst_e:
+                logger.warning(f"⚠️ Crystallization queue failed: {cryst_e}")
 
-            except Exception as db_e:
-                logger.error(f"❌ Database Operation Failed: {db_e}")
 
         # --- 7. Diary × Project Auto-Linking (P2/P3) ---
         link_result = {"completed_tasks": 0, "projects_linked": 0}
