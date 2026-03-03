@@ -331,7 +331,7 @@ export const CardStackDashboard = ({ logs = [], onNavigate }: CardStackDashboard
     };
 
     return (
-        <div className="relative h-full w-full pb-24 overflow-hidden">
+        <div className="relative h-full w-full pb-28 overflow-hidden" style={{ paddingBottom: 'calc(7rem + env(safe-area-inset-bottom, 0px))' }}>
 
             {/* Month Selector */}
             <div className="mb-6 flex justify-between items-center bg-slate-900/50 p-3 rounded-2xl border border-slate-800 backdrop-blur-sm">
@@ -348,7 +348,7 @@ export const CardStackDashboard = ({ logs = [], onNavigate }: CardStackDashboard
             </div>
 
             {/* Card Stack Container */}
-            <div className="relative h-[500px] sm:h-[600px]">
+            <div className="relative h-[420px] sm:h-[520px] lg:h-[600px]">
                 <AnimatePresence mode="wait">
                     <motion.div
                         key={currentIndex}

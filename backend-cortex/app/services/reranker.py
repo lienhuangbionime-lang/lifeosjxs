@@ -3,7 +3,19 @@ import logging
 from typing import List, Dict, Any, Tuple
 from datetime import datetime
 import numpy as np
-from sentence_transformers import CrossEncoder
+
+# [v5.4] Safe import — sentence_transformers is optional.
+# If not installed, reranker falls back to recency-only ordering (no crash).
+try:
+    from sentence_transformers import CrossEncoder
+    _CROSS_ENCODER_AVAILABLE = True
+except ImportError:
+    CrossEncoder = None  # type: ignore
+    _CROSS_ENCODER_AVAILABLE = False
+    logging.getLogger("cortex.reranker").warning(
+        "sentence_transformers not installed. Reranker will use recency-only ordering. "
+        "To enable ML reranking: pip install sentence-transformers"
+    )
 
 logger = logging.getLogger("cortex.reranker")
 
@@ -17,6 +29,9 @@ class RerankerService:
         return cls._instance
 
     def initialize(self, model_id: str = "BAAI/bge-reranker-v2-m3"):
+        if not _CROSS_ENCODER_AVAILABLE:
+            logger.warning("sentence_transformers not available — skipping CrossEncoder init.")
+            return
         if self._model is None:
             logger.info(f"Loading HuggingFace Reranker model: {model_id}...")
             try:
