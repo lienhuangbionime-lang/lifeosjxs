@@ -3,6 +3,28 @@
 // [Fix] Always use Next.js Proxy (Rewrite) to avoid CORS
 export const API_BASE = "";
 
+/**
+ * [v5.4] Read user-saved API keys from Zustand persist storage (localStorage).
+ * The SettingsView saves keys under 'life-os-settings-storage' → state.apiKeys.
+ * Maps them to the backend's expected HTTP headers.
+ */
+function getUserApiHeaders(): Record<string, string> {
+  if (typeof window === "undefined") return {}; // SSR guard
+  try {
+    const raw = localStorage.getItem("life-os-settings-storage");
+    if (!raw) return {};
+    const parsed = JSON.parse(raw);
+    const keys: Record<string, string> = parsed?.state?.apiKeys || {};
+    const headers: Record<string, string> = {};
+    if (keys["google_api_key"]) headers["X-Gemini-Key"] = keys["google_api_key"];
+    if (keys["supabase_url"]) headers["X-Supabase-URL"] = keys["supabase_url"];
+    if (keys["supabase_key"]) headers["X-Supabase-Key"] = keys["supabase_key"];
+    return headers;
+  } catch {
+    return {};
+  }
+}
+
 async function fetchJSON<T>(input: string, init?: RequestInit): Promise<T> {
   // Direct call through proxy
   const url = input.startsWith("/api/v1")
@@ -11,6 +33,7 @@ async function fetchJSON<T>(input: string, init?: RequestInit): Promise<T> {
 
   const headers = {
     "Content-Type": "application/json",
+    ...getUserApiHeaders(),               // ← inject user's own API keys
     ...(init && (init.headers as Record<string, string>)),
   };
 
@@ -75,25 +98,6 @@ export interface IngestResponse {
     projects_linked: number;
     project_names?: string[];
   };
-}
-
-/* --- Private Helper (神經傳導物質) --- */
-// 讀取使用者在 SettingsView 設定的 API Keys
-function getUserApiHeaders(): Record<string, string> {
-  try {
-    if (typeof window === "undefined") return {};
-    const raw = localStorage.getItem("life-os-settings-storage");
-    if (!raw) return {};
-    const settings = JSON.parse(raw);
-    const apiKeys = settings?.state?.apiKeys || {};
-    const headers: Record<string, string> = {};
-    if (apiKeys.google_api_key) headers["X-Gemini-Key"] = apiKeys.google_api_key;
-    if (apiKeys.supabase_url) headers["X-Supabase-URL"] = apiKeys.supabase_url;
-    if (apiKeys.supabase_key) headers["X-Supabase-Key"] = apiKeys.supabase_key;
-    return headers;
-  } catch {
-    return {};
-  }
 }
 
 // 自動處理 Rewrite 路徑與錯誤拋出
