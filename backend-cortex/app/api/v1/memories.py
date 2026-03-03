@@ -1,10 +1,12 @@
 # app/api/v1/memories.py
 from fastapi import APIRouter, HTTPException, Query, Request
 from typing import List, Optional
+from datetime import datetime
 import logging
 import asyncio
 import os
 import sys
+
 
 from app.models.schemas import LogEntrySchema
 from app.core.database import supabase
@@ -269,14 +271,25 @@ Daily Summaries ({len(memories)} entries):
                 "year": year,
                 "month": month,
                 "summary": review_text,
+                "updated_at": datetime.utcnow().isoformat(),
             }
+            # [v5.4 FIX] Use delete + insert instead of upsert.
+            # upsert requires a DB-level UNIQUE constraint on (year, month).
+            # This approach works regardless of constraint configuration.
             await loop.run_in_executor(
                 None,
                 lambda: db.table("MonthlyReview")
-                    .upsert(payload, on_conflict="year,month")
+                    .delete()
+                    .eq("year", year)
+                    .eq("month", month)
                     .execute()
             )
+            await loop.run_in_executor(
+                None,
+                lambda: db.table("MonthlyReview").insert(payload).execute()
+            )
             logger.info(f"Monthly Review for {year}-{month:02d} saved ({len(memories)} memories, {len(review_text)} chars)")
+
 
         except Exception as e:
             logger.exception(f"Monthly review generation failed for {year}-{month:02d}: {e}")
