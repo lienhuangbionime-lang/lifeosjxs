@@ -18,46 +18,64 @@ router = APIRouter()
 logger = logging.getLogger("app.api.v1.system")
 
 
-@router.get("/status", response_model=SystemStatusResponse)
+@router.get("/status")
 async def get_system_status():
     """
-    Return system status including current model and available versions.
+    [v5.4] Return system status including active model and quota state from registry.
     """
     try:
-        from app.core.gemini import gemini_client
+        from app.services.model_discovery import model_discovery
+
+        # Get current active models from dynamic registry
         fast = get_model("fast")
-
         smart = get_model("smart")
-        # choose current model based on env preference or default to fast
-        current_choice = "smart" if smart.get("configured") else "fast"
-        current_model = smart["model"] if current_choice == "smart" else fast["model"]
+        current_model = fast["model"]  # fast is the default active tier
 
-        status = "ok" if (fast.get("configured") or smart.get("configured")) else "degraded"
-        
-        # Try to fetch real quota information from Gemini API
-        # Get real usage from DB
+        # Build quota status from registry
+        available_fast = model_discovery.verified_models.get("fast", [])
+        available_smart = model_discovery.verified_models.get("smart", [])
+        exhausted_fast = model_discovery.quota_exhausted.get("fast", [])
+        exhausted_smart = model_discovery.quota_exhausted.get("smart", [])
+        last_probe = model_discovery.last_discovery or "Unknown"
+
+        # Daily usage count from DB
         try:
             from app.core.usage import get_daily_usage
             usage = await get_daily_usage()
-            count = usage.get("request_count", 0)
-            
-            # Gemini Free Limit: 1500 RPD for Flash/Lite, 50 for Pro
-            is_pro = "pro" in current_model.lower()
-            limit = 50 if is_pro else 1500
-            remaining = max(0, limit - count)
-            
-            model_label = "Pro" if is_pro else "Flash/Lite"
-            remaining_info = f"{remaining} / {limit} ({model_label} Quota Today)"
-        except Exception as e:
-            remaining_info = "Free Tier (Usage tracking active)"
+            daily_requests = usage.get("request_count", 0)
+        except Exception:
+            daily_requests = 0
 
-        return SystemStatusResponse(
-            status=status,
-            current_model=current_model,
-            model_versions=[fast["model"], smart["model"]],
-            remaining_requests=remaining_info,
-            note="Models obtained from app/core/gemini factory."
-        )
+        # Build human-readable quota summary
+        n_available = len(available_fast) + len(available_smart)
+        n_exhausted = len(exhausted_fast) + len(exhausted_smart)
+
+        if n_available > 0:
+            quota_summary = f"{n_available} model(s) with quota, {n_exhausted} exhausted"
+        else:
+            quota_summary = f"All models quota exhausted ({n_exhausted} checked). Reset pending."
+
+        return {
+            "status": "ok" if n_available > 0 else "degraded",
+            "current_model": current_model,
+            "active_fast_model": available_fast[0] if available_fast else None,
+            "active_smart_model": available_smart[0] if available_smart else None,
+            "model_versions": available_fast + available_smart,
+            "quota_status": {
+                "available": {
+                    "fast": available_fast,
+                    "smart": available_smart
+                },
+                "exhausted": {
+                    "fast": exhausted_fast,
+                    "smart": exhausted_smart
+                },
+                "last_probe": last_probe,
+                "daily_api_requests": daily_requests
+            },
+            "remaining_requests": quota_summary,
+            "note": "Run python tools/quota_probe.py to refresh quota status."
+        }
     except Exception as e:
         logger.exception("Failed to get system status: %s", e)
         raise HTTPException(status_code=500, detail="Failed to retrieve system status")

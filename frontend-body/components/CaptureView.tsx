@@ -16,7 +16,7 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
   const [text, setText] = useState('');
   const [isRecording, setIsRecording] = useState(false); // Mock
   const { habits } = useSettings();
-  const [systemStatus, setSystemStatus] = useState<EvolutionStatus | null>(null); // State for system status
+  const [systemStatus, setSystemStatus] = useState<any | null>(null);
 
   // [New] Phase 14: Contextual Prompts
   const [contextualPrompts, setContextualPrompts] = useState<string[]>([]);
@@ -26,8 +26,12 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
   useEffect(() => {
     const fetchStatus = async () => {
       try {
-        const status = await cortex.checkEvolution();
-        setSystemStatus(status);
+        // Use raw fetch to get the richer /status response (not bound to EvolutionStatus schema)
+        const res = await fetch('/api/py/system/status');
+        if (res.ok) {
+          const data = await res.json();
+          setSystemStatus(data);
+        }
       } catch (e) {
         console.error("Failed to fetch system status", e);
       }
@@ -275,8 +279,30 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
         </h2>
         <p className="text-slate-500 font-mono text-sm mt-2 flex items-center justify-between">
           <span>What is on your mind? <span className="text-indigo-500/50">#ideas #tasks</span></span>
-          <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded border border-white/10 text-slate-400">
-            Engine: {systemStatus ? `${systemStatus.model_versions?.[0]?.split('/').pop()} (Fast Mode)` : 'Loading...'}
+          <span className="flex items-center gap-2">
+            {systemStatus ? (
+              <>
+                {/* Active model badge */}
+                <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded border border-white/10 text-slate-300 font-semibold">
+                  {(systemStatus.current_model || systemStatus.model_versions?.[0] || 'Unknown').split('/').pop()?.replace(/-preview$/, '')}
+                </span>
+                {/* Quota status dot */}
+                {(() => {
+                  const available = (systemStatus.quota_status?.available?.fast?.length || 0) + (systemStatus.quota_status?.available?.smart?.length || 0);
+                  const exhausted = (systemStatus.quota_status?.exhausted?.fast?.length || 0) + (systemStatus.quota_status?.exhausted?.smart?.length || 0);
+                  const total = available + exhausted;
+                  if (available === 0) {
+                    return <span title="All quota exhausted" className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/30 px-2 py-0.5 rounded flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block"></span>配額耗盡</span>;
+                  } else if (available < total / 2) {
+                    return <span title={`${available}/${total} models available`} className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>配額剩餘</span>;
+                  } else {
+                    return <span title={`${available}/${total} models available`} className="text-[10px] bg-green-500/10 text-green-400 border border-green-500/30 px-2 py-0.5 rounded flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block"></span>{available} 模型可用</span>;
+                  }
+                })()}
+              </>
+            ) : (
+              <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded border border-white/10 text-slate-400">Loading...</span>
+            )}
           </span>
         </p>
 
