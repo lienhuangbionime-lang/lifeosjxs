@@ -48,6 +48,7 @@ async def get_tasks(project_id: Optional[str] = None, all: bool = False):
 @router.post("")
 async def create_task(task: TaskCreate):
     """Create a new task."""
+    from app.core.database import safe_insert
     data = {
         "title": task.title,
         "status": "todo",
@@ -57,7 +58,7 @@ async def create_task(task: TaskCreate):
     if task.project_id:
         data["project_id"] = task.project_id
         
-    res = supabase.table("tasks").insert(data).execute()
+    res = safe_insert(supabase.table("tasks"), data)
     if not res.data:
         raise HTTPException(status_code=500, detail="Failed to create task")
     return res.data[0]

@@ -93,6 +93,14 @@ export async function DELETE(request: NextRequest, context: RouteContext) {
 }
 
 export async function OPTIONS(request: NextRequest, context: RouteContext) {
-    const { path } = await context.params;
-    return proxyRequest(request, path);
+    // Next.js handles CORS preflight locally to allow browser custom headers
+    return new NextResponse(null, {
+        status: 204,
+        headers: {
+            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization, x-gemini-key, x-supabase-url, x-supabase-key, X-Gemini-Key, X-Supabase-URL, X-Supabase-Key',
+            'Access-Control-Max-Age': '86400',
+        },
+    });
 }

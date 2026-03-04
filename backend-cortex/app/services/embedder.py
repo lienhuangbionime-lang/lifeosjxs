@@ -37,7 +37,8 @@ async def generate_embedding(text: str, task_type: str = "retrieval_document", d
             return None
 
         # [v4.1 - v4.2 Resilience] Retry loop for 429 errors with Exponential Backoff
-        models_to_try = ["text-embedding-004", "models/text-embedding-004"]
+        # [v4.3 Fix] User environment restricted to gemini-embedding-001 (Outputs 3072 dim native)
+        models_to_try = ["gemini-embedding-001"]
         backoff_delays = [0, 1.0, 2.0] # 0, 1s, 2s
         
         last_err = None

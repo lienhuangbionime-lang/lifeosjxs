@@ -20,6 +20,10 @@
 - **Vanilla CSS**: NO Tailwind CSS unless explicitly requested.
 - **LocalStorage**: Be careful with cached model names. Use the `CHECK_AND_CLEAN_MODELS` logic in `CortexChat.tsx`.
 
+## 🗄️ Database & Schema (CRITICAL)
+- **Resilient Database Wrapper (MANDATORY)**: Future AI agents MUST NEVER use raw `db.table().insert()`, `update()`, or `upsert()` calls directly. You MUST ALWAYS import `safe_write` from `app.core.database` and use it instead. Example: `safe_write(db.table("memories"), data, operation_type="insert")`.
+- **Schema Drift Protection**: The remote Postgres database may not always have the columns you assume it does (e.g., missing `updated_at`). `safe_write` automatically handles `PGRST204` errors and strips invalid keys. By strictly using `safe_write`, we prevent silent background task crashes.
+
 ## 🧠 Agentic Protocol (Onboarding - START HERE)
 - **Source of Truth**: Read `sync_brain/task.md` and `sync_brain/SKILLS.md` immediately upon start.
 - **Step Visibility**: Update `sync_brain/task.md` frequently. Every non-trivial task must result in a completion record in `sync_brain/history/[Date]_Task_Name.md`.

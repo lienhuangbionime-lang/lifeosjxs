@@ -332,7 +332,8 @@ class UnifiedRAGService:
                 # Ensure doc_type is set
                 payload["doc_type"] = meta.get("type", "webpage")
             
-            supabase.table(target).insert(payload).execute()
+            from app.core.database import safe_write
+            safe_write(supabase.table(target), payload, operation_type="insert")
             return 1
         except Exception as e:
             logger.error(f"Text ingest failed for target {target}: {e}")

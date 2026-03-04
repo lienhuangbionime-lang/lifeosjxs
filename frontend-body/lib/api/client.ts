@@ -107,16 +107,9 @@ export interface IngestResponse {
 
 // 自動處理 Rewrite 路徑與錯誤拋出
 async function fetchProxy<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  // [FIX] Next.js Proxy blocks due to un-restarted dev server. 
-  // Bypass proxy entirely for dev environment and call backend directly.
-  const isLocalDev =
-    typeof window !== "undefined" &&
-    window.location.hostname === "localhost" &&
-    !process.env.NEXT_PUBLIC_VERCEL_URL;
-
-  const finalUrl = isLocalDev
-    ? `http://127.0.0.1:8000${endpoint}` // direct to backend, avoids IPv6 proxy hang
-    : endpoint.replace(/^\/api\/v1/, "/api/py"); // production: use Next.js rewrite proxy
+  // [FIX] On Windows, direct calls to 127.0.0.1 from localhost:3000 can cause CORS silent drops
+  // for custom headers in some browser states. We strongly enforce going through the Next.js Server Proxy route.
+  const finalUrl = endpoint.replace(/^\/api\/v1/, "/api/py");
 
   try {
     const res = await fetch(finalUrl, {

@@ -126,20 +126,23 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
                 "is_ai": True,
                 "updated_at": new_memory["updated_at"]
             }
-            insert_res = supabase.table("memories").update(update_data).eq("id", existing_record["id"]).execute()
+            from app.core.database import safe_write
+            insert_res = safe_write(supabase.table("memories").eq("id", existing_record["id"]), update_data, operation_type="update")
         else:
             logger.info(f"🧠 [Subconscious] Creating new reflection record for {today_str}...")
-            insert_res = supabase.table("memories").insert(new_memory).execute()
+            from app.core.database import safe_write
+            insert_res = safe_write(supabase.table("memories"), new_memory, operation_type="insert")
         
         # [P3-3] Log to cortex_growth_logs as a lesson learned
         try:
-            supabase.table("cortex_growth_logs").insert({
+            from app.core.database import safe_write
+            safe_write(supabase.table("cortex_growth_logs"), {
                 "decision_context": f"Daily Subconscious Reflection on {get_current_iso_taipei()[:10]}",
                 "options_provided": {"analyzed_memories": len(memories)},
                 "user_choice": "Autonomous Synthesis",
                 "lessons_learned": insight_text,
                 "embedding": embedding
-            }).execute()
+            }, operation_type="insert")
             logger.info("🧠 [Subconscious] Reflection insight stored in growth logs.")
         except Exception as _g_err:
             logger.warning(f"[WARN] Failed to insert subconscious insight into growth logs: {_g_err}")
@@ -307,7 +310,8 @@ async def run_knowledge_decay() -> Dict[str, Any]:
             meta["archived"] = True
             meta["archived_at"] = get_current_iso_taipei()
             
-            supabase.table("nodes").update({"metadata": meta}).eq("id", node_id).execute()
+            from app.core.database import safe_write
+            safe_write(supabase.table("nodes").eq("id", node_id), {"metadata": meta}, operation_type="update")
             archived_count += 1
 
         if archived_count > 0:

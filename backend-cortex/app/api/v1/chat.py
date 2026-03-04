@@ -316,12 +316,13 @@ async def stream_chat(request: Request, payload: ChatRequest):
             """Create a new actionable task for the user in their LifeOS."""
             if not db:
                 return "Database not connected. Cannot create task."
+            from app.core.database import safe_write
             try:
-                db.table("tasks").insert({
+                safe_write(db.table("tasks"), {
                     "title": title,
                     "status": "todo",
                     "priority": priority
-                }).execute()
+                }, operation_type="insert")
                 return f"Successfully created pending task: '{title}'"
             except Exception as e:
                 return f"Failed to create task: {str(e)}"
@@ -330,8 +331,9 @@ async def stream_chat(request: Request, payload: ChatRequest):
             """Mark a specific pending task (by ID) as done."""
             if not db:
                 return "Database not connected. Cannot update task."
+            from app.core.database import safe_write
             try:
-                db.table("tasks").update({"status": "done"}).eq("id", task_id).execute()
+                safe_write(db.table("tasks").eq("id", task_id), {"status": "done"}, operation_type="update")
                 return f"Task {task_id} marked as done."
             except Exception as e:
                 return f"Failed to mark task done: {str(e)}"
@@ -346,7 +348,8 @@ async def stream_chat(request: Request, payload: ChatRequest):
                 if not res.data:
                     return f"Project '{project_name}' not found."
                 proj_id = res.data[0]["id"]
-                db.table("projects").update({"progress": progress}).eq("id", proj_id).execute()
+                from app.core.database import safe_write
+                safe_write(db.table("projects").eq("id", proj_id), {"progress": progress}, operation_type="update")
                 return f"Project progress updated to {progress}%."
             except Exception as e:
                 return f"Failed to update project: {str(e)}"
@@ -368,7 +371,8 @@ async def stream_chat(request: Request, payload: ChatRequest):
                     "prediction_match": match,
                     "lessons_learned": lesson
                 }
-                db.table("cortex_growth_logs").insert(record).execute()
+                from app.core.database import safe_write
+                safe_write(db.table("cortex_growth_logs"), record, operation_type="insert")
                 return f"Decision logged. Match: {match}. Calibration record updated."
             except Exception as e:
                 return f"Failed to log decision: {str(e)}"
@@ -382,8 +386,9 @@ async def stream_chat(request: Request, payload: ChatRequest):
 
         async def archive_discussion(title: str, summary: str, tags: List[str] = []) -> str:
             """
-            Archive a summary of the current strategic discussion into the Knowledge Base (Documents).
-            Use this when a session reaches a significant conclusion or strategic decision.
+            Archive a summary of the current discussion into the Knowledge Base (Documents).
+            Use this when the user explicitly asks to record, note down, or save the conversation, 
+            or when a session reaches a significant conclusion.
             """
             success = await rag_service.ingest_text(
                 text=summary,

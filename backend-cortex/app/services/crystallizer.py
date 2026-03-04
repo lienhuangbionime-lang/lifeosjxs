@@ -97,10 +97,11 @@ Output ONLY a JSON object:
             logger.info(f"Adding node: {label}")
             # Upsert by label (unique constraint)
             # Use PostgREST upsert with 'on_conflict'
-            res = supabase.table("nodes").upsert({
+            from app.core.database import safe_write
+            res = safe_write(supabase.table("nodes"), {
                 "label": label,
                 "type": node.get("type", "concept")
-            }, on_conflict="label").execute()
+            }, operation_type="upsert", on_conflict="label")
             
             if res.data:
                 logger.info(f"Node upserted: {label} -> {res.data[0]['id']}")
@@ -116,12 +117,13 @@ Output ONLY a JSON object:
         """Insert relationship into the 'edges' table using UUIDs."""
         try:
             logger.info(f"Adding edge: {source_id} -> {target_id} ({relation})")
-            res = supabase.table("edges").upsert({
+            from app.core.database import safe_write
+            res = safe_write(supabase.table("edges"), {
                 "source_id": source_id,
                 "target_id": target_id,
                 "relation": relation or "related",
                 "weight": float(weight)
-            }, on_conflict="source_id,target_id,relation").execute()
+            }, operation_type="upsert", on_conflict="source_id,target_id,relation")
             logger.info(f"Edge upserted: {len(res.data or [])} record(s)")
         except Exception as e:
             logger.error(f"Edge insert failed ({source_id}->{target_id}): {e}")

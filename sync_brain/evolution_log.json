@@ -154,5 +154,27 @@
         "type": "SESSION",
         "description": "Completed Phase F Guest Mode (Building in Public)",
         "impact": "Logged by session_end.py"
+    },
+    {
+        "timestamp": "2026-03-05T03:59:29+08:00",
+        "event": "Resolved Windows Next.js IPv6 proxy hang and Owner Mode 500 errors by bypassing ",
+        "type": "SESSION",
+        "description": "Resolved Windows Next.js IPv6 proxy hang and Owner Mode 500 errors by bypassing dev proxy and explicitly fixing CORS headers.",
+        "impact": "Logged by session_end.py"
+    },
+    {
+        "timestamp": "2026-03-04T20:29:48Z",
+        "event": "Schema Drift Reflection",
+        "type": "architecture_insight",
+        "description": "Identified recurring silent PGRST204 errors caused by missing DB columns (e.g. updated_at, category). Proposed implementing a dynamic safe_insert DB wrapper to automatically strip invalid payload keys as a permanent fix rather than patching individual endpoints.",
+        "impact": "High",
+        "meta": {
+            "affected": [
+                "MonthlyReview",
+                "projects",
+                "tasks"
+            ],
+            "solution": "Implement safe_insert wrapper in database.py"
+        }
     }
 ]

@@ -58,7 +58,8 @@ async def create_project(project: ProjectCreate, request: Request):
                 data["meta"] = {}
             data["meta"]["category"] = data.pop("category")
         
-        response = db.table("projects").insert(data).execute()
+        from app.core.database import safe_write
+        response = safe_write(db.table("projects"), data, operation_type="insert")
         return {"message": "Project created", "data": response.data}
     except Exception as e:
         import logging
@@ -80,7 +81,8 @@ async def update_project(project_id: str, project: ProjectUpdate, request: Reque
     # [FIX] Handle missing 'category' column (if update tries to set it, though ProjectUpdate doesn't have it yet)
     # ProjectUpdate model doesn't have category, so this is safe for now.
     
-    response = db.table("projects").update(data).eq("id", project_id).execute()
+    from app.core.database import safe_write
+    response = safe_write(db.table("projects").eq("id", project_id), data, operation_type="update")
     return {"message": "Project updated", "data": response.data}
 
 @router.delete("/{project_id}")
@@ -114,22 +116,23 @@ async def merge_project(source_id: str, merge_data: ProjectMerge, request: Reque
     new_tags = list(set((target.get("tags") or []) + (source.get("tags") or []) + [source["name"]]))
     
     # Update Target tags
-    db.table("projects").update({"tags": new_tags}).eq("id", target_id).execute()
+    from app.core.database import safe_write
+    safe_write(db.table("projects").eq("id", target_id), {"tags": new_tags}, operation_type="update")
     
     # Migrate Tasks from source → target
-    db.table("tasks").update({"project_id": target_id}).eq("project_id", source_id).execute()
+    safe_write(db.table("tasks").eq("project_id", source_id), {"project_id": target_id}, operation_type="update")
     
     # Migrate Brain Edges from source → target
     try:
-        db.table("edges").update({"source": target_id}).eq("source", source_id).execute()
-        db.table("edges").update({"target": target_id}).eq("target", source_id).execute()
+        safe_write(db.table("edges").eq("source", source_id), {"source": target_id}, operation_type="update")
+        safe_write(db.table("edges").eq("target", source_id), {"target": target_id}, operation_type="update")
     except Exception:
         pass  # edges table may not exist yet — non-critical
     
     # Archive Source
-    db.table("projects").update({
+    safe_write(db.table("projects").eq("id", source_id), {
         "status": "archived",
         "name": f"{source['name']} → {target['name']}"
-    }).eq("id", source_id).execute()
+    }, operation_type="update")
 
     return {"message": f"Merged {source['name']} into {target['name']}", "tasks_migrated": True}

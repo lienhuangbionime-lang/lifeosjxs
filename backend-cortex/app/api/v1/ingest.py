@@ -202,8 +202,9 @@ async def auto_link_tasks_projects(content: str, db, http_request: Request) -> d
             logger = logging.getLogger("cortex.api.ingest.autolink")
             
             # 3.1 Mark tasks done
+            from app.core.database import safe_write
             for t_id in completed_ids:
-                db.table("tasks").update({"status": "done"}).eq("id", t_id).execute()
+                safe_write(db.table("tasks").eq("id", t_id), {"status": "done"}, operation_type="update")
                 logger.info(f"Task marked done via auto-link: {t_id}")
                 
             # 3.2 Update projects updated_at (to bubble them up as "focused")
@@ -216,7 +217,7 @@ async def auto_link_tasks_projects(content: str, db, http_request: Request) -> d
                 if p_name != "未知專案":
                     linked_project_names.append(p_name)
                     
-                db.table("projects").update({"updated_at": get_current_iso_taipei()}).eq("id", p_id).execute()
+                safe_write(db.table("projects").eq("id", p_id), {"updated_at": get_current_iso_taipei()}, operation_type="update")
                 logger.info(f"Project updated_at bumped via auto-link: {p_id} ({p_name})")
                 
             return {
@@ -652,13 +653,16 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
 
         # 4. 寫入 Supabase (UPSERT - 一天一筆 for memories, standard insert for documents)
         if db:
+            from app.core.database import safe_write
             try:
                 if target_table == "memories":
                     # Upsert for memories (one entry per day)
-                    response = db.table(target_table).upsert(
+                    response = safe_write(
+                        db.table(target_table),
                         db_payload,
+                        operation_type="upsert",
                         on_conflict="date"
-                    ).execute()
+                    )
                 else:
                     # Generic Insert for documents
                     # Ensure metadata and title are handled for documents

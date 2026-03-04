@@ -290,11 +290,8 @@ Daily Summaries ({len(memories)} entries):
                 "year": year,
                 "month": month,
                 "summary": review_text,
-                "updated_at": datetime.utcnow().isoformat(),
             }
             # [v5.4 FIX] Use delete + insert instead of upsert.
-            # upsert requires a DB-level UNIQUE constraint on (year, month).
-            # This approach works regardless of constraint configuration.
             await loop.run_in_executor(
                 None,
                 lambda: db.table("MonthlyReview")
@@ -303,9 +300,10 @@ Daily Summaries ({len(memories)} entries):
                     .eq("month", month)
                     .execute()
             )
+            from app.core.database import safe_insert
             await loop.run_in_executor(
                 None,
-                lambda: db.table("MonthlyReview").insert(payload).execute()
+                lambda: safe_insert(db.table("MonthlyReview"), payload)
             )
             logger.info(f"Monthly Review for {year}-{month:02d} saved ({len(memories)} memories, {len(review_text)} chars)")
 

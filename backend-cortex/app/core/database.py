@@ -58,6 +58,42 @@ def get_supabase_client() -> Client:
         raise Exception("Supabase client is not initialized. Check SUPABASE_URL and SUPABASE_KEY.")
     return supabase
 
+def safe_write(table_query, payload: dict, operation_type: str = "insert", max_retries: int = 3, **kwargs):
+    """
+    Executes a Supabase write with built-in Schema Drift resilience.
+    If the remote DB throws PGRST204 (Missing Column), this intercepts the error,
+    strips the invalid column from the payload, and retries.
+    """
+    import logging
+    import re
+    logger = logging.getLogger("cortex.database")
+    
+    current_payload = dict(payload)
+    for attempt in range(max_retries):
+        try:
+            if operation_type == "insert":
+                return table_query.insert(current_payload).execute()
+            elif operation_type == "upsert":
+                return table_query.upsert(current_payload, **kwargs).execute()
+            elif operation_type == "update":
+                return table_query.update(current_payload).execute()
+            else:
+                raise ValueError(f"Unknown operation_type: {operation_type}")
+        except Exception as e:
+            error_msg = str(e)
+            if "PGRST204" in error_msg and "Could not find the" in error_msg:
+                # Example error: Could not find the 'updated_at' column of 'MonthlyReview'
+                match = re.search(r"Could not find the '([^']+)' column", error_msg)
+                if match:
+                    invalid_column = match.group(1)
+                    logger.warning(f"[Schema Drift] Column '{invalid_column}' missing. Stripping and retrying...")
+                    if invalid_column in current_payload:
+                        del current_payload[invalid_column]
+                        continue # Retry
+            # If it's a different error, or we couldn't parse the column, raise it
+            raise e
+    raise Exception(f"Failed safe_write after {max_retries} retries due to schema mismatch.")
+
 
 def get_request_client(request: "Request"):
     """
