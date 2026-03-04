@@ -125,12 +125,18 @@ def get_request_client(request: "Request"):
             return None
 
     # [Phase F] Guest Mode Fallback
-    # If no headers are provided, we fall back to the server's own env-var configuration (if available).
-    # To ensure security, we tag this client so endpoints know to apply Guest Mode filters.
     if supabase is not None:
         logger.debug("[GUEST MODE] No X-Supabase headers found. Falling back to Server Client (Guest Mode).")
-        supabase._is_guest_mode = True
-        return supabase
+        # CRITICAL: Do NOT mutate the global singleton. Wrap it.
+        from types import SimpleNamespace
+        wrapped_client = SimpleNamespace()
+        # Proxy attributes
+        for attr in ['table', 'rpc', 'auth', 'postgrest']:
+            if hasattr(supabase, attr):
+                setattr(wrapped_client, attr, getattr(supabase, attr))
+        
+        wrapped_client._is_guest_mode = True
+        return wrapped_client
         
     logger.debug("[SANDBOX] No headers and no server fallback available — returning None.")
     return None

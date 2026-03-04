@@ -57,12 +57,20 @@ app = FastAPI(
 )
 
 # CORS
+raw_origins = os.getenv("ALLOWED_ORIGINS", "")
+env_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+
 origins = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",
     "https://lifeosjxs.vercel.app",      # Vercel Production
     "https://lifeosjxs.vercel.app/",     # Vercel Production (trailing slash safety)
 ]
+
+# Merge with env-defined origins
+if env_origins:
+    origins.extend(env_origins)
+    logger.info(f"CORS origins extended with: {env_origins}")
 
 app.add_middleware(
     CORSMiddleware,

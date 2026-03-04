@@ -15,9 +15,15 @@ import { NextRequest, NextResponse } from 'next/server';
  * 3. Forwards all user API key headers to the backend transparently
  */
 
-const BACKEND_URL = process.env.NODE_ENV === 'production'
-    ? (process.env.NEXT_PUBLIC_PYTHON_API_URL || 'https://lifeosjxs.onrender.com')
-    : 'http://127.0.0.1:8000';
+const FALLBACK_PROD_URL = 'https://lifeosjxs.onrender.com';
+
+const BACKEND_URL = (process.env.NODE_ENV === 'production'
+    ? (process.env.NEXT_PUBLIC_PYTHON_API_URL || FALLBACK_PROD_URL)
+    : 'http://127.0.0.1:8000').replace(/\/$/, ""); // Strip trailing slash
+
+if (process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_PYTHON_API_URL) {
+    console.warn(`[Proxy] NEXT_PUBLIC_PYTHON_API_URL is missing. Falling back to default: ${FALLBACK_PROD_URL}`);
+}
 
 // Headers that should not be forwarded to the backend
 const HOP_BY_HOP_HEADERS = new Set([
