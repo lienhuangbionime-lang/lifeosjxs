@@ -176,5 +176,12 @@
             ],
             "solution": "Implement safe_insert wrapper in database.py"
         }
+    },
+    {
+        "timestamp": "2026-03-05T04:48:52+08:00",
+        "event": "Refactored raw Supabase inserts across the entire Cortex backend to use the resi",
+        "type": "SESSION",
+        "description": "Refactored raw Supabase inserts across the entire Cortex backend to use the resilient safe_write wrapper. Documented the schema drift defense mechanism in SYSTEM_CONTEXT.md and created an atomic history record.",
+        "impact": "Logged by session_end.py"
     }
 ]

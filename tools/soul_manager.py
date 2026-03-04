@@ -31,6 +31,11 @@ SOUL_FILES = {
     "ROADMAP.md":         os.path.join(SYNC_DIR, "ROADMAP.md"),
     "QUESTIONS.md":       os.path.join(SYNC_DIR, "QUESTIONS.md"),
     "START_HERE.md":      os.path.join(SYNC_DIR, "START_HERE.md"),
+    
+    # --- Universal AI Bootstrapper Kit ---
+    "bootstrapper_cursorrules": os.path.join(SYNC_DIR, "ai_bootstrapper", ".cursorrules"),
+    "bootstrapper_env.example": os.path.join(SYNC_DIR, "ai_bootstrapper", ".env.example"),
+    "bootstrapper_sync.py":     os.path.join(SYNC_DIR, "ai_bootstrapper", "sync_dev_rules.py"),
 }
 
 
