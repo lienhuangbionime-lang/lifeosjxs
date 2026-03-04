@@ -23,5 +23,5 @@ backend-cortex/__pycache__/
 .vscode/
 .idea/
 
-# Local backups (handled by GDrive tool, skip in git)
-sync_brain/
+# Local backups
+# (In Open Mode, sync_brain is officially version controlled and shared)
