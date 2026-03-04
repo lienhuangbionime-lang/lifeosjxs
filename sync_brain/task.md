@@ -86,10 +86,17 @@
 - [x] **Agentic DNA Injection**: Standardize `sync_brain` with Skills & History
 - [x] **System Health Check**: Final full-stack verification of the new protocol
 
+## Phase P21: Cloud Connectivity & Architectural Fix (v3.8.7)
+- [x] Implement dynamic CORS in `backend-cortex/main.py`
+- [x] Fix global mutation bug in `backend-cortex/app/core/database.py`
+- [x] Enhance frontend proxy logging and URL handling
+- [x] Commit and push changes to GitHub (fafbb3d)
+
 ---
 
 ## 📈 成長記錄
-- **2026-03-05 (Session End)**: 修除了 Windows 下 Next.js `localhost` proxy 解析為 IPv6 導致 uvicorn (IPv4) 請求靜默卡死的問題。發現 Next.js 15 的 `context.params` 為 Promise，並修復了 Owner Mode 裡自訂 `X-Supabase-Key` 引起的跨網域預檢 (CORS preflight) 被擋的問題。
+- **2026-03-05 (Cloud Fix)**: 解決了雲端 inaccessible 的三大地雷：CORS 限制、Proxy 網址寫死、以及資料庫連線的全域狀態污染問題。
+- **2026-03-05 (Session End)**: 修除了 Windows 下 Next.js `localhost` proxy 解析為 IPv6 導致 uvicorn (IPv4) 請求靜默卡死的問題。
 - **2026-03-05**: 完成 Guest Mode (Building in Public)，包含後端權限隔離、前端介面限制與免 Key 登入體驗。
 - **2026-02-28**: 升級至 v4.0。導入「自主模型發現」技能與「Agentic DNA」開發協議。
 - **2026-02-27**: 完成 Phase P17 & P18。維度對齊 3072。

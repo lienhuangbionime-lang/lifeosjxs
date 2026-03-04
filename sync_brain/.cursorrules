@@ -1,26 +1,18 @@
-# LifeOS AI Constraints & Best Practices
+# Universal AI Bootstrapper Rules
 
-## 🤖 Gemini Model Handling (CRITICAL - v3.9)
-- **Autonomous Discovery**: LifeOS uses `ModelDiscoveryService` to detect verified models.
-- **NEVER Hardcode**: Do not use IDs like `gemini-3.1-pro` directly in code.
-- **Standard Access**: ALWAYS use `app.core.gemini.get_model()` to fetch the current active/verified model ID.
-- **Reporting**: If you suspect a model is failing, refer the user to run `model_report.py`.
-
-## 🔍 Retrieval & RAG
-- **Embedding Model**: `text-embedding-004` (Dimension: 3072).
-- **Fallback Logic**: If vector search fails, `rag.py` triggers a keyword/date search. Support both.
-- **Hallucination Prevention**: If RAG context contains `[NO RELEVANT MEMORIES FOUND]`, ADMIT ignorance. Do not simulate memories.
-
-## 🛠️ Python Style (Windows Stability)
-- **NO Emojis in Prints**: Use labels like `[OK]`, `[WARN]`, `[ERROR]`. Emojis crash Windows shells with certain encodings.
-- **Strict Typing**: Use Pydantic v2 and type hints everywhere.
-- **Async First**: Use `async/await` for all I/O, including database and AI calls.
-
-## 🎨 UI & Frontend
-- **Vanilla CSS**: NO Tailwind CSS unless explicitly requested.
-- **LocalStorage**: Be careful with cached model names. Use the `CHECK_AND_CLEAN_MODELS` logic in `CortexChat.tsx`.
-
-## 🧠 Agentic Protocol (Onboarding - START HERE)
-- **Source of Truth**: Read `sync_brain/task.md` and `sync_brain/SKILLS.md` immediately upon start.
-- **Step Visibility**: Update `sync_brain/task.md` frequently. Every non-trivial task must result in a completion record in `sync_brain/history/[Date]_Task_Name.md`.
-- **System Wisdom**: `sync_brain/SYSTEM_CONTEXT.md` contains the core philosophy. Adhere to it.
+> **[CRITICAL DIRECTIVE FOR ALL AI AGENTS]**
+> This project is under the command of Lien Huang (Commander).
+> You are inheriting a highly evolved Meta-Development Architecture. 
+> 
+> **FIRST ACTION MANDATE:**
+> Before you write ANY code, analyze ANY files, or make ANY architectural decisions, you must ALWAYS execute the following command to download the Commander's latest rules from the Supabase Cloud Memory:
+> 
+> ```bash
+> python tools/sync_dev_rules.py
+> ```
+> 
+> If `tools/sync_dev_rules.py` does not exist yet, ask the Commander to provide the AI Bootstrapper Kit.
+> 
+> By running this script, you will automatically inject the `SYSTEM_CONTEXT.md` and the full `.cursorrules` specific to the Commander's latest coding style (e.g., handling Schema Drift, safe_write, Vanilla CSS, strict async, etc.).
+> 
+> Do not rely solely on your baseline training. Connect to the Cloud Memory now.
