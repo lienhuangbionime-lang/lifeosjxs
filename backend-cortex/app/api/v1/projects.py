@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
-from app.core.database import get_supabase_client
+from app.core.database import get_request_client
 
 router = APIRouter()
 
@@ -24,9 +24,12 @@ class ProjectMerge(BaseModel):
     target_id: str
 
 @router.get("/")
-async def list_projects(status: Optional[str] = None):
-    supabase = get_supabase_client()
-    query = supabase.table("projects").select("*")
+async def list_projects(request: Request, status: Optional[str] = None):
+    db = get_request_client(request)
+    if not db:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+        
+    query = db.table("projects").select("*")
     if status:
         query = query.eq("status", status)
     
@@ -34,8 +37,11 @@ async def list_projects(status: Optional[str] = None):
     return response.data
 
 @router.post("/")
-async def create_project(project: ProjectCreate):
-    supabase = get_supabase_client()
+async def create_project(project: ProjectCreate, request: Request):
+    db = get_request_client(request)
+    if getattr(db, "_is_guest_mode", False):
+        raise HTTPException(status_code=403, detail="Guest Mode cannot create projects.")
+        
     try:
         data = project.dict()
 
@@ -46,7 +52,7 @@ async def create_project(project: ProjectCreate):
                 data["meta"] = {}
             data["meta"]["category"] = data.pop("category")
         
-        response = supabase.table("projects").insert(data).execute()
+        response = db.table("projects").insert(data).execute()
         return {"message": "Project created", "data": response.data}
     except Exception as e:
         import logging
@@ -55,8 +61,11 @@ async def create_project(project: ProjectCreate):
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.patch("/{project_id}")
-async def update_project(project_id: str, project: ProjectUpdate):
-    supabase = get_supabase_client()
+async def update_project(project_id: str, project: ProjectUpdate, request: Request):
+    db = get_request_client(request)
+    if getattr(db, "_is_guest_mode", False):
+        raise HTTPException(status_code=403, detail="Guest Mode cannot update projects.")
+        
     data = {k: v for k, v in project.dict().items() if v is not None}
     
     if not data:
@@ -65,23 +74,29 @@ async def update_project(project_id: str, project: ProjectUpdate):
     # [FIX] Handle missing 'category' column (if update tries to set it, though ProjectUpdate doesn't have it yet)
     # ProjectUpdate model doesn't have category, so this is safe for now.
     
-    response = supabase.table("projects").update(data).eq("id", project_id).execute()
+    response = db.table("projects").update(data).eq("id", project_id).execute()
     return {"message": "Project updated", "data": response.data}
 
 @router.delete("/{project_id}")
-async def delete_project(project_id: str):
-    supabase = get_supabase_client()
-    response = supabase.table("projects").delete().eq("id", project_id).execute()
+async def delete_project(project_id: str, request: Request):
+    db = get_request_client(request)
+    if getattr(db, "_is_guest_mode", False):
+        raise HTTPException(status_code=403, detail="Guest Mode cannot delete projects.")
+        
+    response = db.table("projects").delete().eq("id", project_id).execute()
     return {"message": "Project deleted", "data": response.data}
 
 @router.post("/{source_id}/merge")
-async def merge_project(source_id: str, merge_data: ProjectMerge):
-    supabase = get_supabase_client()
+async def merge_project(source_id: str, merge_data: ProjectMerge, request: Request):
+    db = get_request_client(request)
+    if getattr(db, "_is_guest_mode", False):
+        raise HTTPException(status_code=403, detail="Guest Mode cannot merge projects.")
+        
     target_id = merge_data.target_id
     
     # 1. Get Source and Target
-    source_res = supabase.table("projects").select("*").eq("id", source_id).single().execute()
-    target_res = supabase.table("projects").select("*").eq("id", target_id).single().execute()
+    source_res = db.table("projects").select("*").eq("id", source_id).single().execute()
+    target_res = db.table("projects").select("*").eq("id", target_id).single().execute()
     
     if not source_res.data or not target_res.data:
         raise HTTPException(status_code=404, detail="Project not found")
@@ -93,20 +108,20 @@ async def merge_project(source_id: str, merge_data: ProjectMerge):
     new_tags = list(set((target.get("tags") or []) + (source.get("tags") or []) + [source["name"]]))
     
     # Update Target tags
-    supabase.table("projects").update({"tags": new_tags}).eq("id", target_id).execute()
+    db.table("projects").update({"tags": new_tags}).eq("id", target_id).execute()
     
     # Migrate Tasks from source → target
-    supabase.table("tasks").update({"project_id": target_id}).eq("project_id", source_id).execute()
+    db.table("tasks").update({"project_id": target_id}).eq("project_id", source_id).execute()
     
     # Migrate Brain Edges from source → target
     try:
-        supabase.table("edges").update({"source": target_id}).eq("source", source_id).execute()
-        supabase.table("edges").update({"target": target_id}).eq("target", source_id).execute()
+        db.table("edges").update({"source": target_id}).eq("source", source_id).execute()
+        db.table("edges").update({"target": target_id}).eq("target", source_id).execute()
     except Exception:
         pass  # edges table may not exist yet — non-critical
     
     # Archive Source
-    supabase.table("projects").update({
+    db.table("projects").update({
         "status": "archived",
         "name": f"{source['name']} → {target['name']}"
     }).eq("id", source_id).execute()

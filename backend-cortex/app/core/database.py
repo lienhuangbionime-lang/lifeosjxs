@@ -73,17 +73,28 @@ def get_request_client(request: "Request"):
     Background tasks (subconscious scheduler, crystallizer, etc.) use the
     module-level `supabase` client directly and are unaffected.
     """
-    req_url = request.headers.get("X-Supabase-URL")
-    req_key = request.headers.get("X-Supabase-Key")
+    req_url = request.headers.get("X-Supabase-URL") or request.headers.get("x-supabase-url")
+    req_key = request.headers.get("X-Supabase-Key") or request.headers.get("x-supabase-key")
 
     if req_url and req_key and create_client:
         try:
-            return create_client(req_url, req_key)
+            # Sanitize URL to prevent getaddrinfo errors
+            clean_url = req_url.strip()
+            if not clean_url.startswith("http"):
+                clean_url = "https://" + clean_url
+            clean_key = req_key.strip()
+            return create_client(clean_url, clean_key)
         except Exception as e:
             logger.warning(f"[WARN] Could not create per-request Supabase client: {e}")
             return None
 
-    # No user headers → return None.
-    # Callers check `if not db: raise HTTPException(503)` — no owner data exposed.
-    logger.debug("[SANDBOX] No X-Supabase headers in request — returning None (sandboxed).")
+    # [Phase F] Guest Mode Fallback
+    # If no headers are provided, we fall back to the server's own env-var configuration (if available).
+    # To ensure security, we tag this client so endpoints know to apply Guest Mode filters.
+    if supabase is not None:
+        logger.debug("[GUEST MODE] No X-Supabase headers found. Falling back to Server Client (Guest Mode).")
+        supabase._is_guest_mode = True
+        return supabase
+        
+    logger.debug("[SANDBOX] No headers and no server fallback available — returning None.")
     return None

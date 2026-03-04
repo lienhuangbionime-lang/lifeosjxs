@@ -1,137 +1,151 @@
 [
-  {
-    "timestamp": "2026-02-14T01:55:00Z",
-    "event": "Protocol Alignment",
-    "type": "ARCH",
-    "description": "Aligned frontend CaptureView with backend ingest.py schema. Fixed content/text mismatch.",
-    "impact": "High - Restored Capture flow functionality."
-  },
-  {
-    "timestamp": "2026-02-14T02:05:00Z",
-    "event": "Schema Consolidation",
-    "type": "DB",
-    "description": "Unified all database schemas into lifeos_v3.5_full_schema.sql. Established single source of truth.",
-    "impact": "Critical - Established structural stability."
-  },
-  {
-    "timestamp": "2026-02-14T11:40:00Z",
-    "event": "Evolution Log Implementation",
-    "type": "PROTOCOL",
-    "description": "Implemented migrations/005_cortex_growth_logs.sql for Glass Box protocol transparency.",
-    "impact": "High - Auditable AI decision making."
-  },
-  {
-    "timestamp": "2026-02-14T13:50:00Z",
-    "event": "Growth Verification",
-    "type": "VERIFICATION",
-    "description": "Identified and resolved 38 critical defects across frontend client and backend API. Successfully verified build.",
-    "impact": "Critical - Proved system growth and resilience."
-  },
-  {
-    "timestamp": "2026-02-14T14:10:00Z",
-    "event": "Memory Unification",
-    "type": "API",
-    "description": "Synchronized memories.py and ingest.py to use 'memories' table. Updated Pydantic schemas for UUID and metrics.",
-    "impact": "High - Fixed data visibility across system."
-  },
-  {
-    "timestamp": "2026-02-14T14:20:00Z",
-    "event": "Codebase Purification",
-    "type": "CLEANUP",
-    "description": "Removed legacy kernel source, redundant routers, and transient test scripts. Achieved minimal production state.",
-    "impact": "Medium - Improved maintenance and handover efficiency."
-  },
-  {
-    "timestamp": "2026-02-14T15:45:00Z",
-    "event": "Intelligence Layer Activation",
-    "type": "EVOLUTION",
-    "description": "Implemented 'Glass Box' Decision Matrix (system_cortex.md) and enabled 3072-dim Semantic Search (VectorEngine + RPC)."
-  },
-  {
-    "timestamp": "2026-02-15T09:45:00Z",
-    "event": "Rate Limit Incident",
-    "type": "FIX",
-    "description": "System hit 429 errors on gemini-2.0-flash due to forced hotfix. Switched to gemini-1.5-flash (stable) and removed backend override.",
-    "impact": "High - Restored system availability."
-  },
-  {
-    "timestamp": "2026-02-23T23:20:00Z",
-    "event": "2026 Harness Engineering Upgrade",
-    "type": "ARCH",
-    "description": "Upgraded system to google.genai SDK (v1 API). Replaced conversational prompts with high-signal CodeSpeak protocols. Consolidated tools to root directory.",
-    "impact": "Critical - Eliminated 404 version errors and established minimalist AI command structure."
-  },
-  {
-    "timestamp": "2026-02-24T05:25:00Z",
-    "event": "Brain API Hotfix",
-    "type": "FIX",
-    "description": "Fixed 'embedder' name import error in brain.py. Resolved Gemini 404 version errors in crystallizer/brain by standardizing on get_model() factory. Updated SYSTEM_CONTEXT to v3.5.6.",
-    "impact": "High - Restored semantic search and AI insight generation stability."
-  },
-  {
-    "timestamp": "2026-02-27T05:21:00Z",
-    "event": "Dependency Drift Fix & Reflection",
-    "type": "FIX",
-    "description": "Resolved ModuleNotFoundError for 'duckduckgo_search'. Identified 'Feature-Dependency Drift' where new tool logic was enabled without requirements.txt parity.",
-    "impact": "High - Restored server startup. Optimized requirements.txt sync protocol.",
-    "reflection": "When migrating tools (like web search) into the core chat loop, the dependency must be verified in the same commit. Relying on local pre-installed packages in a development environment is a blind spot."
-  },
-  {
-    "timestamp": "2026-02-27T05:20:00Z",
-    "event": "Knowledge & Memory Isolation",
-    "type": "ARCH",
-    "description": "Implemented physical isolation between 'memories' and 'documents' tables. Enabled Dual-Track RAG (Unified Awareness) and automated search archiving. Updated SYSTEM_CONTEXT to v3.7.7.",
-    "impact": "Critical - Established architectural purity and scalable knowledge management."
-  },
-  {
-    "timestamp": "2026-02-27T14:42:00Z",
-    "event": "Multimodal Ingest & Task Logic Upgrade",
-    "type": "EVOLUTION",
-    "description": "Implemented Phase P17: Enabled Gemini 2.0 Flash Vision/Multimodal for CaptureView and Chat. Successfully integrated support for images, PDFs, and Markdown extraction. Redesigned and implemented default 'todo' filtering for TaskList to resolve UI accumulation.",
-    "impact": "High - Unified multimodal data flow and restored task management clarity."
-  },
-  {
-    "timestamp": "2026-02-27T19:07:59Z",
-    "event": "Soul Sync",
-    "type": "SYNC",
-    "description": "Synced 2 files. Missed: [].",
-    "impact": "Low",
-    "meta": {
-      "drift_count": 1,
-      "drifted_files": [
-        ".cursorrules"
-      ],
-      "copied_count": 2,
-      "missed_count": 0,
-      "status": "drift_resolved"
+    {
+        "timestamp": "2026-02-14T01:55:00Z",
+        "event": "Protocol Alignment",
+        "type": "ARCH",
+        "description": "Aligned frontend CaptureView with backend ingest.py schema. Fixed content/text mismatch.",
+        "impact": "High - Restored Capture flow functionality."
+    },
+    {
+        "timestamp": "2026-02-14T02:05:00Z",
+        "event": "Schema Consolidation",
+        "type": "DB",
+        "description": "Unified all database schemas into lifeos_v3.5_full_schema.sql. Established single source of truth.",
+        "impact": "Critical - Established structural stability."
+    },
+    {
+        "timestamp": "2026-02-14T11:40:00Z",
+        "event": "Evolution Log Implementation",
+        "type": "PROTOCOL",
+        "description": "Implemented migrations/005_cortex_growth_logs.sql for Glass Box protocol transparency.",
+        "impact": "High - Auditable AI decision making."
+    },
+    {
+        "timestamp": "2026-02-14T13:50:00Z",
+        "event": "Growth Verification",
+        "type": "VERIFICATION",
+        "description": "Identified and resolved 38 critical defects across frontend client and backend API. Successfully verified build.",
+        "impact": "Critical - Proved system growth and resilience."
+    },
+    {
+        "timestamp": "2026-02-14T14:10:00Z",
+        "event": "Memory Unification",
+        "type": "API",
+        "description": "Synchronized memories.py and ingest.py to use 'memories' table. Updated Pydantic schemas for UUID and metrics.",
+        "impact": "High - Fixed data visibility across system."
+    },
+    {
+        "timestamp": "2026-02-14T14:20:00Z",
+        "event": "Codebase Purification",
+        "type": "CLEANUP",
+        "description": "Removed legacy kernel source, redundant routers, and transient test scripts. Achieved minimal production state.",
+        "impact": "Medium - Improved maintenance and handover efficiency."
+    },
+    {
+        "timestamp": "2026-02-14T15:45:00Z",
+        "event": "Intelligence Layer Activation",
+        "type": "EVOLUTION",
+        "description": "Implemented 'Glass Box' Decision Matrix (system_cortex.md) and enabled 3072-dim Semantic Search (VectorEngine + RPC)."
+    },
+    {
+        "timestamp": "2026-02-15T09:45:00Z",
+        "event": "Rate Limit Incident",
+        "type": "FIX",
+        "description": "System hit 429 errors on gemini-2.0-flash due to forced hotfix. Switched to gemini-1.5-flash (stable) and removed backend override.",
+        "impact": "High - Restored system availability."
+    },
+    {
+        "timestamp": "2026-02-23T23:20:00Z",
+        "event": "2026 Harness Engineering Upgrade",
+        "type": "ARCH",
+        "description": "Upgraded system to google.genai SDK (v1 API). Replaced conversational prompts with high-signal CodeSpeak protocols. Consolidated tools to root directory.",
+        "impact": "Critical - Eliminated 404 version errors and established minimalist AI command structure."
+    },
+    {
+        "timestamp": "2026-02-24T05:25:00Z",
+        "event": "Brain API Hotfix",
+        "type": "FIX",
+        "description": "Fixed 'embedder' name import error in brain.py. Resolved Gemini 404 version errors in crystallizer/brain by standardizing on get_model() factory. Updated SYSTEM_CONTEXT to v3.5.6.",
+        "impact": "High - Restored semantic search and AI insight generation stability."
+    },
+    {
+        "timestamp": "2026-02-27T05:21:00Z",
+        "event": "Dependency Drift Fix & Reflection",
+        "type": "FIX",
+        "description": "Resolved ModuleNotFoundError for 'duckduckgo_search'. Identified 'Feature-Dependency Drift' where new tool logic was enabled without requirements.txt parity.",
+        "impact": "High - Restored server startup. Optimized requirements.txt sync protocol.",
+        "reflection": "When migrating tools (like web search) into the core chat loop, the dependency must be verified in the same commit. Relying on local pre-installed packages in a development environment is a blind spot."
+    },
+    {
+        "timestamp": "2026-02-27T05:20:00Z",
+        "event": "Knowledge & Memory Isolation",
+        "type": "ARCH",
+        "description": "Implemented physical isolation between 'memories' and 'documents' tables. Enabled Dual-Track RAG (Unified Awareness) and automated search archiving. Updated SYSTEM_CONTEXT to v3.7.7.",
+        "impact": "Critical - Established architectural purity and scalable knowledge management."
+    },
+    {
+        "timestamp": "2026-02-27T14:42:00Z",
+        "event": "Multimodal Ingest & Task Logic Upgrade",
+        "type": "EVOLUTION",
+        "description": "Implemented Phase P17: Enabled Gemini 2.0 Flash Vision/Multimodal for CaptureView and Chat. Successfully integrated support for images, PDFs, and Markdown extraction. Redesigned and implemented default 'todo' filtering for TaskList to resolve UI accumulation.",
+        "impact": "High - Unified multimodal data flow and restored task management clarity."
+    },
+    {
+        "timestamp": "2026-02-27T19:07:59Z",
+        "event": "Soul Sync",
+        "type": "SYNC",
+        "description": "Synced 2 files. Missed: [].",
+        "impact": "Low",
+        "meta": {
+            "drift_count": 1,
+            "drifted_files": [
+                ".cursorrules"
+            ],
+            "copied_count": 2,
+            "missed_count": 0,
+            "status": "drift_resolved"
+        }
+    },
+    {
+        "timestamp": "2026-02-27T19:48:22Z",
+        "event": "Soul Sync",
+        "type": "SYNC",
+        "description": "Synced 2 files. Missed: [].",
+        "impact": "Low",
+        "meta": {
+            "drift_count": 0,
+            "drifted_files": [],
+            "copied_count": 2,
+            "missed_count": 0,
+            "status": "in_sync"
+        }
+    },
+    {
+        "timestamp": "2026-03-03T23:35:32.362023+08:00",
+        "event": "AI Growth Analysis (v5.3)",
+        "type": "ai_lesson",
+        "description": "I must ensure that data categorization changes (such as reflection category) are applied atomically across both new inserts and updates within the same transaction. I should also build resilient fallback content chains (ai_insights -> content -> note) at every display layer, not just the storage layer, to prevent empty UI cards when schema fields are sparsely populated.",
+        "impact": "High - Improved schema consistency and display resiliency.",
+        "meta": {
+            "source": "run_growth_analysis",
+            "prediction_accuracy_pct": 0.0,
+            "judged_decisions": 9,
+            "mismatch_count": 9,
+            "note": "Lesson synthesized manually due to AI quota exhaustion at analysis time."
+        }
+    },
+    {
+        "timestamp": "2026-03-03T21:01:53Z",
+        "event": "Soul Sync",
+        "type": "SYNC",
+        "description": "Synced 2 files. Missed: [].",
+        "impact": "Low",
+        "meta": {
+            "drift_count": 0,
+            "drifted_files": [],
+            "copied_count": 2,
+            "missed_count": 0,
+            "status": "in_sync"
+        }
     }
-  },
-  {
-    "timestamp": "2026-02-27T19:48:22Z",
-    "event": "Soul Sync",
-    "type": "SYNC",
-    "description": "Synced 2 files. Missed: [].",
-    "impact": "Low",
-    "meta": {
-      "drift_count": 0,
-      "drifted_files": [],
-      "copied_count": 2,
-      "missed_count": 0,
-      "status": "in_sync"
-    }
-  },
-  {
-    "timestamp": "2026-03-03T23:35:32.362023+08:00",
-    "event": "AI Growth Analysis (v5.3)",
-    "type": "ai_lesson",
-    "description": "I must ensure that data categorization changes (such as reflection category) are applied atomically across both new inserts and updates within the same transaction. I should also build resilient fallback content chains (ai_insights -> content -> note) at every display layer, not just the storage layer, to prevent empty UI cards when schema fields are sparsely populated.",
-    "impact": "High - Improved schema consistency and display resiliency.",
-    "meta": {
-      "source": "run_growth_analysis",
-      "prediction_accuracy_pct": 0.0,
-      "judged_decisions": 9,
-      "mismatch_count": 9,
-      "note": "Lesson synthesized manually due to AI quota exhaustion at analysis time."
-    }
-  }
 ]

@@ -8,7 +8,42 @@ from app.core.gemini import get_model, gemini_client, types
 from app.services.embedder import generate_embedding
 from app.services.reranker import reranker
 
+import math
+
 logger = logging.getLogger("cortex.rag_service")
+
+def calculate_decay_score(raw_similarity: float, access_count: int, last_accessed_str: str, current_time: Optional[datetime] = None) -> float:
+    """
+    LifeOS Knowledge Decay Formula (Phase E)
+    Adjusts the raw pgvector cosine similarity score based on time elapsed and retrieval frequency.
+    """
+    if current_time is None:
+        current_time = datetime.now()
+        
+    base_half_life_days = 30
+    # Every access extends the half-life by 7 days, up to a year
+    effective_half_life = min(365, base_half_life_days + ((access_count or 0) * 7))
+    
+    days_elapsed = 0
+    if last_accessed_str:
+        try:
+            # Parse typical Postgres ISO 8601 strings
+            last_accessed_at = datetime.fromisoformat(last_accessed_str.replace('Z', '+00:00'))
+            # Calculate delta (Ensure timezone naive math for simplicity if needed, or matched tz)
+            curr_utc = datetime.now().astimezone() 
+            delta = curr_utc - last_accessed_at
+            days_elapsed = max(0, delta.total_seconds() / 86400.0)
+        except Exception as e:
+            logger.warning(f"Could not parse last_accessed_str '{last_accessed_str}': {e}")
+            
+    # Exponential decay formula: N(t) = N0 * (1/2)^(t/h)
+    decay_multiplier = math.pow(0.5, days_elapsed / effective_half_life)
+    
+    # Access Frequency Boost (+0.05 max to similarity)
+    frequency_boost = min(0.05, float(access_count or 0) * 0.005)
+    
+    final_score = float((raw_similarity * decay_multiplier) + frequency_boost)
+    return max(0.0, min(1.0, final_score))
 
 class Memory:
     """Standardized memory data structure for the system."""
@@ -62,10 +97,11 @@ class UnifiedRAGService:
             if not query_embedding:
                 return await self._fallback_search(query, limit)
 
+            # We fetch more than we need so we can re-sort them after applying the Decay Formula
             rpc_params = {
                 "query_embedding": query_embedding,
                 "match_threshold": similarity_threshold,
-                "match_count": limit
+                "match_count": limit * 2
             }
             
             # [v4.3] match_memories RPC usually returns fixed columns. 
@@ -73,10 +109,28 @@ class UnifiedRAGService:
             response = supabase.rpc("match_memories", rpc_params).execute()
             results = response.data
 
-            # 2. Process Vector Results
+            # 2. Process Vector Results & Apply Knowledge Decay Scoring
             memories = []
             if results:
+                processed_results = []
                 for item in results:
+                    raw_sim = item.get("similarity", 0.0)
+                    access_count = item.get("access_count", 0)
+                    last_accessed = item.get("last_accessed_at")
+                    
+                    # Apply Phase E Decay Formula
+                    dynamic_sim = calculate_decay_score(raw_sim, access_count, last_accessed)
+                    item["original_similarity"] = raw_sim
+                    item["similarity"] = dynamic_sim
+                    processed_results.append(item)
+                    
+                # Re-sort descending based on the new Decay-adjusted similarity
+                processed_results.sort(key=lambda x: x['similarity'], reverse=True)
+                
+                # Take the top requested limit
+                final_results = processed_results[:limit]
+                
+                for item in final_results:
                     # [v4.3 Diagnostic] If RPC doesn't return ai_insights, we attempt to use what's there
                     mem = Memory(
                         id=item.get("id"),
@@ -87,6 +141,16 @@ class UnifiedRAGService:
                         metadata=item.get("metadata", {})
                     )
                     memories.append(mem)
+                    
+                # Fire-and-forget RPC call to increment access counts
+                try:
+                    memory_ids = [m.id for m in memories]
+                    if memory_ids:
+                        supabase.rpc("increment_memory_access", {"memory_ids": memory_ids}).execute()
+                        logger.info(f"Knowledge Decay: Bumped access_count for {len(memory_ids)} memories.")
+                except Exception as rpc_e:
+                    logger.warning(f"Failed to increment memory access: {rpc_e}")
+                    
                 return memories
 
             # 3. Fallback to Keyword/Date if vector returns nothing
@@ -142,21 +206,57 @@ class UnifiedRAGService:
             return []
 
     async def search_documents(self, query: str, limit: int = 5) -> List[Dict]:
-        """Search 'documents' table for external knowledge."""
+        """Search 'documents' table for external knowledge with Phase E Knowledge Decay."""
         if not self.enabled: return []
         
         try:
             query_embedding = await generate_embedding(query, task_type="retrieval_query")
             if not query_embedding: return []
 
+            # We fetch more than we need so we can re-sort them after applying the Decay Formula
             rpc_params = {
                 "query_embedding": query_embedding,
                 "match_threshold": 0.3, 
-                "match_count": limit
+                "match_count": limit * 2 
             }
             
             response = supabase.rpc("match_documents", rpc_params).execute()
-            return response.data or []
+            docs = response.data or []
+            
+            if not docs:
+                return []
+                
+            # --- Phase E: Knowledge Decay Scoring ---
+            processed_docs = []
+            for d in docs:
+                raw_sim = d.get('similarity', 0.0)
+                access_count = d.get('access_count', 0)
+                last_accessed = d.get('last_accessed_at')
+                
+                # Re-calculate similarity score accounting for Memory Decay
+                dynamic_sim = calculate_decay_score(raw_sim, access_count, last_accessed)
+                d['original_similarity'] = raw_sim
+                d['similarity'] = dynamic_sim
+                processed_docs.append(d)
+                
+            # Re-sort descending based on the new Decay-adjusted similarity
+            processed_docs.sort(key=lambda x: x['similarity'], reverse=True)
+            
+            # Take the top requested limit
+            final_selection = processed_docs[:limit]
+            
+            if final_selection:
+                # Fire-and-forget RPC call to increment access counts and update last_accessed_at
+                try:
+                    doc_ids = [d['id'] for d in final_selection if 'id' in d]
+                    if doc_ids:
+                        supabase.rpc("increment_document_access", {"doc_ids": doc_ids}).execute()
+                        logger.info(f"Knowledge Decay: Bumped access_count for {len(doc_ids)} documents.")
+                except Exception as rpc_e:
+                    logger.warning(f"Failed to increment document access: {rpc_e}")
+                    
+            return final_selection
+            
         except Exception as e:
             logger.error(f"Document search failed: {e}")
             return []

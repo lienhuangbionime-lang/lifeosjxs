@@ -35,7 +35,9 @@ async def create_memory_entry(content: str, source: str = "system", tags: List[s
     }
     
     try:
-        res = supabase.table("memories").insert(entry).execute()
+        from app.core.database import get_supabase_client
+        db = get_supabase_client()
+        res = db.table("memories").insert(entry).execute()
         return res.data[0] if res.data else None
     except Exception as e:
         logger.error(f"Failed to create memory: {e}")
@@ -44,10 +46,15 @@ async def create_memory_entry(content: str, source: str = "system", tags: List[s
 # --- Endpoints ---
 
 @router.post("/", response_model=dict)
-async def add_memory(entry: LogEntrySchema):
+async def add_memory(entry: LogEntrySchema, request: Request):
     """
     Manual memory insertion endpoint.
     """
+    from app.core.database import get_request_client
+    db = get_request_client(request)
+    if getattr(db, "_is_guest_mode", False):
+        raise HTTPException(status_code=403, detail="Guest Mode cannot alter memories.")
+
     data = await create_memory_entry(
         content=entry.content,
         date=entry.date,
@@ -58,6 +65,7 @@ async def add_memory(entry: LogEntrySchema):
 
 @router.get("/", response_model=List[LogEntrySchema])
 async def get_recent_memories(
+    request: Request,
     limit: int = 20,
     q: Optional[str] = Query(None, description="Search query (semantic or keyword)")
 ):
@@ -66,9 +74,14 @@ async def get_recent_memories(
     - If `q` is provided: Performs Semantic Search (Vector).
     - If `q` is None: Returns recent memories (Chronological).
     """
-    if supabase is None:
+    from app.core.database import get_request_client
+    db = get_request_client(request)
+
+    if db is None:
         logger.warning("Supabase client unavailable; cannot fetch memories.")
         raise HTTPException(status_code=503, detail="Database unavailable (supabase not configured).")
+
+    is_guest = getattr(db, "_is_guest_mode", False)
 
     try:
         # Case 1: Semantic Search
@@ -111,7 +124,13 @@ async def get_recent_memories(
         # supabase client is sync; run in thread to avoid blocking event loop
         def query():
             try:
-                result = supabase.table("memories").select("*").order("date", desc=True).limit(limit).execute()
+                sql_query = db.table("memories").select("*")
+                
+                # [Phase F] Guest Mode Constraint Lock
+                if is_guest:
+                    sql_query = sql_query.eq("is_private", False).eq("category", "Project")
+                    
+                result = sql_query.order("date", desc=True).limit(limit).execute()
                 return result
             except Exception as e:
                 # bubble up

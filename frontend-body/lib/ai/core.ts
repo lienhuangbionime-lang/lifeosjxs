@@ -98,9 +98,23 @@ export const CoreEngine = {
         const text = typeof log === 'string' ? log : log.note;
         if (!text) return "No data";
 
-        // Heuristic: Check for explicit insight markers
+        // Heuristic 1: Check for explicit insight markers
         const insightMatch = text.match(/(?:#insight|💡)\s*(.*)/i);
         if (insightMatch && insightMatch[1]) return insightMatch[1].trim();
+
+        // Heuristic 2: Extract from LifeOS v7.1 Markdown format (Highlights section)
+        const daySummaryMatch = text.match(/-\s*Day Summary:\s*(.*)/i);
+        if (daySummaryMatch && daySummaryMatch[1]) return daySummaryMatch[1].trim();
+
+        // Heuristic 3: Just grab the first meaningful sentence after the Daily Metrics
+        const lines = text.split('\n');
+        for (const line of lines) {
+            const clean = line.trim();
+            // Skip headers, blockquotes, empty lines, and tags
+            if (clean && !clean.startsWith('#') && !clean.startsWith('>') && !clean.startsWith('-') && !clean.startsWith('[[') && clean.length > 10) {
+                return clean.length > 100 ? clean.substring(0, 97) + '...' : clean;
+            }
+        }
 
         if (typeof log === 'string') return "Keep logging to generate insights.";
 

@@ -53,6 +53,8 @@ export const ProjectCard = ({
     const [isTargeted, setIsTargeted] = useState(false);
     const inputRef = useRef<HTMLInputElement>(null);
 
+    const isGuest = typeof window !== 'undefined' && localStorage.getItem('life-os-guest-mode') === 'true';
+
     const status = project.status || 'active';
     const cfg = STATUS_CONFIG[status] || STATUS_CONFIG['active'];
     const progress = project.progress ?? 0;
@@ -141,7 +143,7 @@ export const ProjectCard = ({
                     </span>
 
                     {/* Context menu */}
-                    {!isSelectionMode && (
+                    {!isSelectionMode && !isGuest && (
                         <div className="relative" onClick={(e) => e.stopPropagation()}>
                             <button
                                 onClick={() => setShowMenu(!showMenu)}

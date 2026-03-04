@@ -24,7 +24,16 @@ import { KeyGate } from '@/components/KeyGate'; // [v5.4] Privacy sandbox
 export default function Home() {
   // 1. State Definition
   const [logs, setLogs] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<'capture' | 'graph' | 'list' | 'settings' | 'dashboard' | 'project'>('capture');
+
+  // [Phase F] Guest Mode Default Routing
+  const getInitialTab = () => {
+    if (typeof window !== 'undefined' && localStorage.getItem('life-os-guest-mode') === 'true') {
+      return 'dashboard';
+    }
+    return 'capture';
+  };
+  const [activeTab, setActiveTab] = useState<'capture' | 'graph' | 'list' | 'settings' | 'dashboard' | 'project'>(getInitialTab);
+
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [isCmdOpen, setIsCmdOpen] = useState(false);
@@ -98,6 +107,7 @@ export default function Home() {
   if (!isMounted) return <div className="h-screen bg-red-900 flex flex-col gap-4 items-center justify-center"><div className="w-6 h-6 border-2 border-white rounded-full animate-spin"></div><div className="text-white font-bold">LOADING...</div></div>;
 
   const bgClass = activeTab === 'graph' ? 'bg-[#0f172a] text-slate-200' : 'bg-[#f8fafc] text-slate-900';
+  const isGuest = typeof window !== 'undefined' && localStorage.getItem('life-os-guest-mode') === 'true';
 
   const appContent = (
 
@@ -174,7 +184,7 @@ export default function Home() {
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto overflow-x-hidden relative flex flex-col items-center justify-start w-full">
         <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
-          {activeTab === 'capture' && (
+          {!isGuest && activeTab === 'capture' && (
             <CaptureView
               onSave={(entry) => {
                 // Update local state immediately
@@ -229,7 +239,7 @@ export default function Home() {
             </div>
           )}
 
-          {activeTab === 'settings' && (
+          {!isGuest && activeTab === 'settings' && (
             <SettingsView logs={logs} />
           )}
         </div>

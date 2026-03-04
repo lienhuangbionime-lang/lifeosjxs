@@ -16,6 +16,7 @@ interface EntryDetailModalProps {
 export const EntryDetailModal = ({ entry, isOpen, onClose, onSave, onDelete }: EntryDetailModalProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const [content, setContent] = useState('');
+    const isGuest = typeof window !== 'undefined' && localStorage.getItem('life-os-guest-mode') === 'true';
 
     // Reset state when entry changes
     useEffect(() => {
@@ -60,20 +61,22 @@ export const EntryDetailModal = ({ entry, isOpen, onClose, onSave, onDelete }: E
                     <span className="flex items-center gap-1"><Target size={12} className="text-purple-500" /> FOCUS: {entry.metrics?.focus || entry.focus || '-'}</span>
                 </div>
                 <div className="flex gap-2">
-                    {!isEditing ? (
-                        <button
-                            onClick={() => setIsEditing(true)}
-                            className="text-xs font-bold text-indigo-600 hover:text-indigo-700 px-3 py-1 bg-indigo-50 rounded-full transition-colors"
-                        >
-                            EDIT
-                        </button>
-                    ) : (
-                        <button
-                            onClick={() => setIsEditing(false)}
-                            className="text-xs font-bold text-slate-500 hover:text-slate-700 px-3 py-1 bg-slate-100 rounded-full transition-colors"
-                        >
-                            CANCEL
-                        </button>
+                    {!isGuest && (
+                        !isEditing ? (
+                            <button
+                                onClick={() => setIsEditing(true)}
+                                className="text-xs font-bold text-indigo-600 hover:text-indigo-700 px-3 py-1 bg-indigo-50 rounded-full transition-colors"
+                            >
+                                EDIT
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => setIsEditing(false)}
+                                className="text-xs font-bold text-slate-500 hover:text-slate-700 px-3 py-1 bg-slate-100 rounded-full transition-colors"
+                            >
+                                CANCEL
+                            </button>
+                        )
                     )}
                 </div>
             </div>
@@ -97,17 +100,19 @@ export const EntryDetailModal = ({ entry, isOpen, onClose, onSave, onDelete }: E
 
             {/* Footer Actions */}
             <div className="p-4 border-t border-slate-100 bg-slate-50 flex justify-between items-center">
-                <button
-                    onClick={() => {
-                        if (window.confirm('Are you sure you want to delete this entry?')) {
-                            onDelete(entry.date); // Using date as ID based on current schema usage in frontend
-                            onClose();
-                        }
-                    }}
-                    className="flex items-center gap-2 px-4 py-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors text-xs font-bold"
-                >
-                    <Trash2 size={16} /> DELETE
-                </button>
+                {!isGuest ? (
+                    <button
+                        onClick={() => {
+                            if (window.confirm('Are you sure you want to delete this entry?')) {
+                                onDelete(entry.date); // Using date as ID based on current schema usage in frontend
+                                onClose();
+                            }
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors text-xs font-bold"
+                    >
+                        <Trash2 size={16} /> DELETE
+                    </button>
+                ) : <div />}
 
                 {isEditing && (
                     <button

@@ -23,6 +23,7 @@ export const ProjectBoard = ({ onCreateProject, incomingProject, onJumpToGraph }
     // Merge Mode State
     const [isMergeMode, setIsMergeMode] = useState(false);
     const [mergeSourceId, setMergeSourceId] = useState<string | null>(null);
+    const isGuest = typeof window !== 'undefined' && localStorage.getItem('life-os-guest-mode') === 'true';
 
     // Toast/Notification State
     const [toast, setToast] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
@@ -193,13 +194,15 @@ export const ProjectBoard = ({ onCreateProject, incomingProject, onJumpToGraph }
                         <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
                             LifeOS v3.2
                         </span>
-                        <button
-                            onClick={onCreateProject}
-                            className="ml-2 p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full transition-all shadow-lg hover:shadow-indigo-500/50 active:scale-95 ring-2 ring-indigo-500/30"
-                            title="New Project"
-                        >
-                            <Plus size={20} />
-                        </button>
+                        {!isGuest && (
+                            <button
+                                onClick={onCreateProject}
+                                className="ml-2 p-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-full transition-all shadow-lg hover:shadow-indigo-500/50 active:scale-95 ring-2 ring-indigo-500/30"
+                                title="New Project"
+                            >
+                                <Plus size={20} />
+                            </button>
+                        )}
                     </h2>
                     <p className="text-gray-400 text-sm mt-2 font-medium tracking-wide">
                         Ship your life & work • <span className="text-indigo-400">Cyberpunk Edition</span>

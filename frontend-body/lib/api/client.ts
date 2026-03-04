@@ -11,14 +11,28 @@ export const API_BASE = "";
 function getUserApiHeaders(): Record<string, string> {
   if (typeof window === "undefined") return {}; // SSR guard
   try {
+    // [Phase F] Guest Mode Check
+    if (localStorage.getItem("life-os-guest-mode") === "true") {
+      return {};
+    }
+
     const raw = localStorage.getItem("life-os-settings-storage");
     if (!raw) return {};
     const parsed = JSON.parse(raw);
     const keys: Record<string, string> = parsed?.state?.apiKeys || {};
     const headers: Record<string, string> = {};
     if (keys["google_api_key"]) headers["X-Gemini-Key"] = keys["google_api_key"];
-    if (keys["supabase_url"]) headers["X-Supabase-URL"] = keys["supabase_url"];
-    if (keys["supabase_key"]) headers["X-Supabase-Key"] = keys["supabase_key"];
+
+    // Backend gets headers in lower case mostly, but it's safe to use exact match as in python `request.headers.get("X-Supabase-URL")`
+    // However, some proxies rewrite headers to lowercase. Let's send lowercase versions too just in case.
+    if (keys["supabase_url"]) {
+      headers["X-Supabase-URL"] = keys["supabase_url"];
+      headers["x-supabase-url"] = keys["supabase_url"]; // Fallback for case-insensitive proxies
+    }
+    if (keys["supabase_key"]) {
+      headers["X-Supabase-Key"] = keys["supabase_key"];
+      headers["x-supabase-key"] = keys["supabase_key"];
+    }
     return headers;
   } catch {
     return {};

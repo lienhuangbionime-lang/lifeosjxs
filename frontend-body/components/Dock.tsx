@@ -12,13 +12,19 @@ interface DockProps {
 export const Dock = ({ activeTab, onTabChange }: DockProps) => {
     const mouseX = useMotionValue(Infinity);
 
-    const items = [
+    const isGuest = typeof window !== 'undefined' && localStorage.getItem('life-os-guest-mode') === 'true';
+
+    let items = [
         { id: 'dashboard', icon: Home, label: 'Home' },
         { id: 'project', icon: Layers, label: 'Projects' },
         { id: 'capture', icon: Plus, label: 'Capture' }, // Middle action? Or tab?
         { id: 'graph', icon: Brain, label: 'Brain' },
         { id: 'settings', icon: Settings, label: 'Settings' },
     ];
+
+    if (isGuest) {
+        items = items.filter(i => !['capture', 'settings'].includes(i.id));
+    }
 
     return (
         <div

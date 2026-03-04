@@ -58,6 +58,12 @@ export function KeyGate({ children }: KeyGateProps) {
         setTestOk(false);
     };
 
+    const handleGuest = () => {
+        localStorage.setItem('life-os-guest-mode', 'true');
+        setTestOk(true);
+        setTimeout(() => window.location.reload(), 400);
+    };
+
     const handleSave = async () => {
         if (!form.google_api_key || !form.supabase_url || !form.supabase_key) {
             setTestError('Please fill in all three fields.');
@@ -96,6 +102,11 @@ export function KeyGate({ children }: KeyGateProps) {
             setTesting(false);
         }
     };
+
+    // If already in guest mode but hasn't fully reloaded or something weird
+    if (typeof window !== 'undefined' && localStorage.getItem('life-os-guest-mode') === 'true') {
+        return <>{children}</>;
+    }
 
     return (
         <div className="min-h-screen bg-[#080c14] flex items-center justify-center p-4">
@@ -191,15 +202,31 @@ export function KeyGate({ children }: KeyGateProps) {
                     </AnimatePresence>
 
                     {/* Submit */}
-                    <button
-                        onClick={handleSave}
-                        disabled={testing || testOk}
-                        className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20"
-                    >
-                        {testing ? <><Loader2 className="w-4 h-4 animate-spin" /> Testing connection...</> :
-                            testOk ? <><CheckCircle className="w-4 h-4" /> Launching...</> :
-                                <><Shield className="w-4 h-4" /> Connect &amp; Enter LifeOS</>}
-                    </button>
+                    <div className="space-y-3">
+                        <button
+                            onClick={handleSave}
+                            disabled={testing || testOk}
+                            className="w-full py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/20"
+                        >
+                            {testing ? <><Loader2 className="w-4 h-4 animate-spin" /> Testing connection...</> :
+                                testOk ? <><CheckCircle className="w-4 h-4" /> Launching...</> :
+                                    <><Shield className="w-4 h-4" /> Connect &amp; Enter LifeOS</>}
+                        </button>
+
+                        <div className="relative flex items-center py-2">
+                            <div className="flex-grow border-t border-slate-700/50"></div>
+                            <span className="flex-shrink-0 mx-4 text-xs font-semibold text-slate-500 uppercase tracking-wider">or</span>
+                            <div className="flex-grow border-t border-slate-700/50"></div>
+                        </div>
+
+                        <button
+                            onClick={handleGuest}
+                            disabled={testing || testOk}
+                            className="w-full py-3 rounded-2xl bg-transparent border border-slate-700/50 hover:bg-white/5 text-slate-300 font-bold text-sm transition-all flex items-center justify-center gap-2"
+                        >
+                            <ExternalLink className="w-4 h-4" /> Continue as Guest (View Public Projects)
+                        </button>
+                    </div>
                 </div>
 
                 <p className="text-center text-slate-600 text-[11px] mt-4">
