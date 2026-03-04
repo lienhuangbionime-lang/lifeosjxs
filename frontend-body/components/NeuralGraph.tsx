@@ -86,7 +86,7 @@ export const NeuralGraph = memo(({ logs, onNodeClick, highlightTag }: NeuralGrap
             .attr("stroke-width", (d: any) => Math.sqrt(d.value || 1));
 
         const node = nodeLayer
-            .selectAll("g")
+            .selectAll("circle")
             .data(graphData.nodes)
             .join("circle")
             .attr("r", (d: any) => (d.val || 5) * 1.5)

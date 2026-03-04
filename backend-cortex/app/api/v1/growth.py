@@ -8,7 +8,7 @@ from typing import Optional
 import logging
 import json
 
-from app.core.database import get_supabase_client
+from app.core.database import get_request_client
 from app.core.gemini import get_request_gemini_client
 
 router = APIRouter()
@@ -30,7 +30,7 @@ async def log_decision(request: Request, payload: LogDecisionRequest):
     [Glass Box Protocol] Record an AI decision + outcome into cortex_growth_logs.
     The AI should call this after every significant architectural decision.
     """
-    db = get_supabase_client(request)
+    db = get_request_client(request)
     if not db:
         raise HTTPException(status_code=503, detail="Database not connected.")
 
@@ -80,9 +80,9 @@ async def get_lessons(request: Request, limit: int = 20):
     Retrieve the most recent AI lessons + prediction accuracy.
     Used by build_system_prompt() and subconscious reflection.
     """
-    db = get_supabase_client(request)
+    db = get_request_client(request)
     if not db:
-        raise HTTPException(status_code=503, detail="Database not connected.")
+        return {"lessons": [], "total": 0, "prediction_accuracy_pct": None, "judged_decisions": 0}
 
     try:
         res = db.table("cortex_growth_logs") \
@@ -107,7 +107,7 @@ async def get_lessons(request: Request, limit: int = 20):
 
     except Exception as e:
         logger.error(f"[ERROR] Failed to fetch lessons: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        return {"lessons": [], "total": 0, "prediction_accuracy_pct": None, "judged_decisions": 0}
 
 
 @router.get("/analysis/scoring")
@@ -116,7 +116,7 @@ async def analyze_scoring_mismatches(request: Request, limit: int = 50):
     Analyzes historical scoring discrepancies to detect structural AI bias.
     Identifies if the AI consistently over-estimates or under-estimates scores.
     """
-    db = get_supabase_client(request)
+    db = get_request_client(request)
     if not db:
         raise HTTPException(status_code=503, detail="Database not connected.")
 

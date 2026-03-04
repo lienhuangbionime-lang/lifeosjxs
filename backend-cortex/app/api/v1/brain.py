@@ -20,8 +20,12 @@ async def get_brain_graph(http_request: Request, limit: int = 500):
 
     try:
         # 1. Fetch recent memories
-        response = db.table("memories").select("id,date,content,ai_insights,tags,mood,focus,energy").order("date", desc=True).limit(limit).execute()
-        memories = response.data or []
+        try:
+            response = db.table("memories").select("id,date,content,ai_insights,tags,mood,focus,energy").order("date", desc=True).limit(limit).execute()
+            memories = response.data or []
+        except Exception as conn_err:
+            logger.warning(f"Brain graph: DB connection failed ({conn_err}), returning empty graph.")
+            return {"nodes": [], "links": []}
 
         # 1.5 Fetch Structural Entities
         try:

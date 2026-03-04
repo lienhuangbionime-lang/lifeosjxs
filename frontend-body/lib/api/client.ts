@@ -22,17 +22,8 @@ function getUserApiHeaders(): Record<string, string> {
     const keys: Record<string, string> = parsed?.state?.apiKeys || {};
     const headers: Record<string, string> = {};
     if (keys["google_api_key"]) headers["X-Gemini-Key"] = keys["google_api_key"];
-
-    // Backend gets headers in lower case mostly, but it's safe to use exact match as in python `request.headers.get("X-Supabase-URL")`
-    // However, some proxies rewrite headers to lowercase. Let's send lowercase versions too just in case.
-    if (keys["supabase_url"]) {
-      headers["X-Supabase-URL"] = keys["supabase_url"];
-      headers["x-supabase-url"] = keys["supabase_url"]; // Fallback for case-insensitive proxies
-    }
-    if (keys["supabase_key"]) {
-      headers["X-Supabase-Key"] = keys["supabase_key"];
-      headers["x-supabase-key"] = keys["supabase_key"];
-    }
+    if (keys["supabase_url"]) headers["X-Supabase-URL"] = keys["supabase_url"];
+    if (keys["supabase_key"]) headers["X-Supabase-Key"] = keys["supabase_key"];
     return headers;
   } catch {
     return {};
@@ -116,8 +107,16 @@ export interface IngestResponse {
 
 // 自動處理 Rewrite 路徑與錯誤拋出
 async function fetchProxy<T>(endpoint: string, options?: RequestInit): Promise<T> {
-  // [Critical] Always use Next.js Rewrite to avoid CORS
-  const finalUrl = endpoint.replace(/^\/api\/v1/, "/api/py");
+  // [FIX] Next.js Proxy blocks due to un-restarted dev server. 
+  // Bypass proxy entirely for dev environment and call backend directly.
+  const isLocalDev =
+    typeof window !== "undefined" &&
+    window.location.hostname === "localhost" &&
+    !process.env.NEXT_PUBLIC_VERCEL_URL;
+
+  const finalUrl = isLocalDev
+    ? `http://127.0.0.1:8000${endpoint}` // direct to backend, avoids IPv6 proxy hang
+    : endpoint.replace(/^\/api\/v1/, "/api/py"); // production: use Next.js rewrite proxy
 
   try {
     const res = await fetch(finalUrl, {
@@ -305,8 +304,8 @@ export const cortex = {
   // 5. 專案管理 (Project Management)
   projects: {
     list: async (): Promise<any[]> => {
-      // NOTE: Using general GET for projects list
-      return await fetchProxy("/api/v1/projects/");
+      // NOTE: No trailing slash to avoid FastAPI 307 redirect bypassing proxy
+      return await fetchProxy("/api/v1/projects");
     },
     create: async (data: any): Promise<any> => {
       return await fetchProxy("/api/v1/projects", {
@@ -348,11 +347,11 @@ export const cortex = {
   // 7. 任務管理 (Task Management)
   async getTasks(projectId?: string): Promise<any[]> {
     const query = projectId ? `?project_id=${projectId}` : "";
-    return await fetchProxy(`/api/v1/tasks/${query}`);
+    return await fetchProxy(`/api/v1/tasks${query}`);
   },
 
   async createTask(title: string, projectId?: string): Promise<any> {
-    return await fetchProxy(`/api/v1/tasks/`, {
+    return await fetchProxy(`/api/v1/tasks`, {
       method: "POST",
       body: JSON.stringify({ title, project_id: projectId }),
     });

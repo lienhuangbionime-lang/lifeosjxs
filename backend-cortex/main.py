@@ -52,7 +52,8 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="LifeOS Cortex v3.8.5",
     version="3.8.5",
-    lifespan=lifespan
+    lifespan=lifespan,
+    redirect_slashes=False
 )
 
 # CORS
@@ -68,7 +69,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_headers=["*"],
+    allow_headers=["*", "X-Supabase-URL", "X-Supabase-Key", "X-Gemini-Key", "x-supabase-url", "x-supabase-key"],
 )
 
 # Include Routers

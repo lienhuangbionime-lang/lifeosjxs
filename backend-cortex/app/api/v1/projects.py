@@ -23,20 +23,26 @@ class ProjectCreate(BaseModel):
 class ProjectMerge(BaseModel):
     target_id: str
 
-@router.get("/")
+@router.get("")
 async def list_projects(request: Request, status: Optional[str] = None):
+    import logging
+    logger = logging.getLogger("cortex.projects")
     db = get_request_client(request)
     if not db:
-        raise HTTPException(status_code=503, detail="Database unavailable")
-        
-    query = db.table("projects").select("*")
-    if status:
-        query = query.eq("status", status)
-    
-    response = query.order("created_at", desc=True).execute()
-    return response.data
+        return []
 
-@router.post("/")
+    try:
+        query = db.table("projects").select("*")
+        if status:
+            query = query.eq("status", status)
+
+        response = query.order("created_at", desc=True).execute()
+        return response.data or []
+    except Exception as e:
+        logger.error(f"Failed to list projects: {e}")
+        return []
+
+@router.post("")
 async def create_project(project: ProjectCreate, request: Request):
     db = get_request_client(request)
     if getattr(db, "_is_guest_mode", False):

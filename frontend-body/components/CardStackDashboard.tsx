@@ -360,7 +360,7 @@ export const CardStackDashboard = ({ logs = [], onNavigate }: CardStackDashboard
                         animate={{ opacity: 1, x: 0, scale: 1 }}
                         exit={{ opacity: 0, x: -100, scale: 0.95 }}
                         transition={{ type: "spring", stiffness: 300, damping: 30 }}
-                        className={`absolute inset-0 bg-gradient-to-br ${CARDS[currentIndex].gradient} backdrop-blur-xl rounded-3xl border border-slate-700/50 shadow-2xl p-6 cursor-grab active:cursor-grabbing touch-none`}
+                        className={`absolute inset-0 bg-gradient-to-br ${CARDS[currentIndex].gradient} backdrop-blur-xl rounded-3xl border border-slate-700/50 shadow-2xl p-6 cursor-grab active:cursor-grabbing`}
                     >
                         {/* Card Header */}
                         <div className="flex items-center justify-between mb-6">
@@ -383,8 +383,8 @@ export const CardStackDashboard = ({ logs = [], onNavigate }: CardStackDashboard
                             </div>
                         </div>
 
-                        {/* Card Content */}
-                        <div className="h-[calc(100%-80px)] overflow-hidden">
+                        {/* Card Content - scrollable vertically */}
+                        <div className="h-[calc(100%-80px)] overflow-y-auto overscroll-contain">
                             {renderCardContent(CARDS[currentIndex].id)}
                         </div>
                     </motion.div>

@@ -1,7 +1,6 @@
 'use client';
 import React, { useEffect, useState } from 'react';
 import { Plus } from 'lucide-react';
-import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { Project } from '@/lib/types/api-schema';
 import { ProjectCard } from './ProjectCard';
 import { ProjectDetailPanel } from './ProjectDetailPanel';
@@ -14,7 +13,6 @@ interface ProjectBoardProps {
 }
 
 export const ProjectBoard = ({ onCreateProject, incomingProject, onJumpToGraph }: ProjectBoardProps) => {
-    const supabase = createClientComponentClient();
     const [projects, setProjects] = useState<Project[]>([]);
     const [loading, setLoading] = useState(true);
     const [filter, setFilter] = useState<'all' | 'active' | 'archived' | 'idea' | 'completed'>('active');
@@ -49,20 +47,7 @@ export const ProjectBoard = ({ onCreateProject, incomingProject, onJumpToGraph }
 
     useEffect(() => {
         fetchProjects();
-
-        // Realtime Subscription
-        const channel = supabase
-            .channel('realtime projects')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'projects' }, (payload) => {
-                console.log('Realtime change:', payload);
-                fetchProjects();
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [supabase]);
+    }, []);
 
     useEffect(() => {
         if (incomingProject) {

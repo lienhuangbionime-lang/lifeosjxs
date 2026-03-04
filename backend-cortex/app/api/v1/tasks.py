@@ -29,7 +29,7 @@ class TaskCreate(BaseModel):
 
 # --- Endpoints ---
 
-@router.get("/", response_model=List[Task])
+@router.get("", response_model=List[Task])
 async def get_tasks(project_id: Optional[str] = None, all: bool = False):
     """List tasks. Defaults to 'todo' status unless 'all=true'."""
     query = supabase.table("tasks").select("*")
@@ -45,7 +45,7 @@ async def get_tasks(project_id: Optional[str] = None, all: bool = False):
     res = query.order("created_at", desc=True).execute()
     return res.data
 
-@router.post("/")
+@router.post("")
 async def create_task(task: TaskCreate):
     """Create a new task."""
     data = {

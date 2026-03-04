@@ -75,7 +75,7 @@ export function KeyGate({ children }: KeyGateProps) {
 
         try {
             // Quick connectivity test: hit /status endpoint with user keys
-            const res = await fetch('/api/py/status', {
+            const res = await fetch('/api/py/system/status', {
                 headers: {
                     'X-Gemini-Key': form.google_api_key,
                     'X-Supabase-URL': form.supabase_url,

@@ -45,7 +45,7 @@ async def create_memory_entry(content: str, source: str = "system", tags: List[s
 
 # --- Endpoints ---
 
-@router.post("/", response_model=dict)
+@router.post("", response_model=dict)
 async def add_memory(entry: LogEntrySchema, request: Request):
     """
     Manual memory insertion endpoint.
@@ -63,7 +63,7 @@ async def add_memory(entry: LogEntrySchema, request: Request):
     )
     return {"success": True, "data": data}
 
-@router.get("/", response_model=List[LogEntrySchema])
+@router.get("", response_model=List[LogEntrySchema])
 async def get_recent_memories(
     request: Request,
     limit: int = 20,
@@ -128,7 +128,7 @@ async def get_recent_memories(
                 
                 # [Phase F] Guest Mode Constraint Lock
                 if is_guest:
-                    sql_query = sql_query.eq("is_private", False).eq("category", "Project")
+                    sql_query = sql_query.or_("is_private.eq.false,is_private.is.null")
                     
                 result = sql_query.order("date", desc=True).limit(limit).execute()
                 return result
@@ -161,8 +161,8 @@ async def get_recent_memories(
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Unexpected error fetching memories: %s", e)
-        raise HTTPException(status_code=500, detail="Unexpected error fetching memories")
+        logger.warning("Memories fetch failed (likely connection issue): %s", e)
+        return []
 
 
 # --- Monthly Review Endpoints ---
