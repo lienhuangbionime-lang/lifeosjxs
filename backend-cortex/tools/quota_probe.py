@@ -44,6 +44,11 @@ def rank_model(name: str) -> float:
         if ver in name:
             score += pts
             break
+    
+    # [v5.6] Alias support
+    if "latest" in name:
+        if "pro" in name: score += 85 # Pro-latest is usually 1.5 or 1.0 Pro
+        elif "flash" in name: score += 75 # Flash-latest is usually 1.5 Flash
     # Modifiers
     if "lite" in name or "nano" in name:
         score -= 10

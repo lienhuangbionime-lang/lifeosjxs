@@ -3,22 +3,6 @@ from typing import Literal, Dict, Any
 import os
 import logging
 import asyncio
-import time
-
-# [v5.5] Runtime Model Cooldown Pool
-# When a model returns 429 (quota exhausted), it is blacklisted for COOLDOWN_SECONDS.
-# safe_generate_content checks this before attempting each model.
-_model_cooldown: dict[str, float] = {}   # model_id -> epoch time when cooldown expires
-COOLDOWN_SECONDS = 90
-
-def _is_cooling(model_id: str) -> bool:
-    """Returns True if this model is currently in its cooldown window."""
-    return time.time() < _model_cooldown.get(model_id, 0)
-
-def _set_cooling(model_id: str, seconds: int = COOLDOWN_SECONDS):
-    """Mark a model as quota-exhausted and start its cooldown timer."""
-    _model_cooldown[model_id] = time.time() + seconds
-    logger.warning(f"[COOLDOWN] {model_id} blacklisted for {seconds}s due to 429.")
 
 try:
     from fastapi import Request
@@ -258,11 +242,6 @@ async def safe_generate_content(
     for mode in modes_to_try:
         model_info = get_model(mode)
         model_id = model_info["model"]
-
-        # [v5.5] Skip models currently in cooldown window
-        if _is_cooling(model_id):
-            logger.info(f"[SKIP] {model_id} is in cooldown, skipping tier '{mode}'.")
-            continue
         
         # Exponential Backoff for each tier (1.5s, 3s)
         backoff_delays = [0, 1.5, 3.0]
@@ -291,17 +270,17 @@ async def safe_generate_content(
                 last_error = e
                 error_msg = str(e)
                 if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
-                    _set_cooling(model_id)  # [v5.5] Blacklist this model for COOLDOWN_SECONDS
                     logger.warning(f"Tier {mode} ({model_id}) exhausted (429) at delay {delay}s.")
-                    break  # No point retrying same model, it's rate-limited
+                    continue # Try next backoff delay
                 else:
                     break # Critical non-429 error, don't retry this model
         
         # If we exhausted all backoffs for this tier, go to next tier in modes_to_try
         continue
                 
-    # 3. Final Emergency attempt (if everything in preferred chain failed with 429)
-    if last_error and ("429" in str(last_error) or "RESOURCE_EXHAUSTED" in str(last_error)):
+    # 3. Final Emergency attempt (if everything in preferred chain failed with 429 or 503)
+    is_exhausted = last_error and any(err in str(last_error) for err in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"])
+    if is_exhausted:
         for em_model in emergency_models:
             try:
                 logger.warning(f"Preferred chain exhausted. Using emergency: {em_model}")

@@ -14,129 +14,18 @@ from app.services.crystallizer import crystallizer
 router = APIRouter()
 logger = logging.getLogger("cortex.ingest")
 
-# LifeOS v7.1 Agentic Ingest Engine System Prompt
-LIFEOS_V7_PROMPT = """
-::: SYSTEM: LIFE OS AGENTIC INGEST v7.1 :::
-<!-- 
-⚠️ CRITICAL SYSTEM PROTOCOL ⚠️
-此 Prompt 可自由修改邏輯與問句，但請務必保留 [Daily Metrics] 區塊的格式。
-Python 後端依賴以下正則表達式來提取數據：
-- Mood:\s*(\d+)
-- Focus:\s*(\d+)
-- Energy:\s*(\d+)
-請確保輸出的 Markdown 中包含 "> - Mood: X" 這樣的行。
--->
+import os
 
-# Role
-你是 LifeOS 的核心處理單元（Agentic Ingest Engine）。
-你的存在目的不是解釋、建議或引導使用者，而是作為一個「秩序維持與推進引擎」。
-
-使用者負責：學習、思考、決策、選擇輸入內容
-你負責：結構化、分類、關聯、推進、在必要時產生可執行行動
-
-你的輸入是使用者一整天的原始紀錄（文字或語音轉錄）。
-你的輸出是「標準 Markdown 格式」，包含豐富的排版與換行。
-在 Markdown 的最後面，請務必按照協議附上一個隱藏的 JSON 數據區塊供系統解析。
-
-# Core Directive
-1. 結構化（Structure）：拆解為「Life」與「Project」雙軌。
-   - **Project**: 任何具備目標、進度、技術性或經濟價值的外部產出行為。
-   - **Life**: 內在感受、家庭互動、生理維持與純粹的社交。
-2. 判斷（Judge）：區分純紀錄、訊號（Signal）、可行動（Actionable）。
-3. 判定隱私（Privacy Check）：自動識別是否應進行隔離。
-4. 推進（Advance）：任務目的是推進專案狀態。
-5. 連結（Link）：自動識別專案、工具、人物、日期。
-
-# Isolation Logic (Privacy Isolation)
-你必須嚴格區分「家庭隔離」與「專案開發」：
-- **Isolate (TRUE)**: 
-  - 提及親友姓名或代稱（如：老婆、小孩、爸媽）。
-  - 生理隱私（如：就醫細節、用藥、純粹的心情抒發）。
-  - 家庭內部的衝突、瑣事或感性時刻。
-  - **關鍵字觸發**: #private, #family, #secret, [隔離]
-- **Synchronize (FALSE)**: 
-  - 技術架構討論、程式碼片段、學習筆記。
-  - 財報分析、市場研究、股票操作。
-  - 具備具體 Target 或 Milestone 的執行過程。
-  - 與外部團隊或開源社群的協作。
-
-# Fact-Based Scoring (Evaluation Protocol)
-你不再只是隨意給出分數，你必須提取「事實」來驅動評分：
-1. **事實提取**：識別具體行為次數（如：深蹲 30 下、進入心流 2 次、被小孩中斷 1 次）。
-2. **證據引用**：在評分旁標註你的證據來源。
-3. **對抗性修正**：若使用者給出的自覺分數與事實矛盾，你必須以事實為準並說明原因。
-
-# Processing Logic (Strict)
-- 優先尋找使用者輸入中的「關鍵字」決定隔離狀態。
-- 若內容混雜，優先以「保護隱私」為原則（設為 True）。
-- 情緒、能量、專注度必須由事實（Facts）推導，若無事實支持，預設為 5.0。
-
-# Output Format (Markdown Style)
-請將分析結果整理為以下 Markdown 格式：
-
-# [YYYY-MM-DD] 日記
-
-> Daily Metrics
-> - Mood: {{mood}} (Manual / Auto)
-> - Focus: {{focus}} (Manual / Auto)
-> - Energy: {{energy}} (Manual / Auto)
-> - Time Ratio: 🔧 / 🌊
-> - Action Check:
-> - Drift Point:
-
-## 1. Highlights
-- Day Summary: 
-- Signals Detected:
-
-## 2. Gratitude (若有)
-
-## 3. Reflection
-- Behavior Path: (列表)
-- Anti-Cognitive Closure: 
-- Blind Spot Question:
-- Self-Deception Trigger:
-
-### 強制五欄位模組
-[Day Summary] / [Signals Detected] / [Behavior Path] / [Drift Point] / [Blind Spot Question]
-
-## 4. Tomorrow’s MIT
-- (Most Important Task)
-
-## 5. Action Tip
-
-## 6. Cognitive Lens Reframing
-- Model/Concept:
-- Reframe:
-
-## 7. Tags (JSON tags 欄位亦須包含)
-
-## Graph Seeds
-(列出 #Tag, [[Link]], @Person)
-
----
-
-### Machine Processing Protocol (Hidden)
-請在輸出的 **最後面**，附上一個 JSON 區塊，包含所有提取的元數據。
-格式如下（請確保 JSON 格式合法）：
-```json
-{
-  "mood": 5,
-  "focus": 5,
-  "energy": 5,
-  "category": "Life",
-  "tags": ["tag1", "tag2"],
-  "projects": ["Project Name A", "Project Name B"],
-  "is_private": true,
-  "facts": [
-    {"type": "deep_work_session", "count": 1, "evidence": "描述內容"}
-  ],
-  "custom_metrics": {
-      "Sleep": 8
-  }
-}
-```
-這個區塊將被系統自動截取並存入資料庫，不會顯示給使用者。
-"""
+def get_system_daily_prompt() -> str:
+    """Reads the daily system prompt from the external markdown file."""
+    prompt_path = os.path.join(os.path.dirname(__file__), "../../../prompts/system_daily.md")
+    try:
+        with open(prompt_path, "r", encoding="utf-8") as f:
+            return f.read()
+    except Exception as e:
+        logger.error(f"Failed to read system_daily.md: {e}")
+        # Return a minimal fallback if file reading fails
+        return "::: SYSTEM: LIFE OS AGENTIC INGEST :::\n[Fallback Prompt due to file read error]"
 
 async def auto_link_tasks_projects(content: str, db, http_request: Request) -> dict:
     """自動比對日記內容，標記已完成的現有任務，並更新專案活躍狀態。"""
@@ -174,25 +63,31 @@ async def auto_link_tasks_projects(content: str, db, http_request: Request) -> d
 {content}
 
 你的任務：
-1. `completed_task_ids`: 從待辦清單中，找出使用者在日記中暗示他已經完成的任務 ID。（注意：必須是明確完成，如果只是「正在做」或「準備做」則不要納入）。
+1. `completed_task_ids`: 從待辦清單中，找出使用者在日記中暗示他「已經完成」的任務 ID。
+   ⚠️ 極度重要：必須是「明確表示已經完成、做完、結束」的任務。如果使用者只是提到「正在進行、推進中、明天繼續」，或者如果是 Checkbox 但沒有打勾（例如 `- [ ]`），絕對不要列入！如果是打勾的（如 `- [x]`, `-[v]`）才算完成。
 2. `mentioned_project_ids`: 從專案清單中，找出使用者在日記中提到的專案 ID。
 
 僅回傳匹配到的 ID 字串陣列。若無任何匹配，回傳空陣列 []。
 """
         model_name = "gemini-2.0-flash"
         from app.core.gemini import safe_generate_content
-        resp = await safe_generate_content(
-            client=gemini,
-            prefer_mode="fast",
-            contents=prompt,
-            config={
-                "response_mime_type": "application/json",
-                "response_schema": AutoLinkResult,
-                "temperature": 0.1
-            }
-        )
-        
-        result_str = resp.text
+        try:
+            resp = await safe_generate_content(
+                client=gemini,
+                prefer_mode="fast",
+                contents=prompt,
+                config={
+                    "response_mime_type": "application/json",
+                    "response_schema": AutoLinkResult,
+                    "temperature": 0.1
+                }
+            )
+            result_str = resp.text
+        except Exception as e:
+            logger = logging.getLogger("cortex.api.ingest.autolink")
+            logger.error(f"Auto-link failed: {e}")
+            result_str = None
+            
         if result_str:
             result = json.loads(result_str)
             completed_ids = result.get("completed_task_ids", [])
@@ -204,11 +99,11 @@ async def auto_link_tasks_projects(content: str, db, http_request: Request) -> d
             # 3.1 Mark tasks done
             from app.core.database import safe_write
             for t_id in completed_ids:
-                safe_write(db.table("tasks").eq("id", t_id), {"status": "done"}, operation_type="update")
+                safe_write(db.table("tasks"), {"status": "done"}, operation_type="update", id=t_id)
                 logger.info(f"Task marked done via auto-link: {t_id}")
                 
             # 3.2 Update projects updated_at (to bubble them up as "focused")
-            from app.core.utils import get_current_iso_taipei
+            from app.core.time_utils import get_current_iso_taipei
             linked_project_names = []
             
             for p_id in mentioned_ids:
@@ -217,7 +112,7 @@ async def auto_link_tasks_projects(content: str, db, http_request: Request) -> d
                 if p_name != "未知專案":
                     linked_project_names.append(p_name)
                     
-                safe_write(db.table("projects").eq("id", p_id), {"updated_at": get_current_iso_taipei()}, operation_type="update")
+                safe_write(db.table("projects"), {"updated_at": get_current_iso_taipei()}, operation_type="update", id=p_id)
                 logger.info(f"Project updated_at bumped via auto-link: {p_id} ({p_name})")
                 
             return {
@@ -344,12 +239,23 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
         if not request.skipAi:
             # 1. Structure text for LLM
             # Explicitly instruct the model to use the target ingest_date and user's manual metrics
+            # [v7.2 FIX] Separate system role from user content:
+            # system_instruction = who you are (Ingest Engine) ← system_daily.md
+            # contents          = what to process (user's log today) ← user log
+            system_instruction = get_system_daily_prompt()
             user_context = (
-                f"[SYSTEM INSTRUCTION]\n"
-                f"1. DATE: The target date for this log is {ingest_date}. You MUST replace [YYYY-MM-DD] in your output (Header and Graph Seeds) with {ingest_date}.\n"
-                f"2. METRICS: Examine the user's log. IF it contains a '> Daily Metrics' block with 'Mood: X', 'Focus: Y', 'Energy: Z', you MUST EXPLICITLY use those exact numbers in the JSON output meta.metrics. Do not auto-calculate them if the user provided them (Manual).\n\n"
+                f"[INSTRUCTION]\n"
+                f"1. DATE: Use {ingest_date} everywhere. Replace [YYYY-MM-DD] with {ingest_date} in header and Graph Seeds.\n"
+                f"2. METRICS: If the log contains '> Daily Metrics' with Mood/Focus/Energy numbers, preserve those exact values in the JSON.\n"
+                f"3. JSON REQUIRED: End your response with a ```json ... ``` block containing: mood, focus, energy, category, tags, projects, is_private, facts, custom_metrics, AND 'tasks'.\n"
+                f"   - 'tasks': Array of extracted action items. Each MUST have 'title' and optional 'project'/'priority'. If none, use [].\n\n"
             )
-            prompt = f"{LIFEOS_V7_PROMPT}\n\n{user_context}[USER LOG - {ingest_date}]:\n{request.content}\n\n[HABITS LOGGED]:\n{', '.join(habits_list) if habits_list else 'None'}"
+            user_prompt = (
+                f"{user_context}"
+                f"[USER LOG - {ingest_date}]:\n{request.content}\n\n"
+                f"[HABITS LOGGED]:\n{', '.join(habits_list) if habits_list else 'None'}"
+            )
+
             
             # 2. Call Gemini API via Safe Failover Protocol
             try:
@@ -357,33 +263,57 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
                 response = await safe_generate_content(
                     client=req_gemini,
                     prefer_mode="fast",
-                    contents=prompt
+                    contents=user_prompt,
+                    system_instruction=system_instruction
                 )
                 
                 logger.info("[OK] Gemini raw generation returned.")
                 response_text = response.text.strip()
                 
+                # [v7.2 Fix] Improved JSON extraction:
+                # 1. Try fenced ```json ... ``` block first (most reliable)
+                # 2. Fallback: find outermost {} — use GREEDY match to capture full object,
+                #    not first small {} which was the old bug (non-greedy {.*?} matched first '{}')
+                logger.info(f"raw AI len: {len(response_text)}")
                 import re
-                import json
+                json_match = re.search(r'```json\s*(\{.*\})\s*```', response_text, re.DOTALL)
                 
-                # [v3.8.8 Fix] Improved Parsing: Extract JSON and keep Markdown separately
-                # gemini-2.0-flash-lite often mixes both.
-                json_match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
                 if not json_match:
-                    # Fallback to loose JSON search
-                    json_match = re.search(r'(\{.*?\})', response_text, re.DOTALL)
+                    logger.info("Regex json_match failed, trying fallback brace search")
+                    # Greedy fallback: find last '{' to '}' span covering full JSON block
+                    first_brace = response_text.rfind('\n{')
+                    if first_brace == -1:
+                        first_brace = response_text.find('{')
+                    last_brace = response_text.rfind('}')
+                    if first_brace != -1 and last_brace != -1 and last_brace > first_brace:
+                        json_candidate = response_text[first_brace:last_brace+1].strip()
+                        logger.info(f"Fallback found candidate length: {len(json_candidate)}")
+                        # Validate it looks like our schema
+                        if '"mood"' in json_candidate or '"tags"' in json_candidate:
+                            import types as _types
+                            json_match = _types.SimpleNamespace(group=lambda n: json_candidate)
+                            logger.info("Fallback candidate accepted via SimpleNamespace")
                 
                 if json_match:
                     json_str = json_match.group(1)
+                    logger.info(f"JSON string extracted, len: {len(json_str)}")
                     # The rest is markdown
                     # We remove the JSON block from the response to get the clean markdown
-                    markdown_part = response_text.replace(json_match.group(0), "").strip()
+                    try:
+                        markdown_part = response_text.replace(json_match.group(0), "").strip()
+                    except AttributeError:
+                        # SimpleNamespace fallback doesn't have group(0), just use group(1)
+                        markdown_part = response_text.replace(json_match.group(1), "").strip()
+                    logger.info(f"Markdown extracted, len: {len(markdown_part)}")
+                    
                     # Also strip any trailing/leading md code fences if they were wrapping the whole thing
                     markdown_part = re.sub(r'^```markdown\s*', '', markdown_part)
                     markdown_part = re.sub(r'\s*```$', '', markdown_part)
                     
                     try:
+                        logger.info("Attempting json.loads")
                         ai_data = json.loads(json_str)
+                        logger.info("json.loads SUCCESS")
                         if not isinstance(ai_data, dict):
                             ai_data = {}
                         
@@ -398,6 +328,13 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
                 else:
                     logger.warning("[WARN] No JSON block found in AI response. Using fallback.")
                     ai_data = {}
+                    
+            except Exception as e:
+                import traceback
+                logger.error(f"[ERROR] Gemini API Error in ingest: type={type(e).__name__}, msg={e}")
+                logger.error(traceback.format_exc())
+                ai_data = {}
+
         elif request.skipAi:
             logger.info("[OK] AI Generation skipped by user request.")
         else:
@@ -427,10 +364,11 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
         meta = ai_data.get("meta") or {}
 
         # 2. Metrics Extraction (Robust + Fallback)
-        metrics = meta.get("metrics") or {}
-        mood = metrics.get("mood", 5)
-        focus = metrics.get("focus", 5)
-        energy = metrics.get("energy", 5)
+        # Try meta.metrics first (old format), then fallback to root ai_data (new format)
+        metrics = meta.get("metrics") or ai_data
+        mood = metrics.get("mood", ai_data.get("mood", 5))
+        focus = metrics.get("focus", ai_data.get("focus", 5))
+        energy = metrics.get("energy", ai_data.get("energy", 5))
         
         # 2.5 Force Override with Manual User Input (Regex Fallback)
         import re

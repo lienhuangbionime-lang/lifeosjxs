@@ -6,7 +6,7 @@ import logging
 import json
 import asyncio
 from pathlib import Path
-from app.core.gemini import get_model, gemini_client, get_request_gemini_client
+from app.core.gemini import get_model, gemini_client, get_request_gemini_client, get_discovery_service, sanitize_model_name
 from app.services.skills import orchestrator
 from app.services.search import search_web, format_search_results
 from google import genai
@@ -501,13 +501,18 @@ Type: {url_data.get("type", 'webpage')}
                     if "429" in str(e) or "ResourceExhausted" in str(e) or "quota" in str(e).lower():
                          logger.warning(f"⚠️ Quota Exceeded for {model_name}. Attempting fallback to Fast model.")
                          yield "\n\n*(Capacity Reached. Switching to High-Efficiency mode...)*\n\n"
-                         # Fallback Logic: Try a chain of verified models (v4.2 Ground Truth)
-                         fallbacks = [
-                             sanitize_model_name("gemini-2.0-flash-lite"),
-                             sanitize_model_name("gemini-2.5-flash"),
-                             sanitize_model_name("gemini-2.0-flash"),
-                             sanitize_model_name("gemini-flash-lite-latest"),
-                         ]
+                         # Fallback Logic: Dynamically source from registry (v5.6 Veto-Aligned)
+                         try:
+                             discovery = get_discovery_service()
+                             fallbacks = (
+                                 discovery.verified_models.get("fast", []) +
+                                 discovery.verified_models.get("smart", [])
+                             )
+                             # Remove current model to avoid infinite retry
+                             fallbacks = [m for m in fallbacks if sanitize_model_name(m) != model_name]
+                         except Exception:
+                             # Last-resort fallback to a minimal safe model string if registry fails
+                             fallbacks = ["models/gemini-3-flash-preview"]
                          
                          success_fallback = False
                          for fallback_name in fallbacks:

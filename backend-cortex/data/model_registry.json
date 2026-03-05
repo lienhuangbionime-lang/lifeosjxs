@@ -2,27 +2,27 @@
   "verified_models": {
     "fast": [
       "models/gemini-3.1-flash-lite-preview",
-      "models/gemini-3-flash-preview"
+      "models/gemini-3-flash-preview",
+      "models/gemini-flash-latest",
+      "models/gemini-flash-lite-latest"
     ],
     "smart": []
   },
   "quota_exhausted": {
     "fast": [
-      "models/gemini-3.1-flash-image-preview",
-      "models/gemini-2.5-flash-preview-tts",
-      "models/gemini-2.5-flash-native-audio-preview-09-2025",
-      "models/gemini-2.5-flash-native-audio-preview-12-2025"
+      "models/gemini-2.5-flash-native-audio-latest",
+      "models/gemini-3.1-flash-image-preview"
     ],
     "smart": [
       "models/gemini-3.1-pro-preview",
       "models/gemini-3.1-pro-preview-customtools",
-      "models/gemini-3-pro-preview",
-      "models/gemini-3-pro-image-preview"
+      "models/gemini-pro-latest",
+      "models/gemini-3-pro-preview"
     ]
   },
   "pending_models": {
     "fast": [],
     "smart": []
   },
-  "last_discovery": "2026-03-04T02:24:08.720514"
+  "last_discovery": "2026-03-06T02:31:48.179813"
 }

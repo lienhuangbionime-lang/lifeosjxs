@@ -1,0 +1,39 @@
+{
+  "id": "d6aa1a20-85a6-402f-8769-59d8c23d7e8d",
+  "date": "2026-03-04",
+  "entries": [
+    {
+      "time": "2026-03-06T01:54:30.336092+08:00",
+      "content": "# [2026-03-04] 日記\n\n> Daily Metrics\n> - Mood: 6 (Auto)\n> - Focus: 7 (Auto)\n> - Energy: 6 (Auto)\n> - Time Ratio: 🌊 80% / 🔧 20%\n> - Action Check: 1/1\n> - Drift Point: 0\n\n## 1. Highlights\n- **Day Summary**: 今日核心活動為「越南酸菜發酵狀態檢查」。將此活動定義為食品工程實驗的子專案，並成功執行檢查流程，具備明確的物理狀態反饋。\n- **Signals Detected**: 實驗對象（酸菜）處於穩定的發酵週期，具備進入下一步量化紀錄的條件。\n\n## 2. Gratitude (若有)\n- N/A\n\n## 3. Reflection\n- **Behavior Path**: \n  - 任務啟動 -> 現場檢視 -> 狀態確認 -> 數據歸檔。\n- **Anti-Cognitive Closure**: 透過將家務儀式化與科學化，成功避免了瑣碎行為的無效化，維持了觀察的連續性。\n- **Blind Spot Question**: 是否過度關注「當下狀態」而忽略了「環境變數」（如室溫與濕度）對發酵曲線的隱性影響？\n- **Self-Deception Trigger**: 是否會因為流程順暢而產生「我已經精通發酵」的錯覺，進而停止尋找進階的控制變數？\n\n### 強制五欄位模組\n- [Day Summary]: 完成越南酸菜發酵狀態檢測。\n- [Signals Detected]: 發酵進度正常，可進入數據紀錄階段。\n- [Behavior Path]: 檢查任務啟動 -> 現場觀測 -> 結果歸檔。\n- [Drift Point]: 專注於單一目標，無偏移。\n- [Blind Spot Question]: 是否缺乏對環境變數（溫濕度）的客觀監控與記錄？\n\n## 4. Tomorrow’s MIT\n- 針對越南酸菜進行 pH 值檢測與溫度記錄，建立專案數據矩陣。\n\n## 5. Action Tip\n- 引入「實驗日誌」格式，記錄時間戳記、pH 值與氣味特徵，確保實驗的可重現性。\n\n## 6. Cognitive Lens Reframing\n- **Model/Concept**: 迭代式開發 (Iterative Development)\n- **Reframe**: 家務不僅是勞動，而是將「生活空間」當作「實驗室」的長期專案。每一次的調整（pH值紀錄）都是對系統穩定性的加固。\n\n## 7. Tags\n#ProjectFood, #ExperimentalLiving, #SystemMaintenance\n\n## Graph Seeds\n- #ProjectFood\n- [[越南酸菜實驗]]\n- @Laboratory\n\n---\n\n### Machine Processing Protocol (Hidden)",
+      "ai_processed": "# [[2026-03-04]] 日記\n\n> Daily Metrics\n> - Mood: 6 (Auto)\n> - Focus: 7 (Auto)\n> - Energy: 6 (Auto)\n> - Time Ratio: 🌊 80% / 🔧 20%\n> - Action Check: 1/1\n> - Drift Point: 0\n\n## 1. Highlights\n- Day Summary: 今日核心活動為「越南酸菜發酵狀態檢查」。將此活動定義為食品工程實驗的子專案，並成功執行檢查流程，具備明確的物理狀態反饋。\n- Signals Detected: 實驗對象（酸菜）處於穩定的發酵週期，具備進入下一步量化紀錄的條件。\n\n## 2. Gratitude (若有)\n- N/A\n\n## 3. Reflection\n- Behavior Path: \n  - 任務啟動 -> 現場檢視 -> 狀態確認 -> 數據歸檔。\n- Anti-Cognitive Closure: 透過將家務儀式化與科學化，成功避免了瑣碎行為的無效化，維持了觀察的連續性。\n- Blind Spot Question: 是否過度關注「當下狀態」而忽略了「環境變數」（如室溫與濕度）對發酵曲線的隱性影響？\n- Self-Deception Trigger: 是否會因為流程順暢而產生「我已經精通發酵」的錯覺，進而停止尋找進階的控制變數？\n\n### 強制五欄位模組\n- [Day Summary]: 完成越南酸菜發酵狀態檢測。\n- [Signals Detected]: 發酵進度正常，可進入數據紀錄階段。\n- [Behavior Path]: 檢查任務啟動 -> 現場觀測 -> 結果歸檔。\n- [Drift Point]: 專注於單一目標，無偏移。\n- [Blind Spot Question]: 是否缺乏對環境變數（溫濕度）的客觀監控與記錄？\n\n## 4. Tomorrow’s MIT\n- 針對越南酸菜進行 pH 值檢測與溫度記錄，建立專案數據矩陣。\n\n## 5. Action Tip\n- 引入「實驗日誌」格式，記錄時間戳記、pH 值與氣味特徵，確保實驗的可重現性。\n\n## 6. Cognitive Lens Reframing\n- Model/Concept: 迭代式開發 (Iterative Development)\n- Reframe: 家務不僅是勞動，而是將「生活空間」當作「實驗室」的長期專案。每一次的調整（pH值紀錄）都是對系統穩定性的加固。\n\n## 7. Tags (JSON tags 欄位亦須包含)\n#ProjectFood, #ExperimentalLiving, #SystemMaintenance\n\n## Graph Seeds\n- #ProjectFood\n- [[越南酸菜實驗]]\n- @Laboratory\n- [[2026-03-04]]\n\n---",
+      "metadata": {
+        "mood": 6,
+        "focus": 7,
+        "energy": 6,
+        "tags": [
+          "ProjectFood",
+          "ExperimentalLiving",
+          "SystemMaintenance"
+        ],
+        "is_ai": true,
+        "ai_model": "models/gemini-3.1-flash-lite-preview",
+        "is_private": false,
+        "category": "Project",
+        "facts": [
+          {
+            "type": "experiment_check",
+            "count": 1,
+            "evidence": "執行越南酸菜發酵狀態檢查，並完成數據歸檔"
+          }
+        ],
+        "custom_metrics": {
+          "Time_Ratio_Wave": 0.8,
+          "Time_Ratio_Tool": 0.2
+        }
+      }
+    }
+  ],
+  "combined_content": "# [2026-03-04] 日記\n\n> Daily Metrics\n> - Mood: 6 (Auto)\n> - Focus: 7 (Auto)\n> - Energy: 6 (Auto)\n> - Time Ratio: 🌊 80% / 🔧 20%\n> - Action Check: 1/1\n> - Drift Point: 0\n\n## 1. Highlights\n- **Day Summary**: 今日核心活動為「越南酸菜發酵狀態檢查」。將此活動定義為食品工程實驗的子專案，並成功執行檢查流程，具備明確的物理狀態反饋。\n- **Signals Detected**: 實驗對象（酸菜）處於穩定的發酵週期，具備進入下一步量化紀錄的條件。\n\n## 2. Gratitude (若有)\n- N/A\n\n## 3. Reflection\n- **Behavior Path**: \n  - 任務啟動 -> 現場檢視 -> 狀態確認 -> 數據歸檔。\n- **Anti-Cognitive Closure**: 透過將家務儀式化與科學化，成功避免了瑣碎行為的無效化，維持了觀察的連續性。\n- **Blind Spot Question**: 是否過度關注「當下狀態」而忽略了「環境變數」（如室溫與濕度）對發酵曲線的隱性影響？\n- **Self-Deception Trigger**: 是否會因為流程順暢而產生「我已經精通發酵」的錯覺，進而停止尋找進階的控制變數？\n\n### 強制五欄位模組\n- [Day Summary]: 完成越南酸菜發酵狀態檢測。\n- [Signals Detected]: 發酵進度正常，可進入數據紀錄階段。\n- [Behavior Path]: 檢查任務啟動 -> 現場觀測 -> 結果歸檔。\n- [Drift Point]: 專注於單一目標，無偏移。\n- [Blind Spot Question]: 是否缺乏對環境變數（溫濕度）的客觀監控與記錄？\n\n## 4. Tomorrow’s MIT\n- 針對越南酸菜進行 pH 值檢測與溫度記錄，建立專案數據矩陣。\n\n## 5. Action Tip\n- 引入「實驗日誌」格式，記錄時間戳記、pH 值與氣味特徵，確保實驗的可重現性。\n\n## 6. Cognitive Lens Reframing\n- **Model/Concept**: 迭代式開發 (Iterative Development)\n- **Reframe**: 家務不僅是勞動，而是將「生活空間」當作「實驗室」的長期專案。每一次的調整（pH值紀錄）都是對系統穩定性的加固。\n\n## 7. Tags\n#ProjectFood, #ExperimentalLiving, #SystemMaintenance\n\n## Graph Seeds\n- #ProjectFood\n- [[越南酸菜實驗]]\n- @Laboratory\n\n---\n\n### Machine Processing Protocol (Hidden)",
+  "created_at": "2026-03-06T01:54:30.336092+08:00",
+  "updated_at": "2026-03-06T01:54:30.336092+08:00"
+}

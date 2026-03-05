@@ -93,11 +93,11 @@ Output JSON: {"prompts": ["Q1", "Q2", "Q3"]}'''
                 client=gemini_client,
                 prefer_mode="fast",
                 contents=full_context,
-                config=types.GenerateContentConfig(
-                    system_instruction=sys_prompt,
-                    response_mime_type="application/json",
-                    temperature=0.7
-                )
+                config={
+                    "system_instruction": sys_prompt,
+                    "response_mime_type": "application/json",
+                    "temperature": 0.7
+                }
             )
             
             result_json = json.loads(ai_res.text.strip())

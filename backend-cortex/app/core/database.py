@@ -69,14 +69,22 @@ def safe_write(table_query, payload: dict, operation_type: str = "insert", max_r
     logger = logging.getLogger("cortex.database")
     
     current_payload = dict(payload)
+    item_id = kwargs.pop("id", None)
+    
     for attempt in range(max_retries):
         try:
             if operation_type == "insert":
                 return table_query.insert(current_payload).execute()
             elif operation_type == "upsert":
+                # For upsert, we don't usually use .eq() since it uses unique constraints (e.g. 'on_conflict')
+                # But if an ID is provided, some versions of the SDK might expect it.
+                # Standard v2: .upsert(payload, on_conflict="column").execute()
                 return table_query.upsert(current_payload, **kwargs).execute()
             elif operation_type == "update":
-                return table_query.update(current_payload).execute()
+                if not item_id:
+                    raise ValueError("safe_write update requires an 'id' kwarg for the WHERE clause.")
+                # Sequence: .update().eq()
+                return table_query.update(current_payload).eq("id", item_id).execute()
             else:
                 raise ValueError(f"Unknown operation_type: {operation_type}")
         except Exception as e:

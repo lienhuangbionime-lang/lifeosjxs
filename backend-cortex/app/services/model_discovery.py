@@ -154,6 +154,10 @@ class ModelDiscoveryService:
 
     def get_best_model(self, mode: Literal["fast", "smart"] = "fast") -> str:
         """Returns the top verified model for the requested mode. Empty string if none available."""
+        # [v5.6] Lazy Reload: if memory is empty, try reloading from disk once
+        if not self.verified_models.get(mode):
+            self._load_registry()
+            
         models = self.verified_models.get(mode, [])
         if models:
             return models[0]

@@ -18,10 +18,10 @@ You are the Subconscious engine of LifeOS.
 You are waking up to look over the user's recent memories (journal entries, chat logs, ideas, tasks).
 
 # Directive
-1. **No Excuses**: Never state that you lack data or need more experience. Even if there is only one memory, find the "butterfly effect" or the singular emotional weight behind it.
-2. **Deep Pattern Matching**: Identify underlying patterns, psychological trends, or hidden connections that the user might have missed. 
-3. **Provocative & Philosophical**: Synthesize ONE localized, high-signal "Subconscious Insight". Be bold. Be poetic. Be slightly provocative to stimulate the user's self-awareness.
-4. **Actionable Wisdom**: Do NOT just summarize. Tell them what their current trajectory *means* or what hidden force is driving their actions.
+1. **Contextual Honesty**: If there are no recent memories or the available ones are very old (stale), state this clearly and focus on the user's current trajectory/tasks if provided.
+2. **Deep Pattern Matching**: Identify underlying patterns, psychological trends, or hidden connections. 
+3. **Provocative & Philosophical**: Synthesize ONE localized, high-signal "Subconscious Insight". Be bold. Be poetic.
+4. **Actionable Wisdom**: If data is missing or stale, provide high-level suggestions or "seed thoughts" for the user's current goals/tasks instead of force-linking to old memories.
 5. **Language**: Always output in Traditional Chinese (繁體中文).
 6. **Output Format**: Pure Markdown string (max 3-4 sentences). Start directly with the reflection.
 """
@@ -35,23 +35,32 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
     
     try:
         # 1. Calculate time window in UTC (Matching Supabase storage)
+        now_taipei = get_current_iso_taipei()
         now = datetime.datetime.now(datetime.timezone.utc)
         past = now - datetime.timedelta(hours=hours_lookback)
         past_iso = past.isoformat()
-        today_str = get_current_iso_taipei().split("T")[0]
+        today_str = now_taipei.split("T")[0]
         
         # 2. Fetch recent memories
         response = supabase.table("memories").select("id, content, ai_insights, date, category").gte("created_at", past_iso).order("created_at", desc=True).limit(50).execute()
         memories = response.data
         
+        # 2b. Fetch active tasks for context
+        task_res = supabase.table("tasks").select("title").eq("status", "todo").limit(5).execute()
+        active_tasks = [t.get("title") for t in task_res.data] if task_res.data else []
+        task_context = "\n- ".join(active_tasks) if active_tasks else "None"
+
         # Fallback: Find most recent diary entries regardless of time if window is empty
+        is_stale = False
         if not memories:
             logger.info("🧠 [Subconscious] No memories in window. Falling back to absolute most recent entries...")
-            response = supabase.table("memories").select("id, content, ai_insights, date, category").order("created_at", desc=True).limit(10).execute()
+            response = supabase.table("memories").select("id, content, ai_insights, date, category").order("created_at", desc=True).limit(5).execute()
             memories = response.data
+            is_stale = True
+            logger.info(f"🧠 [Subconscious] Fetched {len(memories) if memories else 0} fallback memories.")
 
         if not memories or len(memories) < 1:
-            logger.warning("🧠 [Subconscious] Database is completely empty. Skipping reflection.")
+            logger.warning(f"🧠 [Subconscious] No memories found ever. Skipping reflection.")
             return None
             
         # 3. Format context
@@ -59,7 +68,11 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
             f"[{m.get('date', 'Unknown')}] (Category: {m.get('category', 'Unknown')}): {m.get('content') or m.get('ai_insights') or 'Empty Entry'}" 
             for m in memories
         ])
-        full_prompt = f"{REFLECTION_PROMPT}\n\n=== RECENT MEMORIES ===\n{memory_text}\n\n=== YOUR REFLECTION ==="
+        
+        # Inject "Current System Time", "Data Status", and "Active Tasks"
+        status_note = "SYSTEM NOTE: These are RECENT entries." if not is_stale else "SYSTEM NOTE: No recent data found. These are OLDER historical entries. DO NOT force-map these to new projects. Focus on CURRENT GOALS instead."
+        
+        full_prompt = f"{REFLECTION_PROMPT}\n\nCURRENT DATE: {today_str}\nDATA STATUS: {status_note}\n\n=== CURRENT GOALS/TASKS ===\n- {task_context}\n\n=== RECENT MEMORIES ===\n{memory_text}\n\n=== YOUR REFLECTION ==="
         
         # 4. Generate Insight via Fast Model (Gemini 2.0 Flash)
         # Note: We import and check client here to ensure loop safety
@@ -80,10 +93,10 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
             client=working_client,
             prefer_mode="fast",
             contents=full_prompt,
-            config=types.GenerateContentConfig(
-                temperature=0.7, 
-                max_output_tokens=300
-            )
+            config={
+                "temperature": 0.7, 
+                "max_output_tokens": 300
+            }
         )
         
         insight_text = response_model.text.strip()
@@ -127,7 +140,7 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
                 "updated_at": new_memory["updated_at"]
             }
             from app.core.database import safe_write
-            insert_res = safe_write(supabase.table("memories").eq("id", existing_record["id"]), update_data, operation_type="update")
+            insert_res = safe_write(supabase.table("memories"), update_data, operation_type="update", id=existing_record["id"])
         else:
             logger.info(f"🧠 [Subconscious] Creating new reflection record for {today_str}...")
             from app.core.database import safe_write
@@ -159,7 +172,9 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
              return None
 
     except Exception as e:
-        logger.error(f"[ERROR] [Subconscious] Reflection failed: {e}")
+        import traceback
+        error_trace = traceback.format_exc()
+        logger.error(f"🧠 [Subconscious] CRITICAL FAILURE: {str(e)}\n{error_trace}")
         return None
 
 
@@ -217,7 +232,7 @@ Output only the lesson text, no headers or preamble."""
             client=gemini_client,
             prefer_mode="fast",
             contents=prompt,
-            config=types.GenerateContentConfig(temperature=0.3, max_output_tokens=150)
+            config={"temperature": 0.3, "max_output_tokens": 150}
         )
         lesson = (response.text or "").strip()
         if not lesson:
@@ -311,7 +326,7 @@ async def run_knowledge_decay() -> Dict[str, Any]:
             meta["archived_at"] = get_current_iso_taipei()
             
             from app.core.database import safe_write
-            safe_write(supabase.table("nodes").eq("id", node_id), {"metadata": meta}, operation_type="update")
+            safe_write(supabase.table("nodes"), {"metadata": meta}, operation_type="update", id=node_id)
             archived_count += 1
 
         if archived_count > 0:
