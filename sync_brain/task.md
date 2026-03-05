@@ -92,9 +92,16 @@
 - [x] Enhance frontend proxy logging and URL handling
 - [x] Commit and push changes to GitHub (fafbb3d)
 
+## Phase P22: Diary Ingest & Monthly Review Stabilization (v3.8.8)
+- [x] Fix Diary Ingest Markdown/JSON parsing logic in `ingest.py`
+- [x] Fix Monthly Review `safe_write` import & call in `memories.py`
+- [x] Verify fix logic (improved regex for multi-part LLM output)
+- [ ] Run Smoke Test (Pending tool creation/location)
+
 ---
 
 ## 📈 成長記錄
+- **2026-03-06 (Bug Fix)**: 解決了 `gemini-2.0-flash-lite` 導致的日記解析失效問題，並修補了 `MonthlyReview` 因為舊函數命名導致的崩潰。
 - **2026-03-05 (Cloud Fix)**: 解決了雲端 inaccessible 的三大地雷：CORS 限制、Proxy 網址寫死、以及資料庫連線的全域狀態污染問題。
 - **2026-03-05 (Session End)**: 修除了 Windows 下 Next.js `localhost` proxy 解析為 IPv6 導致 uvicorn (IPv4) 請求靜默卡死的問題。
 - **2026-03-05**: 完成 Guest Mode (Building in Public)，包含後端權限隔離、前端介面限制與免 Key 登入體驗。

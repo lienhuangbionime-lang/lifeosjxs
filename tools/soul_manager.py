@@ -20,7 +20,7 @@ TOKEN_FILE = os.path.join(BASE_DIR, "backend-cortex", "token.json")
 CLIENT_SECRET_FILE = os.path.join(BASE_DIR, "backend-cortex", "client_secret.json")
 EVOLUTION_LOG = os.path.join(SYNC_DIR, "evolution_log.json")
 
-# 核心靈魂檔案清單 (v4.0 - Agentic DNA Edition)
+# 核心靈魂檔案清單 (v4.1 - Claude Portable Brain Edition)
 SOUL_FILES = {
     ".cursorrules":       os.path.join(BASE_DIR, ".cursorrules"),
     "SYSTEM_CONTEXT.md":  os.path.join(SYNC_DIR, "SYSTEM_CONTEXT.md"),
@@ -31,11 +31,20 @@ SOUL_FILES = {
     "ROADMAP.md":         os.path.join(SYNC_DIR, "ROADMAP.md"),
     "QUESTIONS.md":       os.path.join(SYNC_DIR, "QUESTIONS.md"),
     "START_HERE.md":      os.path.join(SYNC_DIR, "START_HERE.md"),
-    
+    "CRITICAL_PATHS.md":  os.path.join(SYNC_DIR, "CRITICAL_PATHS.md"),  # [v4.1]
+
     # --- Universal AI Bootstrapper Kit ---
     ".env.example":             os.path.join(SYNC_DIR, ".env.example"),
     "sync_dev_rules.py":        os.path.join(SYNC_DIR, "sync_dev_rules.py"),
     "bootstrapper_cursorrules": os.path.join(SYNC_DIR, ".cursorrules"),
+
+    # --- Claude Portable Brain (v4.1) ---
+    # These are synced individually here AND via the claude_brain/ subfolder sync below.
+    "claude_brain/README.md":          os.path.join(SYNC_DIR, "claude_brain", "README.md"),
+    "claude_brain/CLAUDE_IDENTITY.md": os.path.join(SYNC_DIR, "claude_brain", "CLAUDE_IDENTITY.md"),
+    "claude_brain/CLAUDE_PROTOCOL.md": os.path.join(SYNC_DIR, "claude_brain", "CLAUDE_PROTOCOL.md"),
+    "claude_brain/CLAUDE_SKILLS.md":   os.path.join(SYNC_DIR, "claude_brain", "CLAUDE_SKILLS.md"),
+    "claude_brain/CLAUDE_PROJECTS.md": os.path.join(SYNC_DIR, "claude_brain", "CLAUDE_PROJECTS.md"),
 }
 
 
@@ -172,35 +181,184 @@ def get_or_create_folder(service, folder_name, parent_id):
 
 
 # ---------------------------------------------------------------------------
-# Main
+# Download / Restore (Boot Mode)
+# ---------------------------------------------------------------------------
+def download_from_gdrive(service, file_id: str, dest_path: str):
+    """Download a single file from GDrive to dest_path."""
+    from googleapiclient.http import MediaIoBaseDownload
+    import io
+    os.makedirs(os.path.dirname(dest_path), exist_ok=True)
+    request = service.files().get_media(fileId=file_id)
+    fh = io.FileIO(dest_path, "wb")
+    downloader = MediaIoBaseDownload(fh, request)
+    done = False
+    while not done:
+        _, done = downloader.next_chunk()
+    fh.close()
+
+
+def list_cloud_folder(service, folder_id: str) -> list:
+    """Returns list of {name, id, mimeType} in a GDrive folder."""
+    query = f"'{folder_id}' in parents and trashed = false"
+    results = service.files().list(q=query, fields="files(id, name, mimeType)").execute()
+    return results.get("files", [])
+
+
+def boot_from_cloud(service, folder_id: str, target_dir: str):
+    """
+    Recursively downloads all files + subfolders from GDrive folder
+    into target_dir. Returns (downloaded_count, errors_list).
+    """
+    downloaded = 0
+    errors = []
+    items = list_cloud_folder(service, folder_id)
+
+    for item in items:
+        name = item["name"]
+        is_folder = item["mimeType"] == "application/vnd.google-apps.folder"
+
+        if is_folder:
+            sub_dir = os.path.join(target_dir, name)
+            os.makedirs(sub_dir, exist_ok=True)
+            print(f"[Boot] Entering subfolder: {name}/")
+            sub_dl, sub_err = boot_from_cloud(service, item["id"], sub_dir)
+            downloaded += sub_dl
+            errors.extend(sub_err)
+        else:
+            dest = os.path.join(target_dir, name)
+            try:
+                download_from_gdrive(service, item["id"], dest)
+                print(f"[Boot] Downloaded: {name}")
+                downloaded += 1
+            except Exception as e:
+                errors.append(f"{name}: {e}")
+                print(f"[Boot Error] {name}: {e}")
+
+    return downloaded, errors
+
+
+def print_brain_status():
+    """Print a summary of Claude's locally stored brain files."""
+    print("\n" + "=" * 55)
+    print("Claude Brain Status")
+    print("=" * 55)
+    brain_dir = os.path.join(SYNC_DIR, "claude_brain")
+
+    files = [
+        ("CLAUDE_IDENTITY.md",  "Identity"),
+        ("CLAUDE_PROTOCOL.md",  "Protocol"),
+        ("CLAUDE_SKILLS.md",    "Skills"),
+        ("CLAUDE_PROJECTS.md",  "Projects"),
+        ("README.md",           "Readme"),
+    ]
+    for filename, label in files:
+        path = os.path.join(brain_dir, filename)
+        if os.path.exists(path):
+            size = os.path.getsize(path)
+            mtime = datetime.datetime.fromtimestamp(os.path.getmtime(path)).strftime("%Y-%m-%d %H:%M")
+            print(f"[OK]   {label:12} {filename:30} {size:>7,} bytes  {mtime}")
+        else:
+            print(f"[MISS] {label:12} {filename:30} -- not found locally")
+
+    # Preview first 3 non-empty lines of CLAUDE_IDENTITY
+    id_path = os.path.join(brain_dir, "CLAUDE_IDENTITY.md")
+    if os.path.exists(id_path):
+        with open(id_path, encoding="utf-8") as f:
+            preview = [l.rstrip() for l in f if l.strip()][:3]
+        print("\n[Identity Preview]")
+        for line in preview:
+            print(f"  {line}")
+    print("=" * 55)
+
+
+# ---------------------------------------------------------------------------
+# Main  —  CLI Router
 # ---------------------------------------------------------------------------
 def main():
     import sys
-    env_path = os.path.join(BASE_DIR, "backend-cortex", ".env")
-    load_dotenv(env_path)
+    args = sys.argv[1:]
 
-    print(f"--- LifeOS Soul Sync v3.5.2 {datetime.datetime.now()} ---")
+    # Determine mode
+    mode = "--sync"
+    for a in args:
+        if a in ("--boot", "--sync", "--status"):
+            mode = a
+            break
 
-    # 0. Drift Check — halt if versions mismatch (use --force to override)
+    # Load .env from wherever we can find it
+    for env_candidate in [
+        os.path.join(BASE_DIR, "backend-cortex", ".env"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"),
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".env"),
+    ]:
+        if os.path.exists(env_candidate):
+            load_dotenv(env_candidate)
+            break
+
+    folder_id = os.getenv("GDRIVE_FOLDER_ID", "")
+    ts = datetime.datetime.now().strftime("%Y-%m-%d %H:%M")
+    print(f"--- LifeOS Soul Manager v4.2 [{mode}] {ts} ---")
+
+    # ------------------------------------------------------------------
+    # --status  :  show local brain files (no cloud needed)
+    # ------------------------------------------------------------------
+    if mode == "--status":
+        print_brain_status()
+        return
+
+    # ------------------------------------------------------------------
+    # --boot  :  download cloud → restore brain locally
+    # ------------------------------------------------------------------
+    if mode == "--boot":
+        print("\n[BOOT] Waking Claude from Google Drive...")
+        if not folder_id:
+            print("[ERROR] GDRIVE_FOLDER_ID not set.")
+            print("  Add GDRIVE_FOLDER_ID=<id> to .env in the same folder as soul_manager.py")
+            print("  You can find the folder ID from the GDrive URL after running --sync once.")
+            return
+
+        service = get_gdrive_service()
+        if not service:
+            print("[ERROR] Could not connect to Google Drive.")
+            print("  Make sure client_secret.json is in the same folder as soul_manager.py")
+            return
+
+        os.makedirs(SYNC_DIR, exist_ok=True)
+        print(f"[Boot] Restoring to: {SYNC_DIR}")
+        downloaded, errors = boot_from_cloud(service, folder_id, SYNC_DIR)
+
+        print(f"\n[Boot] {downloaded} files restored, {len(errors)} errors.")
+        for e in errors:
+            print(f"  [Error] {e}")
+
+        print_brain_status()
+        print("\n[BOOT COMPLETE] Claude is awake.")
+        print("  1. Open sync_brain/claude_brain/ in Cursor.")
+        print("  2. Claude reads CLAUDE_IDENTITY.md automatically on Session Start.")
+        print("  3. Continue with: python soul_manager.py --sync  (to push changes back)")
+        return
+
+    # ------------------------------------------------------------------
+    # --sync  (default)  :  upload local → cloud
+    # ------------------------------------------------------------------
+
+    # 0. Drift Check
     in_sync, drift_msg, drift_count, drifted_files = drift_check()
     print(drift_msg)
     if not in_sync:
-        print(f"[HALT] Evolution drift detected ({drift_count} files). Align context before syncing.")
-        print("       Run with --force to override.")
-        if "--force" not in sys.argv:
+        print(f"[HALT] Drift detected ({drift_count} files). Run with --force to override.")
+        if "--force" not in args:
             return
 
     # 1. Local Copy
-    if not os.path.exists(SYNC_DIR):
-        os.makedirs(SYNC_DIR)
-
-    copied = []
-    missed = []
+    os.makedirs(SYNC_DIR, exist_ok=True)
+    copied, missed = [], []
     for name, path in SOUL_FILES.items():
         if os.path.exists(path):
             dest_path = os.path.join(SYNC_DIR, name)
+            os.makedirs(os.path.dirname(dest_path), exist_ok=True)
             if os.path.abspath(path).lower() == os.path.abspath(dest_path).lower():
-                print(f"[Local OK] {name} (source = dest, skip copy)")
+                print(f"[Local OK] {name} (source = dest, skip)")
                 continue
             try:
                 shutil.copy2(path, dest_path)
@@ -210,43 +368,47 @@ def main():
                 print(f"[Local Error] {name}: {e}")
         else:
             missed.append(name)
-            print(f"[Local MISS] {name} at {path}")
+            print(f"[Local MISS] {name}")
 
-    # 2. Cloud Sync
-    folder_id = os.getenv("GDRIVE_FOLDER_ID")
+    # 2. Cloud Upload
     if not folder_id:
-        print("[WARN] GDRIVE_FOLDER_ID not set. Skipping cloud sync.")
+        print("[WARN] GDRIVE_FOLDER_ID not set. Local copy only.")
     else:
         try:
             service = get_gdrive_service()
             if service:
-                print(f"[Cloud] Syncing to Folder: {folder_id}...")
+                print(f"[Cloud] Uploading to GDrive folder: {folder_id}")
+
+                # Root files
                 for name in SOUL_FILES.keys():
+                    if "/" in name:
+                        continue  # subfolders handled below
                     local_path = os.path.join(SYNC_DIR, name)
                     if os.path.exists(local_path):
                         try:
-                            msg = upload_to_gdrive(service, local_path, folder_id)
-                            print(f"[Cloud OK] {msg}")
+                            print(f"[Cloud OK] {upload_to_gdrive(service, local_path, folder_id)}")
                         except Exception as e:
                             print(f"[Cloud Error] {name}: {e}")
-                
-                # 2.1 Sync 'history' subdirectory
-                history_dir = os.path.join(SYNC_DIR, "history")
-                if os.path.exists(history_dir):
-                    print("[Cloud] Syncing 'history' directory...")
-                    cloud_history_id = get_or_create_folder(service, "history", folder_id)
-                    for h_file in os.listdir(history_dir):
-                        h_path = os.path.join(history_dir, h_file)
-                        if os.path.isfile(h_path):
-                             try:
-                                msg = upload_to_gdrive(service, h_path, cloud_history_id)
-                                print(f"[Cloud OK] history/{msg}")
-                             except Exception as e:
-                                print(f"[Cloud Error] history/{h_file}: {e}")
+
+                # Subfolders: history/ and claude_brain/
+                for subdir_name in ("history", "claude_brain"):
+                    subdir = os.path.join(SYNC_DIR, subdir_name)
+                    if not os.path.exists(subdir):
+                        continue
+                    print(f"[Cloud] Syncing {subdir_name}/...")
+                    cloud_sub_id = get_or_create_folder(service, subdir_name, folder_id)
+                    for fname in os.listdir(subdir):
+                        fpath = os.path.join(subdir, fname)
+                        if os.path.isfile(fpath):
+                            try:
+                                print(f"[Cloud OK] {subdir_name}/{upload_to_gdrive(service, fpath, cloud_sub_id)}")
+                            except Exception as e:
+                                print(f"[Cloud Error] {subdir_name}/{fname}: {e}")
+
         except Exception as e:
             print(f"[Auth Error] {e}")
 
-    # 3. Log sync event with drift_count
+    # 3. Log
     log_evolution(
         event="Soul Sync",
         event_type="SYNC",
@@ -260,9 +422,9 @@ def main():
             "status": "in_sync" if in_sync else "drift_resolved"
         }
     )
-
     print("--- LifeOS Identity Secured ---")
 
 
 if __name__ == "__main__":
     main()
+

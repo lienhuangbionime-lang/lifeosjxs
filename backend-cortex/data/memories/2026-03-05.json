@@ -1,0 +1,46 @@
+{
+  "id": "be9792ee-2567-46b7-bafe-2b75bcb1ec9c",
+  "date": "2026-03-05",
+  "entries": [
+    {
+      "time": "2026-03-06T00:40:36.168648+08:00",
+      "content": "2026/03/05\n投出履歷\nAI 營運管理主管\n啟誠興業股份有限公司\n03/05 06:42\n\nAI工程師(AI發展中心)\n天主教中華聖母修女會醫療財團法人天主教聖馬爾定醫院\n03/05 06:41\n已經完成以下安全防護與 UI 調整：\n\n後端防護：沒有帶 Key 的訪客連線時，API (專案與記憶) 強制只能讀取 is_private = false 且分類為 Project 的資料，並完全阻擋新增、修改、刪除操作。\n登入介面：在輸入 API Key 畫面新增了「Continue as Guest」按鈕。\n前端 UI 隱藏：訪客登入後，會自動隱藏敏感情資，包含：\n底部導覽列的 Capture (輸入) 與 Settings (設定) 標籤。\n首頁會預設引導至 Dashboard (儀表板) 而非 Capture。\n專案卡片面板與神經網絡節點的 Edit (編輯) 和 Delete (刪除) 按鈕。\n（技能編排器）是 LifeOS Cortex (後端) 的核心服務之一，它的角色就像是大腦的「技能調度員」。\n\n簡單來說，它的功能是：根據您目前的對話情境，動態載入並賦予 AI 對應的專業能力。\n\n以下是它的運作邏輯與內容：\n\n1. 核心任務：動態能力擴展\nAI 的原始能力是有限的，但透過 \n\nSkillOrchestrator\n，系統可以從 backend-cortex/skills/ 目錄中讀取各種針對特定任務編寫的「技能協議 (SKILL.md)」，並將其注入到 AI 的思維中。\n\n2. 它目前管理哪些技能？\n在代碼中（app/services/skills.py），它會掃描以下技能模組：\n\ncore (核心執行)：處理專案管理、任務建立、進度更新。\nresearch (研究調研)：啟動聯網搜尋 (DuckDuckGo)、分析網頁內容。\nreflection (自我反思)：分析歷史日誌，找出行為盲點或情緒趨勢。\nhandoff (開發交接)：專門給我們這些「開發 AI」使用的，紀錄系統演化與技術決策，確保換人（或重啟）時開發進度不中斷。",
+      "ai_processed": null,
+      "metadata": {
+        "mood": 5,
+        "focus": 5,
+        "energy": 5,
+        "tags": [
+          "Career",
+          "LifeOS",
+          "Security",
+          "Backend",
+          "SkillOrchestrator",
+          "DevLog"
+        ],
+        "is_ai": true,
+        "ai_model": "models/gemini-2.0-flash-lite",
+        "is_private": false,
+        "category": "Project",
+        "facts": [
+          {
+            "type": "job_application",
+            "count": 2,
+            "evidence": "投遞啟誠興業與聖馬爾定醫院職位"
+          },
+          {
+            "type": "security_deployment",
+            "count": 1,
+            "evidence": "完成 API 訪客權限隔離與 UI 隱藏邏輯"
+          }
+        ],
+        "custom_metrics": {
+          "Sleep": null
+        }
+      }
+    }
+  ],
+  "combined_content": "2026/03/05\n投出履歷\nAI 營運管理主管\n啟誠興業股份有限公司\n03/05 06:42\n\nAI工程師(AI發展中心)\n天主教中華聖母修女會醫療財團法人天主教聖馬爾定醫院\n03/05 06:41\n已經完成以下安全防護與 UI 調整：\n\n後端防護：沒有帶 Key 的訪客連線時，API (專案與記憶) 強制只能讀取 is_private = false 且分類為 Project 的資料，並完全阻擋新增、修改、刪除操作。\n登入介面：在輸入 API Key 畫面新增了「Continue as Guest」按鈕。\n前端 UI 隱藏：訪客登入後，會自動隱藏敏感情資，包含：\n底部導覽列的 Capture (輸入) 與 Settings (設定) 標籤。\n首頁會預設引導至 Dashboard (儀表板) 而非 Capture。\n專案卡片面板與神經網絡節點的 Edit (編輯) 和 Delete (刪除) 按鈕。\n（技能編排器）是 LifeOS Cortex (後端) 的核心服務之一，它的角色就像是大腦的「技能調度員」。\n\n簡單來說，它的功能是：根據您目前的對話情境，動態載入並賦予 AI 對應的專業能力。\n\n以下是它的運作邏輯與內容：\n\n1. 核心任務：動態能力擴展\nAI 的原始能力是有限的，但透過 \n\nSkillOrchestrator\n，系統可以從 backend-cortex/skills/ 目錄中讀取各種針對特定任務編寫的「技能協議 (SKILL.md)」，並將其注入到 AI 的思維中。\n\n2. 它目前管理哪些技能？\n在代碼中（app/services/skills.py），它會掃描以下技能模組：\n\ncore (核心執行)：處理專案管理、任務建立、進度更新。\nresearch (研究調研)：啟動聯網搜尋 (DuckDuckGo)、分析網頁內容。\nreflection (自我反思)：分析歷史日誌，找出行為盲點或情緒趨勢。\nhandoff (開發交接)：專門給我們這些「開發 AI」使用的，紀錄系統演化與技術決策，確保換人（或重啟）時開發進度不中斷。",
+  "created_at": "2026-03-06T00:40:36.168648+08:00",
+  "updated_at": "2026-03-06T00:40:36.168648+08:00"
+}

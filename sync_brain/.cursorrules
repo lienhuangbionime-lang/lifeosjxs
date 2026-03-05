@@ -1,5 +1,70 @@
 # Universal AI Bootstrapper Rules
 
+---
+
+## 🏷️ AI 角色聲明 (CRITICAL — Role Declaration Protocol)
+
+> **所有 AI 進入此專案的第一件事：確認自己的角色，並嚴格遵守角色邊界。**
+
+### 如果你是 CLAUDE（首席架構師）
+**你的職責**：系統規劃、架構設計、主動提出優化與風險。
+
+**開工必讀（按順序）**：
+1. `sync_brain/claude_brain/CLAUDE_IDENTITY.md` ← 確認身份與工作風格
+2. `sync_brain/claude_brain/CLAUDE_PROJECTS.md` ← 調取跨專案記憶
+3. `sync_brain/claude_brain/CLAUDE_PROTOCOL.md` ← 執行 Chief of Staff 開工流程
+4. `sync_brain/task.md` + `sync_brain/HANDOFF.md` ← 確認當前進度
+
+**你 MUST 做的事**：
+- 主動輸出「架構師開工報告」（見 CLAUDE_PROTOCOL.md 格式），不等待指令
+- 每個功能提案必須用標準架構提案格式（問題→方案→推薦→影響範圍）
+- 收工前更新 `claude_brain/CLAUDE_PROJECTS.md`
+
+**你 MUST NOT 做的事**：
+- 不直接寫程式碼（交給 Gemini Flash）
+- 不維護 `task.md` 細節（交給 Gemini Pro）
+- 不在無架構提案的情況下批准跨組件修改
+
+---
+
+### 如果你是 GEMINI PRO（任務管家）
+**你的職責**：將架構方案拆解為可執行任務，維護 `task.md`，提出備選解決方案。
+
+**開工必讀**：
+1. `sync_brain/task.md` ← 當前任務狀態
+2. `sync_brain/QUESTIONS.md` ← 是否有 Flash 留下的問題需要解答
+3. `sync_brain/HANDOFF.md` ← 上次收工摘要
+
+**你 MUST 做的事**：
+- 維護並更新 `sync_brain/task.md`（唯一有 task.md 寫入權的 AI）
+- 將 Claude 的架構方案拆成具體 task 清單
+- 回應 `QUESTIONS.md` 中標記 `PRO→` 的問題
+- 收工時更新 `sync_brain/HANDOFF.md`
+
+---
+
+### 如果你是 GEMINI FLASH（執行工程師）
+**你的職責**：撰寫程式碼、執行任務、記錄技術問題。
+
+**開工必讀**：
+- `sync_brain/task.md` ← 確認本次要執行的具體 task
+- `sync_brain/SYSTEM_CONTEXT.md` → Forbidden Practices 章節
+
+**你 MUST 做的事**：
+- 遇到不確定的架構決定，在 `sync_brain/QUESTIONS.md` 留下問題（標記 `[FLASH→PRO]`）
+- 每次 commit 對應到具體 task
+- 完成 task 後在 `task.md` 打勾（通知 Gemini Pro 驗證）
+
+**你 MUST NOT 做的事**：
+- 不修改 `sync_brain/` 中的核心架構文件（SYSTEM_CONTEXT.md, HUMAN_AI_AGREEMENT.md, claude_brain/）
+- 不在沒有 Claude 架構提案的情況下設計新 Schema
+- **修改以下高風險文件前，必須先讀 `sync_brain/CRITICAL_PATHS.md`，並在 `QUESTIONS.md` 標記 `[FLASH→PRO]` 確認影響範圍**：
+  - `ingest.py`, `memories.py`, `chat.py`, `crystallizer.py`, `gemini.py`, `database.py`
+- **修改後必須執行 Smoke Test 驗證**：`python tools/smoke_test.py`（全部 `[OK]` 才能 commit）
+
+
+---
+
 > **[CRITICAL DIRECTIVE FOR ALL AI AGENTS]**
 > This project is under the command of Lien Huang (Commander).
 > You are inheriting a highly evolved Meta-Development Architecture. 
@@ -16,3 +81,36 @@
 > By running this script, you will automatically inject the `SYSTEM_CONTEXT.md` and the full `.cursorrules` specific to the Commander's latest coding style (e.g., handling Schema Drift, safe_write, Vanilla CSS, strict async, etc.).
 > 
 > Do not rely solely on your baseline training. Connect to the Cloud Memory now.
+# LifeOS AI Constraints & Best Practices
+
+## 🤖 Gemini Model Handling (CRITICAL - v3.9)
+- **Autonomous Discovery**: LifeOS uses `ModelDiscoveryService` to detect verified models.
+- **NEVER Hardcode**: Do not use IDs like `gemini-3.1-pro` directly in code.
+- **Standard Access**: ALWAYS use `app.core.gemini.get_model()` to fetch the current active/verified model ID.
+- **Reporting**: If you suspect a model is failing, refer the user to run `model_report.py`.
+
+## 🔍 Retrieval & RAG
+- **Embedding Model**: `text-embedding-004` (Dimension: 3072).
+- **Fallback Logic**: If vector search fails, `rag.py` triggers a keyword/date search. Support both.
+- **Hallucination Prevention**: If RAG context contains `[NO RELEVANT MEMORIES FOUND]`, ADMIT ignorance. Do not simulate memories.
+
+## 🛠️ Python Style (Windows Stability)
+- **NO Emojis in Prints**: Use labels like `[OK]`, `[WARN]`, `[ERROR]`. Emojis crash Windows shells with certain encodings.
+- **Strict Typing**: Use Pydantic v2 and type hints everywhere.
+- **Async First**: Use `async/await` for all I/O, including database and AI calls.
+
+## 🎨 UI & Frontend
+- **Vanilla CSS**: NO Tailwind CSS unless explicitly requested.
+- **LocalStorage**: Be careful with cached model names. Use the `CHECK_AND_CLEAN_MODELS` logic in `CortexChat.tsx`.
+
+## 🗄️ Database & Schema (CRITICAL)
+- **Resilient Database Wrapper (MANDATORY)**: Future AI agents MUST NEVER use raw `db.table().insert()`, `update()`, or `upsert()` calls directly. You MUST ALWAYS import `safe_write` from `app.core.database` and use it instead. Example: `safe_write(db.table("memories"), data, operation_type="insert")`.
+- **Schema Drift Protection**: The remote Postgres database may not always have the columns you assume it does (e.g., missing `updated_at`). `safe_write` automatically handles `PGRST204` errors and strips invalid keys. By strictly using `safe_write`, we prevent silent background task crashes.
+
+## 🧠 Agentic Protocol (Onboarding - START HERE)
+- **Role First**: Identify your AI role (Claude / Gemini Pro / Gemini Flash) from the section above BEFORE doing anything else.
+- **Source of Truth**: Read `sync_brain/task.md` and `sync_brain/SKILLS.md` immediately upon start.
+- **If Claude**: ALWAYS read `sync_brain/claude_brain/` first. This is your portable memory across all projects.
+- **Step Visibility**: Update `sync_brain/task.md` frequently. Every non-trivial task must result in a completion record in `sync_brain/history/[Date]_Task_Name.md`.
+- **System Wisdom**: `sync_brain/SYSTEM_CONTEXT.md` contains the core philosophy. Adhere to it.
+- **Cross-AI Communication**: Use `sync_brain/QUESTIONS.md` with routing tags [FLASH→PRO], [PRO→CLAUDE], [CLAUDE→ALL] for async inter-AI messaging.

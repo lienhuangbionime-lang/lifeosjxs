@@ -300,10 +300,10 @@ Daily Summaries ({len(memories)} entries):
                     .eq("month", month)
                     .execute()
             )
-            from app.core.database import safe_insert
+            from app.core.database import safe_write
             await loop.run_in_executor(
                 None,
-                lambda: safe_insert(db.table("MonthlyReview"), payload)
+                lambda: safe_write(db.table("MonthlyReview"), payload, operation_type="insert")
             )
             logger.info(f"Monthly Review for {year}-{month:02d} saved ({len(memories)} memories, {len(review_text)} chars)")
 

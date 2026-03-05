@@ -362,25 +362,42 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
                 
                 logger.info("[OK] Gemini raw generation returned.")
                 response_text = response.text.strip()
-                import re
-                json_match = re.search(r'\{.*\}', response_text, re.DOTALL)
-                if json_match:
-                    response_text = json_match.group(0)
                 
-                try:
-                    ai_data = json.loads(response_text)
-                    if not isinstance(ai_data, dict):
-                        ai_data = {}
-                    logger.info("[OK] Gemini JSON parsing complete.")
-                except json.JSONDecodeError as je:
-                    logger.error(f"[ERROR] Gemini JSON Decode Error: {je}. Raw output snippet: {response_text[:100]}")
-                    ai_data = {}
+                import re
+                import json
+                
+                # [v3.8.8 Fix] Improved Parsing: Extract JSON and keep Markdown separately
+                # gemini-2.0-flash-lite often mixes both.
+                json_match = re.search(r'```json\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+                if not json_match:
+                    # Fallback to loose JSON search
+                    json_match = re.search(r'(\{.*?\})', response_text, re.DOTALL)
+                
+                if json_match:
+                    json_str = json_match.group(1)
+                    # The rest is markdown
+                    # We remove the JSON block from the response to get the clean markdown
+                    markdown_part = response_text.replace(json_match.group(0), "").strip()
+                    # Also strip any trailing/leading md code fences if they were wrapping the whole thing
+                    markdown_part = re.sub(r'^```markdown\s*', '', markdown_part)
+                    markdown_part = re.sub(r'\s*```$', '', markdown_part)
                     
-            except Exception as e:
-                import traceback
-                logger.error(f"[ERROR] Gemini API Error in ingest: type={type(e).__name__}, msg={e}")
-                logger.error(traceback.format_exc())
-                ai_data = {}
+                    try:
+                        ai_data = json.loads(json_str)
+                        if not isinstance(ai_data, dict):
+                            ai_data = {}
+                        
+                        # Inject the extracted markdown if the JSON didn't already have a better one
+                        if markdown_part and not ai_data.get("markdown_body"):
+                            ai_data["markdown_body"] = markdown_part
+                            
+                        logger.info("[OK] Gemini JSON parsing complete with extracted Markdown.")
+                    except json.JSONDecodeError as je:
+                        logger.error(f"[ERROR] Gemini JSON Decode Error: {je}. Raw snippet: {json_str[:100]}")
+                        ai_data = {}
+                else:
+                    logger.warning("[WARN] No JSON block found in AI response. Using fallback.")
+                    ai_data = {}
         elif request.skipAi:
             logger.info("[OK] AI Generation skipped by user request.")
         else:
