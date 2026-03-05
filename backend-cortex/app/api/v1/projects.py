@@ -113,26 +113,29 @@ async def merge_project(source_id: str, merge_data: ProjectMerge, request: Reque
     target = target_res.data
     
     # 2. Merge Logic
-    new_tags = list(set((target.get("tags") or []) + (source.get("tags") or []) + [source["name"]]))
+    # Projects table might not have 'tags' column (it's in meta or missing)
+    source_tags = source.get("tags") or source.get("meta", {}).get("tags", [])
+    target_tags = target.get("tags") or target.get("meta", {}).get("tags", [])
+    new_tags = list(set(target_tags + source_tags + [source["name"]]))
     
-    # Update Target tags
+    # Update Target tags (safe_write will strip 'tags' if it doesn't exist in DB)
     from app.core.database import safe_write
-    safe_write(db.table("projects").eq("id", target_id), {"tags": new_tags}, operation_type="update")
+    safe_write(db.table("projects"), {"tags": new_tags}, operation_type="update", id=target_id)
     
     # Migrate Tasks from source → target
-    safe_write(db.table("tasks").eq("project_id", source_id), {"project_id": target_id}, operation_type="update")
+    safe_write(db.table("tasks"), {"project_id": target_id}, operation_type="update", filters=[("eq", "project_id", source_id)])
     
     # Migrate Brain Edges from source → target
     try:
-        safe_write(db.table("edges").eq("source", source_id), {"source": target_id}, operation_type="update")
-        safe_write(db.table("edges").eq("target", source_id), {"target": target_id}, operation_type="update")
+        safe_write(db.table("edges"), {"source": target_id}, operation_type="update", filters=[("eq", "source", source_id)])
+        safe_write(db.table("edges"), {"target": target_id}, operation_type="update", filters=[("eq", "target", source_id)])
     except Exception:
         pass  # edges table may not exist yet — non-critical
     
     # Archive Source
-    safe_write(db.table("projects").eq("id", source_id), {
+    safe_write(db.table("projects"), {
         "status": "archived",
         "name": f"{source['name']} → {target['name']}"
-    }, operation_type="update")
+    }, operation_type="update", id=source_id)
 
     return {"message": f"Merged {source['name']} into {target['name']}", "tasks_migrated": True}

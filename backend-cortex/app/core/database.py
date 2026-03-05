@@ -61,8 +61,8 @@ def get_supabase_client() -> Client:
 def safe_write(table_query, payload: dict, operation_type: str = "insert", max_retries: int = 3, **kwargs):
     """
     Executes a Supabase write with built-in Schema Drift resilience.
-    If the remote DB throws PGRST204 (Missing Column), this intercepts the error,
-    strips the invalid column from the payload, and retries.
+    - filters: Optional list of tuples for WHERE clauses, e.g. [("eq", "project_id", "xyz")]
+    - id: Legacy shorthand for eq("id", id)
     """
     import logging
     import re
@@ -70,35 +70,44 @@ def safe_write(table_query, payload: dict, operation_type: str = "insert", max_r
     
     current_payload = dict(payload)
     item_id = kwargs.pop("id", None)
+    filters = kwargs.pop("filters", [])
+    
+    # Normalize filters: if 'id' is provided, add it as an 'eq' filter
+    if item_id:
+        filters.append(("eq", "id", item_id))
     
     for attempt in range(max_retries):
         try:
+            # 1. Initialize Query
+            q = table_query
+            
+            # 2. Add Operation
             if operation_type == "insert":
-                return table_query.insert(current_payload).execute()
+                q = q.insert(current_payload)
             elif operation_type == "upsert":
-                # For upsert, we don't usually use .eq() since it uses unique constraints (e.g. 'on_conflict')
-                # But if an ID is provided, some versions of the SDK might expect it.
-                # Standard v2: .upsert(payload, on_conflict="column").execute()
-                return table_query.upsert(current_payload, **kwargs).execute()
+                q = q.upsert(current_payload, **kwargs)
             elif operation_type == "update":
-                if not item_id:
-                    raise ValueError("safe_write update requires an 'id' kwarg for the WHERE clause.")
-                # Sequence: .update().eq()
-                return table_query.update(current_payload).eq("id", item_id).execute()
+                q = q.update(current_payload)
             else:
                 raise ValueError(f"Unknown operation_type: {operation_type}")
+                
+            # 3. Apply Filters (required for update/delete, optional for others)
+            for f_type, f_col, f_val in filters:
+                if hasattr(q, f_type):
+                    q = getattr(q, f_type)(f_col, f_val)
+                    
+            return q.execute()
+            
         except Exception as e:
             error_msg = str(e)
             if "PGRST204" in error_msg and "Could not find the" in error_msg:
-                # Example error: Could not find the 'updated_at' column of 'MonthlyReview'
                 match = re.search(r"Could not find the '([^']+)' column", error_msg)
                 if match:
                     invalid_column = match.group(1)
                     logger.warning(f"[Schema Drift] Column '{invalid_column}' missing. Stripping and retrying...")
                     if invalid_column in current_payload:
                         del current_payload[invalid_column]
-                        continue # Retry
-            # If it's a different error, or we couldn't parse the column, raise it
+                        continue 
             raise e
     raise Exception(f"Failed safe_write after {max_retries} retries due to schema mismatch.")
 
