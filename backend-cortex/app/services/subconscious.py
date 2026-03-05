@@ -23,7 +23,16 @@ You are waking up to look over the user's recent memories (journal entries, chat
 3. **Provocative & Philosophical**: Synthesize ONE localized, high-signal "Subconscious Insight". Be bold. Be poetic.
 4. **Actionable Wisdom**: If data is missing or stale, provide high-level suggestions or "seed thoughts" for the user's current goals/tasks instead of force-linking to old memories.
 5. **Language**: Always output in Traditional Chinese (繁體中文).
-6. **Output Format**: Pure Markdown string (max 3-4 sentences). Start directly with the reflection.
+6. **Output Format**: 
+   - Start with 2-4 sentences of provocative reflection (Markdown).
+   - End with a JSON block in a code fence:
+     ```json
+     {
+       "tasks": [
+         {"title": "Suggested Task A", "project": "Project Name", "priority": 1}
+       ]
+     }
+     ```
 """
 
 async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[str, Any]]:
@@ -99,12 +108,29 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
             }
         )
         
-        insight_text = response_model.text.strip()
-        if not insight_text:
+        raw_response = response_model.text.strip()
+        if not raw_response:
              logger.warning("🧠 [Subconscious] Model returned empty insight.")
              return None
              
-        # 5. Store the reflection back into the database
+        # 5. Extraction Logic (Markdown + JSON)
+        import re
+        import json
+        json_match = re.search(r'```json\s*(\{.*\})\s*```', raw_response, re.DOTALL)
+        tasks_to_create = []
+        if json_match:
+            try:
+                json_data = json.loads(json_match.group(1))
+                tasks_to_create = json_data.get("tasks", [])
+                insight_text = raw_response.replace(json_match.group(0), "").strip()
+                logger.info(f"🧠 [Subconscious] Extracted {len(tasks_to_create)} suggested tasks.")
+            except Exception as je:
+                logger.error(f"🧠 [Subconscious] JSON parse failed: {je}")
+                insight_text = raw_response
+        else:
+            insight_text = raw_response
+
+        # 6. Store the reflection back into the database
         logger.info("🧠 [Subconscious] Insight generated. Storing to memory...")
         
         embedding = await get_embeddings(insight_text)
@@ -163,6 +189,45 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
         if insert_res.data:
             logger.info("🧠 [Subconscious] Reflection successfully integrated into LifeOS.")
             res_val = insert_res.data[0]
+            memory_id_db = res_val.get("id")
+
+            # [New] Parallel Task Creation from Subconscious
+            if tasks_to_create:
+                try:
+                    # Pre-fetch Projects for Linking
+                    proj_res = supabase.table("projects").select("id, name").execute()
+                    proj_map = {p["name"].lower(): p["id"] for p in (proj_res.data or [])}
+                    
+                    inserted_tasks_count = 0
+                    for tk in tasks_to_create:
+                        if not tk.get("title"): continue
+                        
+                        proj_id = None
+                        if tk.get("project"):
+                            p_name = tk["project"].lower()
+                            if p_name in proj_map:
+                                proj_id = proj_map[p_name]
+                            else:
+                                # Auto-create new project if referenced
+                                logger.info(f"🧠 [Subconscious] Creating new project '{tk['project']}'...")
+                                new_p = supabase.table("projects").insert({"name": tk["project"], "status": "active"}).execute()
+                                if new_p.data:
+                                    proj_id = new_p.data[0]["id"]
+                                    proj_map[p_name] = proj_id
+                                    
+                        task_payload = {
+                            "title": tk["title"],
+                            "status": "todo",
+                            "priority": tk.get("priority", 1),
+                            "project_id": proj_id,
+                            "source_memory_id": memory_id_db
+                        }
+                        supabase.table("tasks").insert(task_payload).execute()
+                        inserted_tasks_count += 1
+                    logger.info(f"🧠 [Subconscious] Auto-created {inserted_tasks_count} tasks from reflection.")
+                except Exception as task_e:
+                    logger.error(f"🧠 [Subconscious] Task creation failed: {task_e}")
+
             # [v5.1] Ensure 'content' is populated for legacy frontend components
             if not res_val.get("content") and res_val.get("ai_insights"):
                 res_val["content"] = res_val["ai_insights"]

@@ -1,0 +1,26 @@
+{
+  "id": "af3ffa4e-e9b9-4a74-8705-051189c1f077",
+  "date": "2026-03-06",
+  "entries": [
+    {
+      "time": "2026-03-06T04:38:26.050937+08:00",
+      "content": "\n# 2026-03-06 專案進度\n今天研發了影片專案，決定要有三個步驟：\n1. 建立腳本範本\n2. 匯入服飾圖片\n3. 測試語音合成\n- Mood: 8\n- Focus: 9\n- Energy: 8\n",
+      "ai_processed": "# [[2026-03-06]] 日記\n\n\n# [[2026-03-06]] 專案進度\n今天研發了影片專案，決定要有三個步驟：\n1. 建立腳本範本\n2. 匯入服飾圖片\n3. 測試語音合成\n- Mood: 8\n- Focus: 9\n- Energy: 8\n",
+      "metadata": {
+        "mood": 8,
+        "focus": 9,
+        "energy": 8,
+        "tags": [],
+        "is_ai": true,
+        "ai_model": "models/gemini-3.1-flash-lite-preview",
+        "is_private": false,
+        "category": "Life",
+        "facts": [],
+        "custom_metrics": {}
+      }
+    }
+  ],
+  "combined_content": "\n# 2026-03-06 專案進度\n今天研發了影片專案，決定要有三個步驟：\n1. 建立腳本範本\n2. 匯入服飾圖片\n3. 測試語音合成\n- Mood: 8\n- Focus: 9\n- Energy: 8\n",
+  "created_at": "2026-03-06T04:38:26.050937+08:00",
+  "updated_at": "2026-03-06T04:38:26.050937+08:00"
+}

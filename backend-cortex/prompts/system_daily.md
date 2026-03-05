@@ -117,6 +117,10 @@ Python 後端依賴以下正則表達式來提取數據：
   "tags": ["tag1", "tag2"],
   "projects": ["Project Name A", "Project Name B"],
   "is_private": <boolean>,
+  "tasks": [
+    {"title": "待辦事項 A", "project": "專案名稱", "priority": 1},
+    {"title": "待辦事項 B", "priority": 2}
+  ],
   "facts": [
     {"type": "deep_work_session", "count": 1, "evidence": "描述內容"},
     {"type": "distraction_event", "count": 2, "evidence": "分心原因"}
