@@ -248,7 +248,7 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
                 f"1. DATE: Use {ingest_date} everywhere. Replace [YYYY-MM-DD] with {ingest_date} in header and Graph Seeds.\n"
                 f"2. METRICS: If the log contains '> Daily Metrics' with Mood/Focus/Energy numbers, preserve those exact values in the JSON.\n"
                 f"3. JSON REQUIRED: End your response with a ```json ... ``` block containing: mood, focus, energy, category, tags, projects, is_private, facts, custom_metrics, AND 'tasks'.\n"
-                f"   - 'tasks': Array of extracted action items. Each MUST have 'title' and optional 'project'/'priority'. If none, use [].\n\n"
+                f"   - 'tasks': Array of action items to be added to the task board. Look for numbered steps, MITs, or future commitments across ALL sections (including 'Project Progress'). Each MUST have 'title' and optional 'project'/'priority'. If none, use [].\n\n"
             )
             user_prompt = (
                 f"{user_context}"
