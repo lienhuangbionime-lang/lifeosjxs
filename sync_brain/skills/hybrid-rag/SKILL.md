@@ -16,14 +16,16 @@ Implements "Unified Awareness" by searching across temporal memories (Diary) and
 ## 🛠️ Workflow
 
 ### 1. Vector Search
-Search `memories` and `documents` tables using `text-embedding-004`.
+Search `memories` and `documents` tables using `gemini-embedding-2-preview`.
 
-### 2. Recency Weighting
-Heuristically boost records from the last 7 days to ensure the AI remains present in the current life phase.
+### 2. [v7.1] Neural Gap Resilience (Fallback)
+If Vector Search returns zero results (Neural Gap):
+- **Stage A: Content Match**: Perform exact `ilike` matching on `content` and `ai_insights`.
+- **Stage B: Tag Overlap**: Search for overlapping tags in the memory array.
+- **Stage C: Structural Injection**: Fetch `projects` metadata naming/description as a baseline.
 
-### 3. Isolation
-- Documents = "Ground Truth / Technical".
-- Memories = "Contextual / Personal".
+### 3. Recency Weighting
+Heuristically boost records from the last 7 days.
 
 ## 🛑 Guardrails
-- If results show `[NO RELEVANT MEMORIES]`, Admit ignorance.
+- If results show `[NO RELEVANT MEMORIES]`, trigger **Discovery Insight** (Prompt the user for local context).

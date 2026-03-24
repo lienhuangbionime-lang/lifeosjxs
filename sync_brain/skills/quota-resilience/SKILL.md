@@ -15,16 +15,19 @@ Ensures system uptime by dynamically switching between AI models based on curren
 
 ## 🛠️ Workflow
 
-### 1. Detect Exhaustion
-- Intercept 429 errors in the `chat.py` stream.
+### 1. Detect Exhaustion / Latency
+- Intercept 429 (Resource Exhausted) or 503 (High Demand) errors.
+- Monitor response latency (>10s triggers potential failover).
 
-### 2. Cascading Fallback
-1. Try Gemini 3.1 Pro (Manager).
-2. If fails, switch to Gemini 2.0 Flash (Engineer).
-3. If fails, switch to Gemma/Flash-Lite (Automaton).
+### 2. [v7.1] Cascading Fallback (2026 Stable Standard)
+1. **Tier 1 (Flagship)**: Gemini 2.5 Flash (Production Worker).
+2. **Tier 2 (Insight)**: Gemini 2.5 Pro (Conceptual Thinker).
+3. **Tier 3 (Alternative)**: Gemini 3.0 Flash (Stable Redundancy).
+4. **Tier 4 (Edge)**: Gemini 3.1 Flash-Lite-Preview (High Demand - Last Resort).
 
-### 3. Registry Refresh
-Call `get_discovery_service().refresh()` to check for new available models.
+### 3. Registry Re-Ranking
+Dynamically refresh `model_registry.json` via heuristic scoring that penalizes "lite-preview" tiers during high-demand spikes.
 
 ## 🛑 Guardrails
-- Inform the user whenever a fallback occurs to manage expectations.
+- **Fast Failover**: Max 3 retries with shallow backoff (1s, 3s) for UI-responsive sessions.
+- **Fail-Safe Summary**: If all tiers are 503, return a structural summary from the DB to avoid blank insights.

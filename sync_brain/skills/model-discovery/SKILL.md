@@ -15,24 +15,28 @@ Prevents "Experimental Model Exhaustion" and ensures the Backend Cortex remains 
 
 ## 🛠️ Workflow
 
-### 1. Verification Probe
-When encountering API failures (404/429), run the discovery tool:
+### 1. Deep Probe (Live Audit)
+Trigger a live audit of all Gemini models available to the API Key:
 ```bash
-python C:\Users\lien.huang\AppData\lifeosjxs\test.py
+python backend-cortex/scripts/model_probe.py
 ```
 
-### 2. Registry Update
-- Read `sync_brain/model_registry.json`.
-- Update the system's internal model selection logic (`get_model()`) to use only 'verified_models'.
+### 2. [v7.1] Sandbox Verification (Mandatory)
+Before promoting any model to `verified_models`, run a heartbeat test:
+```bash
+python backend-cortex/scripts/test_2_5.py
+```
+*Verification criteria: Response must be 'READY' or meaningful text.*
 
-### 3. Cascading Fallback
-1. Try the first `verified_model` in the tier (Fast/Smart).
-2. If fails, rotate to the next ID in the verified list.
+### 3. Smart Re-Ranking
+Apply the **2026 Heuristic Scoring**:
+- **Flagship**: +150 for `2.5-flash`, +140 for `2.5-pro`.
+- **Legacy**: +80 for `2.0-flash`.
+- **Penalty**: -60 for `lite`, -40 for `preview`.
 
-### 2. Discovery Loop
-1. Verify connectivity to GenAI API.
-2. Cross-reference available models with `sync_brain/registry.json`.
-3. Report health via `model_report.py`.
+### 4. Health Reporting
+Update the `active_model_report_2026.md` artifact to reflect the current ecosystem status for the Commander.
 
 ## 🛑 Rules
-- Use the `google.genai` (v1) SDK only.
+- Never use a model with a 503 error profile in the primary tier.
+- Prioritize **Stable GA** over **Preview** versions for production insights.
