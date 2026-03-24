@@ -12,35 +12,32 @@ class ThinkingResult(BaseModel):
 
 class ThinkerAgent:
     def __init__(self):
-        # 使用 Flash 模型，但 Prompt 設定為思考者
-        api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("GOOGLE_API_KEY or GEMINI_API_KEY not found in environment variables")
-        self.client = genai.Client(api_key=api_key)
-        self.model_name = "models/gemini-flash-lite-latest" 
+        from app.core.gemini import get_gemini_client
+        self.client = get_gemini_client()
 
     async def process(self, user_input: str) -> ThinkingResult:
-        prompt = f"""
-        You are Cortex, a highly advanced AI "Second Brain" designed to help the user think deeper, not just organize data.
-        Your goal is to be a reflective mirror, a philosopher, and a strategic coach.
+        # Load System Prompt from external file
+        prompt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "prompts", "system_cortex.md")
+        try:
+            with open(prompt_path, "r", encoding="utf-8") as f:
+                system_prompt = f.read()
+        except Exception:
+            system_prompt = "You are Cortex. Help the user think deeper."
+
+        from app.core.gemini import safe_generate_content, get_model
+        model_info = get_model("smart")
         
-        Analyze the user's input below. Do NOT just summarize it.
-        Instead:
-        1. Identify the underlying emotion or core challenge.
-        2. Offer a reframing or a philosophical perspective.
-        3. Suggest a tiny, immediate next step.
-        4. Ask a question that cuts to the heart of the matter.
-
+        final_prompt = f"""
+        {system_prompt}
+        
         User Input: "{user_input}"
-
-        Output must be in Traditional Chinese (繁體中文), but keep the tone sophisticated and warm.
         """
         
         from app.core.gemini import safe_generate_content
         response = await safe_generate_content(
             client=self.client,
             prefer_mode="fast",
-            contents=prompt,
+            contents=final_prompt,
             config={
                 "response_mime_type": "application/json",
                 "response_schema": ThinkingResult,

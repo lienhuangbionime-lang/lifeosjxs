@@ -6,14 +6,14 @@
 
 ### ✅ What We Accomplished Today (2026-03-05)
 
-#### 1. Resilient Database Wrapping (`safe_write`)
-   - **Problem:** Background tasks (`cortex_growth_logs`, `tasks`, `MonthlyReview`) were silently failing with `PGRST204` errors due to "Schema Drift" (local Python inserting columns like `updated_at` that the remote Supabase lacked).
-   - **Fix:** Implemented a global `safe_write` function in `database.py` that intercepts `PGRST204` errors, strips the invalid column from the payload, and auto-retries.
-   - **Deployment:** Replaced raw `db.table().insert()` and `upsert()` calls in `memories.py`, `tasks.py`, and `ingest.py` with `safe_write`. The backend is now fully resistant to schema drift.
+#### 3. Messenger Notification Resilience (2026-03-13)
+   - **Permanent Token Loop:** Replaced short-lived FB tokens with a Permanent Page Access Token loop via `me/accounts`. Updated Render environment variables (`PAGE_ACCESS_TOKEN`) to ensure persistence.
+   - **Deferred Processing (Race Condition Fix):** Implemented a `missing_code` status in back-end order processing. If a comment arrives before the local product dictionary has synced from the frontend, the system now "suspends" the comment and automatically retries on the next poll cycle, preventing data loss during initial sync lag.
+   - **Diagnostic Crash Fix:** Resolved a critical frontend crash in `DiagnosticConsole.tsx` where an undefined `data` object caused `TypeError: .slice()`. Added fallback guards to all raw trace views.
 
-#### 2. Local Environment Fixes 
-   - **Next.js Proxy Hang:** Bypassed `rewrites` on Windows dev mode by directly pointing frontend fetching to `127.0.0.1:8000` to avoid Node.js IPv6 resolution hangs.
-   - **CORS Preflight:** Hardcoded `X-Supabase-URL`, `X-Supabase-Key`, and `X-Gemini-Key` into FastAPI's `allow_headers` to fix Owner Mode login.
+#### 4. Environment Discovery & CLI Activation
+   - **Binary Recovery:** Discovered that critical runtimes (Node 24, npm 11) were present in `C:\Users\lien.huang\AppData\node` but omitted from the system PATH.
+   - **Tooling:** Successfully installed `@aisuite/chub` globally to bridge the gap between AI sessions and maintain context across repositories.
 
 ---
 

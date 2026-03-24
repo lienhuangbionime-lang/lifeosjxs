@@ -729,6 +729,18 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
             except Exception as link_e:
                 logger.warning(f"⚠️ Auto-link failed, skipping: {link_e}")
 
+        # --- 8. Proactive Sovereign Insights ---
+        sovereign_insights = None
+        if db:
+            try:
+                # Fetch the latest context to report back to the Commander
+                recon_res = db.table("cortex_context").select("*").order("last_updated", desc=True).limit(1).execute()
+                if recon_res.data:
+                    sovereign_insights = recon_res.data[0]
+                    logger.info("📡 Sovereign Insights injected into response.")
+            except Exception as recon_e:
+                logger.warning(f"⚠️ Failed to fetch recon insights: {recon_e}")
+
         # 8. 回傳給前端
         return {
             "success": True,
@@ -736,7 +748,8 @@ async def ingest_log(http_request: Request, request: IngestRequest, background_t
             "message": "Stored in DB and Kernel",
             "model": model_name,
             "data": ai_data,
-            "link_result": link_result
+            "link_result": link_result,
+            "sovereign_insights": sovereign_insights
         }
 
     except Exception as e:

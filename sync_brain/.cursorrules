@@ -1,3 +1,15 @@
+# 🚨 MANDATORY FIRST ACTION (Memory-First Protocol)
+
+> **[CRITICAL] 所有 AI 進入此空間的第一個動作（不論指令為何）：**
+> 1. `list_dir("C:\Users\lien.huang\AppData\lifeosjxs\sync_brain\")`
+> 2. `view_file("C:\Users\lien.huang\AppData\lifeosjxs\sync_brain\cortex_state.md")`
+> 3. `view_file("C:\Users\lien.huang\AppData\lifeosjxs\sync_brain\task.md")`
+> 
+> **在完成上述「同步」前，嚴禁執行任何代碼修改、刪除或規劃。**
+> **每次任務結束前，必須在 `sync_brain/` 留下結構化的進度紀錄。**
+
+---
+
 # Universal AI Bootstrapper Rules
 
 ---

@@ -9,7 +9,8 @@ try:
 except ImportError:
     Request = None  # type: ignore
 
-# genai is the modern google.genai wrapper used in the project; defensive import
+from pathlib import Path
+
 try:
     from google import genai
     from google.genai import types
@@ -38,7 +39,7 @@ def get_gemini_client():
     Returns a Gemini client bound to the current event loop.
     Prevents 'attached to a different loop' errors in async environments.
     """
-    if not GEMINI_API_KEY:
+    if not GEMINI_API_KEY or not genai:
         return None
         
     loop = asyncio.get_event_loop()
@@ -59,89 +60,55 @@ gemini_client = get_gemini_client() if genai and GEMINI_API_KEY else None
 
 
 
+import json
+
+# Registry Resolution (v5.6)
+# Standardized to look for sync_brain at the project root (lifeosjxs/)
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+REGISTRY_PATH = PROJECT_ROOT / "sync_brain" / "model_registry.json"
+
 def sanitize_model_name(name: str) -> str:
-    """
-    Ensures model names follow the exact identifiers required by the SDK.
-    Prevents common mismatches and ensures IDs are in 'models/...' format.
-    """
-    if not name:
-        return name
-        
+    """Ensures model names follow the exact identifiers required by the SDK."""
+    if not name: return name
     s = name.strip().lower()
-    
-    # Remove prefix if exists for easier matching
     if s.startswith("models/"):
         s = s.replace("models/", "", 1)
-    
-    # Strict mapping dictionary (Updated from live quota probe 2026-03-04)
-    # Confirmed AVAILABLE: gemini-2.5-flash, gemini-flash-lite-latest
-    # Confirmed QUOTA-EXHAUSTED: gemini-2.0-flash, gemini-2.0-flash-lite
-    mapping = {
-        "gemini-2.5-flash": "gemini-2.5-flash",       # [OK] Available
-        "gemini-flash-lite-latest": "gemini-flash-lite-latest",  # [OK] Available
-        "gemini-2.5-pro": "gemini-2.5-pro",            # [QUOTA] exhausted
-        "gemini-2.0-flash-lite": "gemini-2.0-flash-lite",  # [QUOTA] exhausted
-        "gemini-2.0-flash": "gemini-2.0-flash",        # [QUOTA] exhausted
-        "gemini-pro-latest": "gemini-pro-latest",
-        "gemini-pro": "gemini-pro-latest",
-    }
-    
-    # Check if the name starts with any of our known prefixes (sorted by length descending to match 3.1 before 3)
-    sorted_prefixes = sorted(mapping.keys(), key=len, reverse=True)
-    for prefix in sorted_prefixes:
-        if s.startswith(prefix):
-            return f"models/{mapping[prefix]}"
-            
-    # Default: Ensure models/ prefix
     return f"models/{s}"
 
 def get_model(mode: Literal["fast", "smart"] = "fast") -> Dict[str, Any]:
-    """
-    [v5.4 Fully Dynamic] Returns the best available model for the requested tier.
-    Model priority: ENV override > discovery registry > absolute emergency fallback.
-    All model IDs come from the dynamic registry (quota_probe.py).
-    NEVER hardcoded — complies with SYSTEM_CONTEXT.md.
-    """
+    """[v5.5 Dynamic] Returns the best available model from the verified registry."""
     try:
-        # 1. ENV override always wins (allows manual per-deployment override)
+        # 1. ENV override
         env_model = os.getenv("GEMINI_FAST_MODEL" if mode == "fast" else "GEMINI_SMART_MODEL")
         if env_model:
             return {"model": sanitize_model_name(env_model), "configured": bool(GEMINI_API_KEY)}
 
-        # 2. Dynamic registry (populated by quota_probe.py)
-        discovery = get_discovery_service()
-        registry_model = discovery.get_best_model(mode)
+        # 2. Dynamic registry (populated by test.py probe)
+        if REGISTRY_PATH.exists():
+            try:
+                import json
+                reg = json.loads(REGISTRY_PATH.read_text(encoding="utf-8"))
+                # Note: test.py saves 'verified_models' as a flat list
+                candidates = reg.get("verified_models", [])
+                
+                # Filter by tier-relevant substrings if needed, or just take first
+                if candidates:
+                    # Logic: 3.1 or 2.0-flash-lite for 'fast', pro for 'smart'
+                    if mode == "fast":
+                        fast_tier = [c for c in candidates if "flash" in c and "lite" in c] or candidates
+                        return {"model": sanitize_model_name(fast_tier[0]), "configured": bool(GEMINI_API_KEY)}
+                    else:
+                        smart_tier = [c for c in candidates if "pro" in c] or [c for c in candidates if "3" in c] or candidates
+                        return {"model": sanitize_model_name(smart_tier[0]), "configured": bool(GEMINI_API_KEY)}
+            except Exception as e:
+                logger.error(f"Failed to parse registry: {e}")
 
-        # 3. Cross-tier fallback: if smart is unavailable, try fast; and vice versa
-        if not registry_model and mode == "smart":
-            registry_model = discovery.get_best_model("fast")
-            logger.warning("Smart tier unavailable, falling back to fast tier.")
-
-        if registry_model:
-            return {"model": sanitize_model_name(registry_model), "configured": bool(GEMINI_API_KEY)}
-
-        # 4. Absolute last resort: ask the registry for ANY verified model
-        all_models = (
-            discovery.verified_models.get("fast", []) +
-            discovery.verified_models.get("smart", [])
-        )
-        if all_models:
-            return {"model": sanitize_model_name(all_models[0]), "configured": bool(GEMINI_API_KEY)}
-
-        raise ValueError("No verified models in registry. Run: python tools/quota_probe.py")
+        # 3. Last Resort fallback (Hardcoded to known active ID)
+        return {"model": "models/gemini-flash-lite-latest", "configured": bool(GEMINI_API_KEY)}
+        
     except Exception as e:
         logger.exception("Error in get_model: %s", e)
-        # Last-resort: try reading raw from registry file to recover gracefully
-        try:
-            import json
-            from pathlib import Path
-            reg = json.loads(Path("data/model_registry.json").read_text(encoding="utf-8"))
-            candidates = reg.get("verified_models", {}).get(mode, [])
-            if candidates:
-                return {"model": sanitize_model_name(candidates[0]), "configured": bool(GEMINI_API_KEY)}
-        except Exception:
-            pass
-        return {"model": "models/gemini-2.5-flash", "configured": False}  # absolute bare minimum
+        return {"model": "models/gemini-flash-lite-latest", "configured": False}
 
 async def get_embeddings(text: str) -> list[float]:
     """
@@ -152,30 +119,36 @@ async def get_embeddings(text: str) -> list[float]:
     if not gemini_client:
         return []
     
-    # Embedding models to try in order (Verified 2026-02-28: gemini-embedding-001 is active)
+    # Embedding models to try in order (Verified 2026-03-24: gemini-embedding-2-preview is active)
     embedding_models = [
+        "models/gemini-embedding-2-preview",
         "models/text-embedding-004", 
-        "models/gemini-embedding-001",
-        "text-embedding-004"
+        "models/gemini-embedding-001"
     ]
     
     for model_id in embedding_models:
         try:
+            # Flexible configuration per model capability
+            config_args = {
+                "task_type": "RETRIEVAL_DOCUMENT",
+                "title": "Cortex Memory"
+            }
+            # Only apply 3072 if using the standard text-embedding-004 (Full Precision Protocol)
+            if "004" in model_id:
+                config_args["output_dimensionality"] = 3072
+
             result = await gemini_client.aio.models.embed_content(
                 model=model_id,
                 contents=text,
-                config=types.EmbedContentConfig(
-                    task_type="RETRIEVAL_DOCUMENT",
-                    title="Cortex Memory",
-                    output_dimensionality=3072
-                )
+                config=types.EmbedContentConfig(**config_args)
             )
             if result.embeddings and len(result.embeddings) > 0:
                 return result.embeddings[0].values
             return []
         except Exception as e:
-            if "429" in str(e) or "RESOURCE_EXHAUSTED" in str(e):
-                logger.warning(f"Embedding model {model_id} exhausted (429).")
+            error_msg = str(e)
+            if any(err in error_msg for err in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"]):
+                logger.warning(f"Embedding model {model_id} throttled or unavailable ({error_msg}). Retrying next model...")
             else:
                 logger.error(f"Failed to generate embeddings with {model_id}: {e}")
             continue # Try the next model in the chain
@@ -243,8 +216,8 @@ async def safe_generate_content(
         model_info = get_model(mode)
         model_id = model_info["model"]
         
-        # Exponential Backoff for each tier (1.5s, 3s)
-        backoff_delays = [0, 1.5, 3.0]
+        # [v7.1 Turbo] Deeper Exponential Backoff for sustained 503/429 spikes
+        backoff_delays = [0, 2.0, 5.0, 10.0, 20.0]
         
         for delay in backoff_delays:
             if delay > 0:
@@ -269,8 +242,8 @@ async def safe_generate_content(
             except Exception as e:
                 last_error = e
                 error_msg = str(e)
-                if "429" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
-                    logger.warning(f"Tier {mode} ({model_id}) exhausted (429) at delay {delay}s.")
+                if any(err in error_msg for err in ["429", "RESOURCE_EXHAUSTED", "503", "UNAVAILABLE"]):
+                    logger.warning(f"Tier {mode} ({model_id}) temporarily unavailable ({error_msg}) at delay {delay}s.")
                     continue # Try next backoff delay
                 else:
                     break # Critical non-429 error, don't retry this model

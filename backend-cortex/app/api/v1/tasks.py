@@ -1,5 +1,5 @@
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Request
 from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
@@ -64,7 +64,7 @@ async def create_task(task: TaskCreate):
     return res.data[0]
 
 @router.post("/{task_id}/complete")
-async def complete_task(task_id: str, background_tasks: BackgroundTasks):
+async def complete_task(task_id: str, request: Request, background_tasks: BackgroundTasks):
     """Mark a task as done and log it to today's diary."""
     
     # 1. Update Task Status
@@ -80,4 +80,9 @@ async def complete_task(task_id: str, background_tasks: BackgroundTasks):
     log_content = f"- [x] **Completed Task**: {task_title} (via Project Board)"
     background_tasks.add_task(create_memory_entry, content=log_content, tags=["task", "achievement"])
     
+    # 3. [v6.0] Sync Project Progress if linked
+    if task.get("project_id"):
+        from app.services.project_service import sync_project_progress
+        background_tasks.add_task(sync_project_progress, project_id=task["project_id"], request=request)
+        
     return {"success": True, "task": task}

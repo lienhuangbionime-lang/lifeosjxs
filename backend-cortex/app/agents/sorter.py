@@ -7,13 +7,9 @@ load_dotenv()
 
 class SorterAgent:
     def __init__(self):
-        # 使用 Flash 模型進行快速分類
-        api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            raise ValueError("GOOGLE_API_KEY or GEMINI_API_KEY not found in environment variables")
-        self.client = genai.Client(api_key=api_key)
-        # 優先從環境變數讀取，若無則預設為 Flash Lite
-        self.model_name = os.getenv("GEMINI_FAST_MODEL", "gemini-flash-lite-latest")
+        # Using loop-safe client and dynamic models from core
+        from app.core.gemini import get_gemini_client
+        self.client = get_gemini_client()
 
     async def process(self, user_input: str) -> LogEntry:
         # Load System Prompt from external file
@@ -89,7 +85,16 @@ class SorterAgent:
                 tags_raw = data.get("tags", [])
                 projects_raw = data.get("projects", [])
                 is_private = bool(data.get("is_private", False))
-                facts_list = data.get("facts", [])
+                facts_raw = data.get("facts", [])
+                
+                # Normalize facts to be a list of dicts (Pydantic requirement)
+                facts_list = []
+                if isinstance(facts_raw, list):
+                    for f in facts_raw:
+                        if isinstance(f, dict):
+                            facts_list.append(f)
+                        elif isinstance(f, str):
+                            facts_list.append({"type": "observation", "evidence": f})
 
                 
                 if isinstance(tags_raw, list):

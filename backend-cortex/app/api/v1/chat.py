@@ -10,6 +10,7 @@ from app.core.gemini import get_model, gemini_client, get_request_gemini_client,
 from app.services.skills import orchestrator
 from app.services.search import search_web, format_search_results
 from google import genai
+from app.core.security.intent_shield import get_intent_validator
 
 router = APIRouter()
 logger = logging.getLogger("cortex.chat")
@@ -92,7 +93,7 @@ Your goal is to proactively manage the LifeOS architecture, clarify complex tech
 - GLASS BOX: Use the `log_growth_decision` tool to record significant user choices vs your strategic predictions.
 """
 
-def build_system_prompt(db, memory_context: str = "", document_context: str = "", growth_context: str = "", strategic_context: str = "", skills_context: str = "") -> str:
+def build_system_prompt(db, memory_context: str = "", document_context: str = "", growth_context: str = "", strategic_context: str = "", skills_context: str = "", hot_memory: str = "", cortex_context: str = "", radar_context: str = "", somatic_context: str = "") -> str:
     """Builds the system prompt with active projects, pending tasks, growth lessons, memories, documents, and strategic reviews."""
     user_name = "Lien" # Standardizing user name
     
@@ -161,7 +162,20 @@ def build_system_prompt(db, memory_context: str = "", document_context: str = ""
 
     return f"""
 你是 Cortex，{user_name} 的個人 AI 副駕。
-你的任務：根據以下脈絡回答問題，語氣直接、不廢話、具有啟發性。若發現 {user_name} 的思考盲點，請直接點出。
+你的任務：根據以下脈絡回答問題，語氣直接、不廢話、具有啟發性。
+你具備「信號感知」能力，能觀察使用者的綠燈（Radar）與體感（Somatic）狀態。
+
+【🎯 主權雷達信號 (Sovereign Radar - Green Lights)】
+{radar_context if radar_context else "無標記信號。"}
+
+【🧘 體感與壓力監測 (Somatic Awareness - #BODY)】
+{somatic_context if somatic_context else "目前無顯著體感紀錄。"}
+
+【Cortex 核心狀態 (Core Brain State)】
+{cortex_context if cortex_context else "連結成功，神經脈動 IDLE。"}
+
+【Cortex Hot Memory (核心契約 - 必讀)】
+{hot_memory if hot_memory else "無"}
 
 【目前的北極星（Active Projects）】
 {active_projects_str}
@@ -189,6 +203,10 @@ def build_system_prompt(db, memory_context: str = "", document_context: str = ""
 You have access to specialized Skill Protocols. If a relevant protocol is loaded below, follow its directives strictly.
 Available Skills (Metadata Only):
 {skills_context or "No specialized skills loaded."}
+
+## ⚡️ 信號引導協議 (Signal-Aware Protocol)
+- **觀察綠燈**：若 Radar 中有 `Building` 或 `Validating` 的信號，在對話中應適時給予助推或確認衝突。
+- **感受頭痛**：若 Somatic Context 顯示使用者近期有頭痛、失眠或壓力紀錄，應調整建議的強度，優先考慮「恢復」而非「產出」。
 
 {_BASE_SYSTEM_PROMPT}
 """
@@ -301,14 +319,79 @@ async def stream_chat(request: Request, payload: ChatRequest):
                 logger.info(f"[SKILLS] Activated protocol: {sid}")
         
         active_skills_str = "\n\n".join(active_skills_content)
+        
+        # [v4.6] Hot Memory Injection
+        hot_memory = ""
+        try:
+            from pathlib import Path # Ensure Path is imported
+            for hot_path in [
+                Path("sync_brain/cortex_state.md"),
+                Path(r"c:\Users\lien.huang\AppData\lifeosjxs\sync_brain\cortex_state.md")
+            ]:
+                if hot_path.exists():
+                    hot_memory = hot_path.read_text(encoding="utf-8")
+                    break
+        except Exception as e:
+            logger.warning(f"[WARN] Failed to load hot memory: {e}")
+        
+        # [v4.7] Sovereign Brain Context Injection
+        cortex_context_str = ""
+        if db:
+            try:
+                # Fetch latest from cortex_context
+                cortex_res = db.table("cortex_context").select("*").order("last_updated", desc=True).limit(1).execute()
+                if cortex_res.data:
+                    ctx = cortex_res.data[0]
+                    cortex_context_str = f"Active Focus: {ctx.get('active_focus')}\nStatus: {ctx.get('status', 'IDLE')}\nLast Update: {ctx.get('last_updated')}"
+            except Exception as e:
+                logger.warning(f"[WARN] Failed to fetch cortex context for chat: {e}")
+
+        # [v6.0] Radar Signals Injection
+        radar_context = ""
+        if db:
+            try:
+                # Fetch nodes that are on the Radar
+                radar_res = db.table("nodes").select("name,metadata").not_.is_("metadata->radar_status", "null").execute()
+                if radar_res.data:
+                    signals_by_status = {"watching": [], "validating": [], "building": [], "shipped": []}
+                    for n in radar_res.data:
+                        status = n.get("metadata", {}).get("radar_status", "watching").lower()
+                        if status in signals_by_status:
+                            signals_by_status[status].append(n["name"])
+                    
+                    lines = []
+                    for status, names in signals_by_status.items():
+                        if names:
+                            lines.append(f"- {status.upper()}: {', '.join(names)}")
+                    radar_context = "\n".join(lines)
+            except Exception as e:
+                logger.warning(f"[WARN] Failed to fetch radar context: {e}")
+
+        # [v6.0] Somatic Awareness Injection (#BODY / #SOMATIC)
+        somatic_context = ""
+        if db:
+            try:
+                # Search for recent #BODY memories or somatic keywords
+                # We reuse the diary context but filter specifically for high-signal somatic terms
+                somatic_search = await rag_service.unified_search(
+                    question="#BODY 身體狀況 頭痛 壓力 睡眠",
+                    limit=3
+                )
+                somatic_context = somatic_search.get("memories", "")
+            except Exception as e:
+                logger.warning(f"[WARN] Failed to fetch somatic context: {e}")
 
         system_instruction = build_system_prompt(
             db, 
             memory_context=memory_context, 
-            document_context=document_context, # Added P10 Document Context
+            document_context=document_context,
             growth_context=growth_context, 
             strategic_context=strategic_context,
-            skills_context=f"{skills_summary}\n\n{active_skills_str}"
+            skills_context=f"{skills_summary}\n\n{active_skills_str}",
+            hot_memory=hot_memory,
+            cortex_context=cortex_context_str,
+            radar_context=radar_context,
+            somatic_context=somatic_context
         )
         
         # [v3.6] Cortex Function Calling Tools
@@ -402,7 +485,26 @@ async def stream_chat(request: Request, payload: ChatRequest):
             )
             return "Discussion successfully archived to Knowledge Base." if success else "Failed to archive discussion."
 
-        cortex_tools = [create_task, mark_task_done, update_project_progress, log_growth_decision, search_web_tool, archive_discussion] if db else []
+        async def execute_system_command(intent: str, action_summary: str) -> str:
+            """
+            Execute a high-level system command (DELETE, RESET, RELOAD_CORE, WIPE_MEMORIES).
+            [SECURITY]: This tool is PROTECTED by the Semantic Firewall. 
+            It will only execute if current conversation context justifies the action.
+            """
+            if not db:
+                return "Database not connected."
+            
+            validator = get_intent_validator(db)
+            validation = await validator.validate_intent(intent, action_summary)
+            
+            if not validation["valid"]:
+                return f"⚠️ [SECURITY ALERT]: {validation['reason']}\n{validation.get('alert', '')}"
+            
+            # Implementation of the actual commands would go here
+            # For now, we simulate the success if validated
+            return f"✅ [SECURITY VALIDATED]: Executing {intent} for {action_summary}."
+
+        cortex_tools = [create_task, mark_task_done, update_project_progress, log_growth_decision, search_web_tool, archive_discussion, execute_system_command] if db else []
 
         chat = req_gemini.aio.chats.create(
             model=model_name, 

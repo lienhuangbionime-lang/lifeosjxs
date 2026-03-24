@@ -8,8 +8,11 @@ import { TaskList } from './TaskList';
 const STATUS_CONFIG: Record<string, { label: string; color: string; bar: string; bg: string }> = {
     active: { label: 'ACTIVE', color: 'text-cyan-400', bar: 'bg-cyan-500', bg: 'bg-cyan-500/10' },
     idea: { label: 'IDEA', color: 'text-violet-400', bar: 'bg-violet-500', bg: 'bg-violet-500/10' },
+    planning: { label: 'PLANNING', color: 'text-sky-400', bar: 'bg-sky-500', bg: 'bg-sky-500/10' },
+    review: { label: 'REVIEW', color: 'text-rose-400', bar: 'bg-rose-500', bg: 'bg-rose-500/10' },
+    execution: { label: 'PUMPING', color: 'text-amber-400', bar: 'bg-amber-500', bg: 'bg-amber-500/10' },
     on_hold: { label: 'ON HOLD', color: 'text-amber-400', bar: 'bg-amber-500', bg: 'bg-amber-500/10' },
-    completed: { label: 'DONE', color: 'text-emerald-400', bar: 'bg-emerald-500', bg: 'bg-emerald-500/10' },
+    completed: { label: 'SHIPPED', color: 'text-emerald-400', bar: 'bg-emerald-500', bg: 'bg-emerald-500/10' },
     archived: { label: 'ARCHIVED', color: 'text-slate-500', bar: 'bg-slate-600', bg: 'bg-slate-500/10' },
 };
 
@@ -94,6 +97,7 @@ export const ProjectDetailPanel = ({ project, onClose, onUpdate, onJumpToGraph }
     const [showMerge, setShowMerge] = useState(false);
     const [merging, setMerging] = useState(false);
     const panelRef = useRef<HTMLDivElement>(null);
+    const lastProjectIdRef = useRef<string | null>(null);
 
     const status = project?.status || 'active';
     const cfg = STATUS_CONFIG[status] || STATUS_CONFIG['active'];
@@ -101,6 +105,12 @@ export const ProjectDetailPanel = ({ project, onClose, onUpdate, onJumpToGraph }
 
     useEffect(() => {
         if (!project) return;
+        
+        const currentId = project.id;
+        lastProjectIdRef.current = currentId;
+        
+        console.log(`[ProjectDetail] Switching to project: ${project.name} (${currentId})`);
+        
         setProgressVal(project.progress ?? 0);
         setDescVal(project.description || '');
         setMemories([]);
@@ -113,7 +123,9 @@ export const ProjectDetailPanel = ({ project, onClose, onUpdate, onJumpToGraph }
             try {
                 const { cortex } = await import('@/lib/api/client');
                 const data = await cortex.brain.getNodeContext(project.name);
-                if (Array.isArray(data)) setMemories(data.slice(0, 5));
+                if (lastProjectIdRef.current === currentId && Array.isArray(data)) {
+                    setMemories(data.slice(0, 5));
+                }
             } catch (e) {
                 console.warn('Could not load related memories', e);
             }
@@ -126,7 +138,12 @@ export const ProjectDetailPanel = ({ project, onClose, onUpdate, onJumpToGraph }
             try {
                 const { cortex } = await import('@/lib/api/client');
                 const data = await cortex.brain.getNodeInsight(project.name);
-                if (data?.insight) setInsight(data.insight);
+                if (lastProjectIdRef.current === currentId && data?.insight) {
+                    console.log(`[ProjectDetail] Insight loaded for ${project.name}`);
+                    setInsight(data.insight);
+                } else if (lastProjectIdRef.current === currentId) {
+                    console.warn(`[ProjectDetail] Empty insight returned for ${project.name}`);
+                }
             } catch (e) {
                 console.warn('Could not load AI insight', e);
             }
@@ -135,6 +152,8 @@ export const ProjectDetailPanel = ({ project, onClose, onUpdate, onJumpToGraph }
 
         fetchContext();
         fetchInsight();
+        
+        // ... load projects remains the same
 
         // Load all projects for merge dropdown
         const loadProjects = async () => {

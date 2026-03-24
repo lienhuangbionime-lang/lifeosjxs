@@ -81,8 +81,9 @@ async def update_project(project_id: str, project: ProjectUpdate, request: Reque
     # [FIX] Handle missing 'category' column (if update tries to set it, though ProjectUpdate doesn't have it yet)
     # ProjectUpdate model doesn't have category, so this is safe for now.
     
-    from app.core.database import safe_write
-    response = safe_write(db.table("projects").eq("id", project_id), data, operation_type="update")
+    from app.services.project_service import sync_project_progress
+    await sync_project_progress(project_id, request)
+    
     return {"message": "Project updated", "data": response.data}
 
 @router.delete("/{project_id}")

@@ -1,9 +1,11 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, MessageSquare, X, Bot, User, Loader2, Maximize2, Minimize2, Trash2, Settings, Terminal, Sparkles, Link2 } from 'lucide-react';
+import { Send, Paperclip, MessageSquare, X, Bot, User, Loader2, Maximize2, Minimize2, Trash2, Settings, Terminal, Sparkles, Link2, Zap, Brain } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cortex, EvolutionStatus } from '@/lib/api/client';
+import { CaptureView } from './CaptureView';
+import { RadarView } from './RadarView';
 
 interface Message {
     role: 'user' | 'assistant';
@@ -26,10 +28,12 @@ export const CortexChat = () => {
     const [selectedModel, setSelectedModel] = useState('models/gemini-flash-lite-latest');
     const [isRefreshingModels, setIsRefreshingModels] = useState(false);
     const [apiKey, setApiKey] = useState('');
-    const [activeTab, setActiveTab] = useState<'chat' | 'logic'>('chat');
+    const [activeTab, setActiveTab] = useState<'capture' | 'chat' | 'brain' | 'logic' | 'radar'>('capture');
     const [prompts, setPrompts] = useState<Record<string, string>>({});
     const [selectedPrompt, setSelectedPrompt] = useState('system_cortex');
     const [isSavingPrompt, setIsSavingPrompt] = useState(false);
+    const [brainContext, setBrainContext] = useState<any | null>(null); // [New] Sovereign Context
+    const [currentThought, setCurrentThought] = useState(''); // [New] Thinking Stream
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -177,6 +181,7 @@ export const CortexChat = () => {
 
         setInput('');
         setUrlContext(null);
+        setCurrentThought(''); // Reset thought
 
         const currentHistory = messages.map(m => ({
             role: m.role,
@@ -207,25 +212,31 @@ export const CortexChat = () => {
 
             const reader = response.body.getReader();
             const decoder = new TextDecoder();
-            let aiMsg = '';
+            let fullText = '';
 
-            if (currentUrlContext) {
-                // Subtle indicator that background archiving started
-                setMessages(prev => [...prev, { role: 'assistant', content: `*Integrating external knowledge: ${currentUrlContext.title}...*` }]);
-            }
+            // Add initial empty message for the assistant
+            setMessages(prev => [...prev, { role: 'assistant', content: currentUrlContext ? `*Integrating: ${currentUrlContext.title}...*` : '...' }]);
 
             while (true) {
                 const { done, value } = await reader.read();
                 if (done) break;
                 const chunk = decoder.decode(value);
-                aiMsg += chunk;
+                fullText += chunk;
+
+                // [New] Thought Extraction Logic
+                if (fullText.includes('<thought>')) {
+                    const parts = fullText.split('<thought>');
+                    const thoughtContent = parts[1]?.split('</thought>')[0] || parts[1] || '';
+                    setCurrentThought(thoughtContent);
+                }
+
+                // Clean the text for the chat bubble (remove thought block)
+                const chatDisplay = fullText.replace(/<thought>[\s\S]*?<\/thought>/g, '').trim();
+
                 setMessages(prev => {
                     const newMsgs = [...prev];
-                    // If we just added the "Integrating..." message, we need to handle the index correctly
-                    const targetIndex = currentUrlContext ? newMsgs.length - 1 : newMsgs.length - 1;
-                    // Actually, if currentUrlContext exists, newMsgs[length-2] is prompt, newMsgs[length-1] is current AI response
-                    // Let's just use the last one.
-                    newMsgs[newMsgs.length - 1].content = aiMsg;
+                    const finalDisplay = chatDisplay || (fullText.includes('<thought>') && !fullText.includes('</thought>') ? 'Thinking...' : '...');
+                    newMsgs[newMsgs.length - 1].content = finalDisplay;
                     return newMsgs;
                 });
             }
@@ -324,18 +335,36 @@ export const CortexChat = () => {
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex bg-slate-50/50 border-b border-slate-100 px-3 py-1 gap-4 shrink-0">
+            <div className="flex bg-slate-50/50 border-b border-slate-100 px-3 py-1 gap-4 shrink-0 overflow-x-auto no-scrollbar">
+                <button
+                    onClick={() => setActiveTab('capture')}
+                    className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all shrink-0 ${activeTab === 'capture' ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
+                >
+                    📝 Capture
+                </button>
                 <button
                     onClick={() => setActiveTab('chat')}
-                    className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all ${activeTab === 'chat' ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
+                    className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all shrink-0 ${activeTab === 'chat' ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
                 >
                     Chat
                 </button>
                 <button
-                    onClick={() => setActiveTab('logic')}
-                    className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all ${activeTab === 'logic' ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
+                    onClick={() => setActiveTab('brain')}
+                    className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all shrink-0 ${activeTab === 'brain' ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
                 >
-                    🧠 Logic
+                    🧠 Brain
+                </button>
+                <button
+                    onClick={() => setActiveTab('logic')}
+                    className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all shrink-0 ${activeTab === 'logic' ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
+                >
+                    Logic
+                </button>
+                <button
+                    onClick={() => setActiveTab('radar')}
+                    className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all shrink-0 ${activeTab === 'radar' ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
+                >
+                    📡 Radar
                 </button>
             </div>
 
@@ -397,6 +426,78 @@ export const CortexChat = () => {
                         >
                             Save Changes
                         </button>
+                    </div>
+                </div>
+            )}
+
+            {/* Capture Tab Body */}
+            {activeTab === 'capture' && (
+                <div className="flex-1 overflow-y-auto p-4 bg-slate-950 custom-scrollbar">
+                    <CaptureView onSave={(entry) => {
+                        console.log("Capture from Chat Hub:", entry);
+                    }} />
+                </div>
+            )}
+
+            {/* Radar Tab Body */}
+            {activeTab === 'radar' && (
+                <div className="flex-1 overflow-hidden p-4 bg-slate-950">
+                    <RadarView />
+                </div>
+            )}
+
+            {/* Brain Tab Body */}
+            {activeTab === 'brain' && (
+                <div className="flex-1 flex flex-col p-4 bg-slate-900 border-t border-slate-800 overflow-y-auto custom-scrollbar font-mono">
+                    <div className="mb-6">
+                        <div className="flex items-center gap-2 mb-3 text-indigo-400">
+                            <Zap size={14} className={brainContext?.status && brainContext.status !== 'IDLE' ? 'animate-pulse' : ''} />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Neural Thinking Stream</span>
+                        </div>
+                        <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl min-h-[120px]">
+                            <p className="text-[11px] text-indigo-300 leading-relaxed italic whitespace-pre-wrap">
+                                {currentThought || (isLoading ? 'Neural pathways firing...' : 'System idle. Awaiting command.')}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="mb-6">
+                        <div className="flex items-center gap-2 mb-3 text-slate-400">
+                            <Bot size={14} />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Active Focus</span>
+                        </div>
+                        <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
+                            <p className="text-xs text-slate-300 leading-relaxed font-sans">
+                                {brainContext?.active_focus || 'Standby Mode.'}
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="mb-6">
+                        <div className="flex items-center gap-2 mb-3 text-slate-400">
+                            <Link2 size={14} />
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Sovereign Skill Manifest</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            {['Search', 'Task', 'Project', 'Growth', 'Archiver', 'Reasoner'].map(skill => (
+                                <div key={skill} className="bg-white/5 border border-white/10 rounded-lg p-2 flex items-center gap-2">
+                                    <div className="w-1 h-1 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+                                    <span className="text-[10px] text-slate-400 font-bold">{skill.toUpperCase()}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    {/* Meta Info */}
+                    <div className="mt-auto pt-4 border-t border-white/5 space-y-2 opacity-40 text-[9px]">
+                        <div className="flex justify-between">
+                            <span>LAST_SYNC:</span>
+                            <span>{brainContext?.last_updated ? new Date(brainContext.last_updated).toLocaleTimeString() : 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span>INTEGRITY:</span>
+                            <span>SHIELD_ACTIVE</span>
+                        </div>
                     </div>
                 </div>
             )}
@@ -463,7 +564,20 @@ export const CortexChat = () => {
                                                     ),
                                                     pre: ({ ...props }) => (
                                                         <pre className="bg-slate-800 text-slate-100 p-3 rounded-xl my-3 overflow-x-auto text-[11px] font-mono shadow-inner" {...props} />
-                                                    )
+                                                    ),
+                                                    blockquote: ({ ...props }) => {
+                                                        const isAction = String(props.children).includes('[Cortex Action]');
+                                                        return (
+                                                            <blockquote 
+                                                                className={`border-l-4 pl-3 py-1 my-3 italic text-xs rounded-r-lg ${
+                                                                    isAction 
+                                                                    ? 'border-indigo-500 bg-indigo-50 text-indigo-900 font-bold not-italic font-mono' 
+                                                                    : 'border-slate-300 bg-slate-50 text-slate-600'
+                                                                }`} 
+                                                                {...props} 
+                                                            />
+                                                        );
+                                                    }
                                                 }}
                                             >
                                                 {m.content}

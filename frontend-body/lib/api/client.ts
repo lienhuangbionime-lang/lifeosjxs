@@ -362,6 +362,22 @@ export const cortex = {
     }
   },
 
+  // [New] Sovereign Radar (v6.0)
+  radar: {
+    getSignals: async (): Promise<any> => {
+      return await fetchProxy("/api/v1/radar/signals");
+    },
+    promote: async (data: { label: string; target_status: string; meta_updates?: any }): Promise<any> => {
+      return await fetchProxy("/api/v1/radar/promote", {
+        method: "POST",
+        body: JSON.stringify(data),
+      });
+    },
+    scan: async (): Promise<any> => {
+      return await fetchProxy("/api/v1/radar/scan");
+    }
+  },
+
   // [New] One-Click Supabase Schema Setup — runs full LifeOS schema on user's DB
   async setupDb(): Promise<{ success: boolean; message: string; errors: string[] }> {
     return await fetchProxy("/api/v1/system/setup-db", {

@@ -29,13 +29,20 @@ async def get_system_status():
         # Get current active models from dynamic registry
         fast = get_model("fast")
         smart = get_model("smart")
-        current_model = fast["model"]  # fast is the default active tier
+        current_model = fast.get("model", "unknown")
 
-        # Build quota status from registry
-        available_fast = model_discovery.verified_models.get("fast", [])
-        available_smart = model_discovery.verified_models.get("smart", [])
-        exhausted_fast = model_discovery.quota_exhausted.get("fast", [])
-        exhausted_smart = model_discovery.quota_exhausted.get("smart", [])
+        # [v5.7] Defensive Registry Access
+        verified = getattr(model_discovery, "verified_models", {})
+        exhausted = getattr(model_discovery, "quota_exhausted", {})
+
+        # Ensure they are dicts to prevent AttributeErrors on .get()
+        if not isinstance(verified, dict): verified = {"fast": [], "smart": []}
+        if not isinstance(exhausted, dict): exhausted = {"fast": [], "smart": []}
+
+        available_fast = verified.get("fast", [])
+        available_smart = verified.get("smart", [])
+        exhausted_fast = exhausted.get("fast", [])
+        exhausted_smart = exhausted.get("smart", [])
         last_probe = model_discovery.last_discovery or "Unknown"
 
         # Daily usage count from DB
@@ -79,6 +86,21 @@ async def get_system_status():
     except Exception as e:
         logger.exception("Failed to get system status: %s", e)
         raise HTTPException(status_code=500, detail="Failed to retrieve system status")
+
+
+@router.get("/hippocampus/health")
+async def get_hippocampus_health():
+    """
+    [v6.0] Perform a real-time structural health check of the cloud database
+    relative to the local static blueprint.
+    """
+    from app.agents.hippocampus_agent import hippocampus_agent
+    try:
+        health = await hippocampus_agent.check_health()
+        return health
+    except Exception as e:
+        logger.error(f"Hippocampus health check failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.post("/upgrade", response_model=UpgradeResponse)
@@ -382,11 +404,11 @@ create policy "Allow all access" on public.system_usage for all using (true) wit
 @router.post("/setup-db")
 async def setup_database(request: Request):
     """
-    Run the full LifeOS v3.8.1 schema on the user's own Supabase.
-    Requires X-Supabase-URL and X-Supabase-Key headers (service_role key recommended).
+    Run LifeOS schema by reading migration files from database-hippocampus.
+    This ensures the Cloud DB is always in sync with the latest local blueprint.
     """
     from app.core.database import get_request_client
-    import httpx
+    from pathlib import Path
 
     supabase_url = request.headers.get("X-Supabase-URL")
     supabase_key = request.headers.get("X-Supabase-Key")
@@ -399,36 +421,52 @@ async def setup_database(request: Request):
         if not db:
             raise HTTPException(status_code=400, detail="Could not connect to your Supabase")
         
-        # Split on semicolons, filter empty
-        statements = [s.strip() for s in LIFEOS_SETUP_SQL.split(";") if s.strip() and not s.strip().startswith("--")]
+        # 1. Locate the Hippocampus Migrations
+        # Correct path from backend-cortex/app/api/v1/system.py back to project root
+        project_root = Path(__file__).parent.parent.parent.parent.parent
+        hippocampus_dir = project_root / "database-hippocampus"
+        migrations_dir = hippocampus_dir / "migrations"
+        
+        sql_files = sorted(list(migrations_dir.glob("*.sql")))
+        
+        if not sql_files:
+            # Fallback to the internal hardcoded baseline if no migrations found
+            logger.warning("No migration files found in database-hippocampus. Using internal baseline.")
+            all_sql = LIFEOS_SETUP_SQL
+        else:
+            logger.info(f"Found {len(sql_files)} migration files in {migrations_dir}")
+            # Combine migrations in order
+            all_sql = ""
+            for f in sql_files:
+                all_sql += f"\n-- MIGRATION: {f.name}\n"
+                all_sql += f.read_text(encoding="utf-8") + "\n"
+
+        # 2. Split and Execute
+        statements = [s.strip() for s in all_sql.split(";") if s.strip() and not s.strip().startswith("--")]
         
         errors = []
         success_count = 0
         for stmt in statements:
             try:
                 # 🚨 Dependency: User MUST have an 'exec' RPC function defined in Supabase 
-                # (Standard trick for headless SQL setup via PostgREST)
                 db.rpc("exec", {"sql": stmt}).execute()
                 success_count += 1
             except Exception as e:
                 err_msg = str(e)
-                # Ignore "already exists" errors — those are OK
                 if "already exists" in err_msg.lower() or "duplicate" in err_msg.lower():
                     success_count += 1
                 elif "function public.exec(sql text) does not exist" in err_msg.lower():
                     raise HTTPException(
                         status_code=400, 
-                        detail="Missing 'exec' function. Please run the bootstrap SQL in Supabase Editor first (see Settings)."
+                        detail="Missing 'exec' function. Run bootstrap SQL in Supabase Editor first."
                     )
                 else:
                     errors.append(f"{stmt[:60]}... → {err_msg[:100]}")
         
-        if errors:
-            logger.warning(f"Setup-db completed with {len(errors)} non-fatal errors: {errors[:3]}")
-        
         return {
             "success": True,
-            "message": f"LifeOS v3.8.1 schema setup complete. {success_count} statements executed.",
+            "message": f"Hippocampus Sync Complete. {success_count} statements executed.",
+            "migrations_performed": [f.name for f in sql_files] if sql_files else ["Internal Baseline"],
             "errors": errors[:5] if errors else []
         }
         

@@ -52,13 +52,19 @@
 ## Phase P9: Role Alignment & Prompt Optimization (Completed)
 - [x] 更新 `sync_brain/system_cortex.md` 以適配搜尋技能
 - [x] 強化「開發者 AI」與「使用者系統」的角色邊界
+- [ ] Skill Evolution: `skill-improvement` v7.0 [id: 90]
+    - [ ] Research Advanced Diagnostic Patterns [id: 91]
+    - [ ] Draft 'Evolution v7.0' Proposal [id: 92]
+    - [ ] Update `global_skills/skill-improvement/SKILL.md` [id: 93]
+    - [ ] Create `scripts/skill_validator.py` template [id: 94]
 - [x] 執行最終驗證
 
 ## Phase P10: Knowledge & Memory Isolation (Completed)
-- [x] 獲取並驗證 `documents` 表之 SQL Schema
-- [x] 更新 `registry.json` 定義 (包含 Unified Awareness 協議)
-- [x] 修改 `rag_service.py` 實作資料流隔離與雙軌檢索
-- [x] 實作指令識別 (Intent Routing) 邏輯 (source-based)
+- [/] Chat Awareness Enhancement (v6.0) [id: 40]
+    - [/] Fetch Radar Signals Context [id: 41]
+    - [/] Fetch Somatic (#BODY) Memory Context [id: 42]
+    - [/] Update `build_system_prompt` in `chat.py` [id: 43]
+    - [/] Update AI persona instructions for Signal Awareness [id: 44]
 - [x] 升級 Crystallize 2.0 (自動文獻摘要)
 - [x] 點對點串接 Frontend / Ingest / Chat 流程
 

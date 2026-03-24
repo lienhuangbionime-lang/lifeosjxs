@@ -1,0 +1,24 @@
+{
+  "timestamp": "2026-03-24T03:03:01.159358",
+  "verified_models": [
+    "models/gemini-flash-lite-latest"
+  ],
+  "quota_exhausted": [
+    "models/gemini-2.0-flash-lite",
+    "models/gemini-2.0-flash"
+  ],
+  "failed_others": [
+    {
+      "id": "models/gemini-1.5-flash-8b",
+      "reason": "404"
+    },
+    {
+      "id": "models/gemini-1.5-flash",
+      "reason": "404"
+    },
+    {
+      "id": "models/gemini-1.5-pro",
+      "reason": "404"
+    }
+  ]
+}

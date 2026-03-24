@@ -14,24 +14,45 @@ class ModelDiscoveryService:
     Detects available Gemini models, runs sandbox health tests, and maintains a verified registry.
     """
     
-    def __init__(self, registry_path: str = "data/model_registry.json"):
-        self.registry_path = registry_path
+    def __init__(self, registry_path: str = None):
+        if not registry_path:
+            # v5.6 Standard Path - Up to lifeosjxs/
+            root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+            self.registry_path = os.path.join(root, "sync_brain", "model_registry.json")
+        else:
+            self.registry_path = registry_path
+            
         self.verified_models: Dict[str, List[str]] = {"fast": [], "smart": []}
         self.pending_models: Dict[str, List[str]] = {"fast": [], "smart": []}
-        self.quota_exhausted: Dict[str, List[str]] = {"fast": [], "smart": []}  # [v5.4]
+        self.quota_exhausted: Dict[str, List[str]] = {"fast": [], "smart": []}
         self.last_discovery: Optional[str] = None
         self._load_registry()
 
     def _load_registry(self):
-        """Load the verified model registry from disk."""
+        """Load the verified model registry from disk with flat-list fallback."""
         if os.path.exists(self.registry_path):
             try:
                 with open(self.registry_path, "r", encoding="utf-8") as f:
                     data = json.load(f)
-                    self.verified_models = data.get("verified_models", {"fast": [], "smart": []})
+                    raw_verified = data.get("verified_models", [])
+                    
+                    # Handle flat list from test.py probe
+                    if isinstance(raw_verified, list):
+                        self.verified_models["fast"] = [m for m in raw_verified if "lite" in m or "flash" in m]
+                        self.verified_models["smart"] = [m for m in raw_verified if "pro" in m or "3" in m]
+                    else:
+                        self.verified_models = raw_verified
+                        
+                    # Handle exhausted models list
+                    raw_exhausted = data.get("quota_exhausted", [])
+                    if isinstance(raw_exhausted, list):
+                        self.quota_exhausted["fast"] = [m for m in raw_exhausted if "lite" in m or "flash" in m]
+                        self.quota_exhausted["smart"] = [m for m in raw_exhausted if "pro" in m or "3" in m]
+                    else:
+                        self.quota_exhausted = raw_exhausted
+
                     self.pending_models = data.get("pending_models", {"fast": [], "smart": []})
-                    self.quota_exhausted = data.get("quota_exhausted", {"fast": [], "smart": []})  # [v5.4]
-                    self.last_discovery = data.get("last_discovery")
+                    self.last_discovery = data.get("last_discovery") or data.get("last_updated") or data.get("timestamp")
                 logger.info(f"[OK] Loaded model registry: {len(self.verified_models['fast'])} fast, {len(self.verified_models['smart'])} smart. Pending: {len(self.pending_models['fast'])} fast, {len(self.pending_models['smart'])} smart")
             except Exception as e:
                 logger.error(f"[ERROR] Failed to load model registry: {e}")

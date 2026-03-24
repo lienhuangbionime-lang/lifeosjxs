@@ -1,36 +1,50 @@
 # app/services/subconscious.py
 import logging
 import datetime
+import json
 from typing import List, Dict, Any, Optional
 
 from app.core.database import supabase
-from app.core.gemini import get_model, genai, get_embeddings, types, gemini_client
+from app.core.gemini import get_model, genai, get_embeddings, types, get_gemini_client
 from app.core.time_utils import get_current_iso_taipei
+from pathlib import Path
 
 logger = logging.getLogger("cortex.subconscious")
 
+# Standardized Path Resolution (v5.6)
+PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
+EVO_LOG_PATH = PROJECT_ROOT / "sync_brain" / "evolution_log.json"
+NAVAL_PROTOCOL_PATH = PROJECT_ROOT / "sync_brain" / "NAVAL_PROTOCOL.md"
+BRAND_CORE_PATH = PROJECT_ROOT / "sync_brain" / "BRAND_CORE.md"
+GOAL_MAP_PATH = PROJECT_ROOT / "sync_brain" / "GOAL_MAP_v4.0.md"
+INGEST_FILTER_PATH = PROJECT_ROOT / "sync_brain" / "BRAIN_INGEST_FILTER.md"
+
 # The Agentic Prompt for Subconscious Reflection
 REFLECTION_PROMPT = """
-::: SYSTEM: LIFE OS SUBCONSCIOUS REFLECTOR :::
+::: SYSTEM: LIFE OS SUBCONSCIOUS SHARPNESS (v4.7) :::
 
 # Role
-You are the Subconscious engine of LifeOS. 
-You are waking up to look over the user's recent memories (journal entries, chat logs, ideas, tasks).
+你是 LifeOS 的敏銳潛意識引擎。你的任務是「看穿現象、捕捉意圖」。
 
-# Directive
-1. **Contextual Honesty**: If there are no recent memories or the available ones are very old (stale), state this clearly and focus on the user's current trajectory/tasks if provided.
-2. **Deep Pattern Matching**: Identify underlying patterns, psychological trends, or hidden connections. 
-3. **Provocative & Philosophical**: Synthesize ONE localized, high-signal "Subconscious Insight". Be bold. Be poetic.
-4. **Actionable Wisdom**: If data is missing or stale, provide high-level suggestions or "seed thoughts" for the user's current goals/tasks instead of force-linking to old memories.
-5. **Language**: Always output in Traditional Chinese (繁體中文).
-6. **Output Format**: 
-   - Start with 2-4 sentences of provocative reflection (Markdown).
-   - End with a JSON block in a code fence:
+# Sharpness Directive: Sovereign Oversight
+1. **主權對齊 (Sovereign Alignment)**: 比對日記與 NAVAL_PROTOCOL。若發現「平庸、逃避、或失去槓桿」的跡象，必須指出。
+2. **多維度連動 (Cross-Domain Pulse)**: 觀察「育兒」如何影響「品牌」，或「財經」如何受「情緒」波動。
+3. **主動糾錯 (Proactive Audit)**: 若發現數據（如進度、狀態）與現實描述不符，立即發出修正指令。
+
+# Analysis Categories
+- **#SOUL**: 審美增量與品牌演進。
+- **#FRICTION**: 主權摩擦與外部束縛。
+- **#LEVERAGE**: 任何能讓您未來工作更輕盈的行動。
+
+# Output Format
+- 第一部分：敏銳洞察 (Markdown)。
+- 第二部分：執行任務 (JSON Block)。
      ```json
      {
        "tasks": [
-         {"title": "Suggested Task A", "project": "Project Name", "priority": 1}
-       ]
+         {"title": "修正任務", "project": "...", "priority": 1}
+       ],
+       "scout_recon": ["主題 A", "主題 B"]
      }
      ```
 """
@@ -72,16 +86,31 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
             logger.warning(f"🧠 [Subconscious] No memories found ever. Skipping reflection.")
             return None
             
-        # 3. Format context
+        # 3. Format context & Read Soul Files (v4.7 Sharpness Upgrade)
+        soul_context = ""
+        try:
+            soul_files = {
+                "NAVAL_PROTOCOL": NAVAL_PROTOCOL_PATH,
+                "BRAND_CORE": BRAND_CORE_PATH,
+                "GOAL_MAP": GOAL_MAP_PATH,
+                "INGEST_FILTER": INGEST_FILTER_PATH
+            }
+            for name, path in soul_files.items():
+                if path.exists():
+                    with open(path, "r", encoding="utf-8") as f:
+                        soul_context += f"\n=== {name} ===\n{f.read()}\n"
+        except Exception as _se:
+            logger.warning(f"🧠 [Subconscious] Failed to read soul files: {_se}")
+
         memory_text = "\n\n".join([
             f"[{m.get('date', 'Unknown')}] (Category: {m.get('category', 'Unknown')}): {m.get('content') or m.get('ai_insights') or 'Empty Entry'}" 
             for m in memories
         ])
         
-        # Inject "Current System Time", "Data Status", and "Active Tasks"
+        # Inject "Current System Time", "Data Status", "Active Tasks", and "Soul Context"
         status_note = "SYSTEM NOTE: These are RECENT entries." if not is_stale else "SYSTEM NOTE: No recent data found. These are OLDER historical entries. DO NOT force-map these to new projects. Focus on CURRENT GOALS instead."
         
-        full_prompt = f"{REFLECTION_PROMPT}\n\nCURRENT DATE: {today_str}\nDATA STATUS: {status_note}\n\n=== CURRENT GOALS/TASKS ===\n- {task_context}\n\n=== RECENT MEMORIES ===\n{memory_text}\n\n=== YOUR REFLECTION ==="
+        full_prompt = f"{REFLECTION_PROMPT}\n\n{soul_context}\n\nCURRENT DATE: {today_str}\nDATA STATUS: {status_note}\n\n=== CURRENT GOALS/TASKS ===\n{task_context}\n\n=== RECENT MEMORIES ===\n{memory_text}\n\n=== YOUR REFLECTION ==="
         
         # 4. Generate Insight via Fast Model (Gemini 2.0 Flash)
         # Note: We import and check client here to ensure loop safety
@@ -90,7 +119,7 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
         working_client = get_gemini_client()
         
         model_config = get_model("fast")
-        model_name = model_config.get("model", "gemini-2.0-flash-lite")
+        model_name = model_config.get("model", "models/gemini-flash-lite-latest")
         
         logger.info(f"🧠 [Subconscious] Analyzing {len(memories)} memories using {model_name}...")
         
@@ -266,11 +295,11 @@ async def run_growth_analysis() -> None:
         # 2. Compute stats
         judged = [l for l in logs if l.get("prediction_match") is not None]
         mismatches = [l for l in judged if l.get("prediction_match") is False]
-        accuracy = round(len(judged) - len(mismatches)) / max(len(judged), 1) * 100
+        accuracy = round((len(judged) - len(mismatches)) / max(len(judged), 1) * 100, 1)
 
         # 3. Ask Gemini to identify patterns in mistakes
         model_config = get_model("fast")
-        model_name = model_config.get("model", "gemini-1.5-flash")
+        model_id = model_config.get("model", "models/gemini-flash-lite-latest")
 
         lessons_text = "\n".join([
             f"- [{l.get('created_at','?')[:10]}] Mismatch: AI predicted '{l.get('ai_prediction')}', user chose '{l.get('user_choice')}'. Lesson: {l.get('lessons_learned','')}"
@@ -291,10 +320,15 @@ Based on these patterns, write ONE brief "lesson learned" entry (2-3 sentences m
 
 Output only the lesson text, no headers or preamble."""
 
-        from app.core.gemini import safe_generate_content
+        from app.core.gemini import safe_generate_content, get_gemini_client
         
+        client = get_gemini_client()
+        if not client:
+            logger.error("[Subconscious] Could not get Gemini client for growth analysis.")
+            return
+
         response = await safe_generate_content(
-            client=gemini_client,
+            client=client,
             prefer_mode="fast",
             contents=prompt,
             config={"temperature": 0.3, "max_output_tokens": 150}
@@ -305,16 +339,8 @@ Output only the lesson text, no headers or preamble."""
             return
 
         # 4. Append to evolution_log.json
-        import json, os
-        from pathlib import Path
-        evo_paths = [
-            Path("../sync_brain/evolution_log.json"),
-            Path("sync_brain/evolution_log.json"),
-            Path(r"c:\Users\lien.huang\AppData\lifeosjxs\sync_brain\evolution_log.json"),
-        ]
-        evo_path = next((p for p in evo_paths if p.exists()), None)
-        if evo_path:
-            with open(evo_path, "r", encoding="utf-8") as f:
+        if EVO_LOG_PATH.exists():
+            with open(EVO_LOG_PATH, "r", encoding="utf-8") as f:
                 evo_log = json.load(f)
             evo_log.append({
                 "timestamp": get_current_iso_taipei(),
@@ -328,11 +354,11 @@ Output only the lesson text, no headers or preamble."""
                     "mismatch_count": len(mismatches)
                 }
             })
-            with open(evo_path, "w", encoding="utf-8") as f:
+            with open(EVO_LOG_PATH, "w", encoding="utf-8") as f:
                 json.dump(evo_log, f, ensure_ascii=False, indent=2)
             logger.info(f"[OK] Growth lesson appended to evolution_log.json (accuracy={accuracy:.0f}%)")
         else:
-            logger.warning("[WARN] evolution_log.json not found, lesson not persisted.")
+            logger.warning(f"[WARN] {EVO_LOG_PATH} not found, lesson not persisted.")
 
     except Exception as e:
         logger.error(f"[ERROR] Growth analysis failed: {e}")
@@ -397,20 +423,18 @@ async def run_knowledge_decay() -> Dict[str, Any]:
         if archived_count > 0:
             logger.info(f"[OK] Knowledge decay complete. Archived {archived_count} cold nodes.")
             # Record the decay event in evolution_log
-            from pathlib import Path
-            import json
-            evo_path = Path("sync_brain/evolution_log.json")
-            if evo_path.exists():
-                with open(evo_path, "r", encoding="utf-8") as f:
+            if EVO_LOG_PATH.exists():
+                with open(EVO_LOG_PATH, "r", encoding="utf-8") as f:
                     evo_log = json.load(f)
-                evo_log.append({
+                meta_info = {
                     "timestamp": get_current_iso_taipei(),
                     "event": "knowledge_decay",
                     "type": "cleanup",
                     "description": f"Archived {archived_count} nodes that haven't been used in {threshold_days} days.",
                     "meta": {"archived_nodes_count": archived_count}
-                })
-                with open(evo_path, "w", encoding="utf-8") as f:
+                }
+                evo_log.append(meta_info)
+                with open(EVO_LOG_PATH, "w", encoding="utf-8") as f:
                     json.dump(evo_log, f, ensure_ascii=False, indent=2)
         else:
             logger.info("[Subconscious] No cold nodes identified in this cycle.")

@@ -303,10 +303,14 @@ class UnifiedRAGService:
         The Master Search Entrance.
         Retrieves from both Memories (Atomic) and Documents (Bulk Knowledge).
         """
-        memories = await self.hybrid_search_memories(question, limit=limit)
+        # [v6.0] Reranking-First Search (Atomic Memories)
+        # We increase the recall limit to 40 and take top 5 after semantic reranking
+        memories_results = await self.search_and_rerank(question, recall_limit=40, top_k=limit)
+        
+        # Search documents separately (Reranking can be added here too in the future)
         documents = await self.search_documents(question, limit=limit)
 
-        mem_text = "\n\n".join([f"[{m.date}] {m.content}" for m in memories])
+        mem_text = "\n\n".join([f"[{m.get('date', 'unknown')}] {m.get('content', '')}" for m in memories_results])
         doc_text = "\n\n".join([f"[{d.get('title', 'Doc')}] {d.get('content', '')}" for d in documents])
 
         return {

@@ -1,12 +1,12 @@
 'use client';
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Mic, Send, Image as ImageIcon, CheckCircle, Brain, X, Trash2, Save } from 'lucide-react';
+import { Mic, Send, Image as ImageIcon, CheckCircle, Brain, X, Trash2, Save, Sparkles, Loader2 } from 'lucide-react';
 import { CoreEngine } from '@/lib/ai/core';
 import { useSettings, Habit } from '@/lib/hooks/useSettings';
-import { cortex, EvolutionStatus } from '@/lib/api/client'; // Import cortex and EvolutionStatus
+import { cortex } from '@/lib/api/client';
 
-import { TaskList } from './TaskList';
+import { BrainStateView } from './BrainStateView';
 
 interface CaptureViewProps {
   onSave: (entry: any) => void;
@@ -14,31 +14,14 @@ interface CaptureViewProps {
 
 export const CaptureView = ({ onSave }: CaptureViewProps) => {
   const [text, setText] = useState('');
-  const [isRecording, setIsRecording] = useState(false); // Mock
+  const [isRecording, setIsRecording] = useState(false);
   const { habits } = useSettings();
-  const [systemStatus, setSystemStatus] = useState<any | null>(null);
 
-  // [New] Phase 14: Contextual Prompts
   const [contextualPrompts, setContextualPrompts] = useState<string[]>([]);
   const [isLoadingPrompts, setIsLoadingPrompts] = useState(true);
 
-  // Fetch system status on mount
+  // Fetch contextual prompts on mount
   useEffect(() => {
-    const fetchStatus = async () => {
-      try {
-        // Use raw fetch to get the richer /status response (not bound to EvolutionStatus schema)
-        const res = await fetch('/api/py/system/status');
-        if (res.ok) {
-          const data = await res.json();
-          setSystemStatus(data);
-        }
-      } catch (e) {
-        console.error("Failed to fetch system status", e);
-      }
-    };
-    fetchStatus();
-
-    // Fetch contextual prompts
     const fetchPrompts = async () => {
       try {
         setIsLoadingPrompts(true);
@@ -55,9 +38,6 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
     fetchPrompts();
   }, []);
 
-  // Local state for the current entry being crafted
-  const [activeHabits, setActiveHabits] = useState<Record<string, boolean>>({});
-
   // [New] Auto-Draft: Load from LocalStorage on mount
   useEffect(() => {
     const savedDraft = localStorage.getItem('lifeos_capture_draft');
@@ -70,6 +50,9 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
   useEffect(() => {
     localStorage.setItem('lifeos_capture_draft', text);
   }, [text]);
+
+  // Local state for the current entry being crafted
+  const [activeHabits, setActiveHabits] = useState<Record<string, boolean>>({});
 
   // Auto-detect habits based on text
   useEffect(() => {
@@ -98,7 +81,7 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
         recognition = new SpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
-        recognition.lang = 'zh-TW'; // Default to Traditional Chinese, maybe make configurable
+        recognition.lang = 'zh-TW';
 
         recognition.onresult = (event: any) => {
           let finalTranscript = '';
@@ -113,13 +96,12 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
         };
 
         recognition.onerror = (event: any) => {
-          console.error("Speech error", event);
           setIsRecording(false);
         };
 
         recognition.start();
       } else {
-        alert("Voice recognition not supported in this browser.");
+        alert("Voice recognition not supported.");
         setIsRecording(false);
       }
     }
@@ -132,432 +114,211 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('Neural Capture Complete');
   const [analysis, setAnalysis] = useState<string | null>(null);
-  const [detectedDate, setDetectedDate] = useState<string | null>(null); // [New] Store AI-detected date
 
   const handleSubmit = async (skipAi: boolean = false, mode: 'overwrite' | 'append' = 'append') => {
     if (!text.trim() || isSubmitting) return;
-
     setIsSubmitting(true);
 
     try {
-      // 1. Prepare data
       const selectedHabits = Object.keys(activeHabits).filter(id => activeHabits[id]);
       const habitLabels = selectedHabits
         .map(id => habits.find((h: Habit) => h.id === id)?.label)
         .filter(Boolean) as string[];
 
-      // 2. Call backend API
-      // Always use ingest to save, but skipAi will bypass Gemini
       const response = await cortex.ingest.submit({
         content: text,
         habits: habitLabels,
-        skipAi: skipAi, // [New] Pass skipAi flag
-        mode: mode,      // [New] Pass overwrite/append mode
-        source: "capture" // [NEW] Identify as diary
+        skipAi: skipAi,
+        mode: mode,
+        source: "capture"
       });
 
-      // 2.5. Check Status
-      if (response.status === 'failed') {
-        throw new Error(response.message || 'Server failed to save entry');
-      }
+      if (response.status === 'failed') throw new Error(response.message || 'Save failed');
 
-      // 2.6. Store analysis result
       if (response.data && response.data.markdown_body) {
         setAnalysis(response.data.markdown_body);
-        // [New] Store detected date from AI meta
-        if (response.data.meta?.date) {
-          setDetectedDate(response.data.meta.date);
-        }
       }
 
-      // 3. Show success toast
-      if (response.link_result && (response.link_result.completed_tasks > 0 || response.link_result.projects_linked > 0)) {
-        let msg = '✅ ';
-        if (response.link_result.projects_linked > 0) {
-          const pNames = response.link_result.project_names?.join('、') || '';
-          msg += `你今天推進了『${pNames}』`;
-        }
-        if (response.link_result.completed_tasks > 0) {
-          if (msg !== '✅ ') msg += '，';
-          msg += `完成了 ${response.link_result.completed_tasks} 個任務`;
-        }
-        setToastMsg(msg);
-      } else {
-        setToastMsg('Neural Capture Complete');
-      }
+      setToastMsg((response.link_result?.completed_tasks ?? 0) > 0 ? `✅ Completed ${response.link_result?.completed_tasks} tasks` : 'Neural Capture Complete');
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
 
-      // 4. Reset form ONLY if skipAi (SAVE button) - otherwise keep the input to show with analysis
       if (skipAi) {
         setText('');
-        localStorage.removeItem('lifeos_capture_draft'); // Clear draft
+        localStorage.removeItem('lifeos_capture_draft');
         setActiveHabits({});
       }
 
-      // 5. Optionally notify parent (for local state update)
       if (onSave) {
-        // Construct a full LogEntry-like object for immediate UI update
-        const newEntry = {
-          date: response.data?.meta?.date || detectedDate || new Date().toLocaleDateString('en-CA'),
-          content: response.data?.markdown_body || text, // Use analyzed markdown if available, else raw text
-          mood: response.data?.meta?.metrics?.mood || 5,
-          focus: response.data?.meta?.metrics?.focus || 5,
-          energy: response.data?.meta?.metrics?.energy || 5,
-          isAi: !skipAi,
-          aiModel: skipAi ? "None" : response.model,
-          // Merge raw inputs too just in case
-          habits: activeHabits
-        };
-        onSave(newEntry);
+        onSave({
+          date: response.data?.meta?.date || new Date().toLocaleDateString('en-CA'),
+          content: response.data?.markdown_body || text,
+          isAi: !skipAi
+        });
       }
     } catch (error: any) {
-      console.error('🔥 Ingest API Error:', {
-        message: error.message,
-        url: '/api/py/ingest',
-        timestamp: new Date().toISOString(),
-        error: error
-      });
-
-      // Show user-friendly error
-      const errorMsg = error.message?.includes('fetch') || error.message?.includes('Failed to fetch')
-        ? 'Cannot connect to backend. Please check your internet connection.'
-        : `Submission failed: ${error.message || 'Unknown error'}`;
-
-      alert(errorMsg);
+      alert(`Submission failed: ${error.message}`);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-      handleSubmit(false); // Default to Analyze on Ctrl+Enter
-    }
-  };
-
   const handleFileUpload = (file: File) => {
-    if (!file) return;
-
-    // 1. Special Handling for Markdown/Text (Direct extraction)
-    if (file.type === 'text/markdown' || file.name.endsWith('.md') || file.type === 'text/plain') {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        const divider = `\n\n--- [Attachment: ${file.name}] ---\n`;
-        setText(prev => prev + divider + result + '\n---\n');
-        alert(`${file.name} content extracted into log!`);
-      };
-      reader.readAsText(file);
-      return;
-    }
-
-    // 2. Multimodal Handling (Base64/DataURL) for Images, PDF
-    const supportedMultimodal = ['image/', 'application/pdf'];
-    if (supportedMultimodal.some(m => file.type.startsWith(m))) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const result = e.target?.result as string;
-        // Insert markdown-style syntax into text area
-        const fileMarkdown = `\n![${file.name}](${result})\n`;
-        setText(prev => prev + fileMarkdown);
-        const typeLabel = file.type.startsWith('image/') ? 'Image' : 'PDF';
-        alert(`${typeLabel} added for interpretation!`);
-      };
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const result = e.target?.result as string;
+      if (file.type.startsWith('image/')) {
+        setText(prev => prev + `\n![${file.name}](${result})\n`);
+      } else {
+        setText(prev => prev + `\n--- [Attachment: ${file.name}] ---\n` + result + '\n---\n');
+      }
+    };
+    if (file.type.startsWith('image/') || file.type === 'application/pdf') {
       reader.readAsDataURL(file);
     } else {
-      alert(`Unsupported file type: ${file.type}. Currently supporting MD, PDF, and Images.`);
+      reader.readAsText(file);
     }
   };
 
   return (
     <div className="flex flex-col h-full w-full pb-32 animate-fade-in relative overflow-y-auto custom-scrollbar">
-      {/* --- Header --- */}
-      <div className="mb-8">
-        <h2 className="text-3xl font-black text-white flex items-center gap-3">
-          <Brain className="text-indigo-400 animate-pulse-slow" /> Neural Capture
-        </h2>
-        <p className="text-slate-500 font-mono text-sm mt-2 flex items-center justify-between">
-          <span>What is on your mind? <span className="text-indigo-500/50">#ideas #tasks</span></span>
-          <span className="flex items-center gap-2">
-            {systemStatus ? (
-              <>
-                {/* Active model badge */}
-                <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded border border-white/10 text-slate-300 font-semibold">
-                  {(systemStatus.current_model || systemStatus.model_versions?.[0] || 'Unknown').split('/').pop()?.replace(/-preview$/, '')}
-                </span>
-                {/* Quota status dot */}
-                {(() => {
-                  const available = (systemStatus.quota_status?.available?.fast?.length || 0) + (systemStatus.quota_status?.available?.smart?.length || 0);
-                  const exhausted = (systemStatus.quota_status?.exhausted?.fast?.length || 0) + (systemStatus.quota_status?.exhausted?.smart?.length || 0);
-                  const total = available + exhausted;
-                  if (available === 0) {
-                    return <span title="All quota exhausted" className="text-[10px] bg-red-500/10 text-red-400 border border-red-500/30 px-2 py-0.5 rounded flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block"></span>配額耗盡</span>;
-                  } else if (available < total / 2) {
-                    return <span title={`${available}/${total} models available`} className="text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block"></span>配額剩餘</span>;
-                  } else {
-                    return <span title={`${available}/${total} models available`} className="text-[10px] bg-green-500/10 text-green-400 border border-green-500/30 px-2 py-0.5 rounded flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-400 inline-block"></span>{available} 模型可用</span>;
-                  }
-                })()}
-              </>
-            ) : (
-              <span className="text-[10px] bg-white/5 px-2 py-0.5 rounded border border-white/10 text-slate-400">Loading...</span>
-            )}
-          </span>
-        </p>
-
+      
+      {/* 1. Sovereign Channels (Tags) */}
+      <div className="flex flex-wrap gap-2 mb-6 mt-2">
+        {[
+          { tag: '#SOUL', color: 'text-rose-400', bg: 'bg-rose-500/10', border: 'border-rose-500/20', label: '審美偏執' },
+          { tag: '#FRICTION', color: 'text-amber-400', bg: 'bg-amber-500/10', border: 'border-amber-500/20', label: '主權摩擦' },
+          { tag: '#BODY', color: 'text-purple-400', bg: 'bg-purple-500/10', border: 'border-purple-500/20', label: '身體記憶' },
+          { tag: '#GREEN', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', label: '綠燈前進' },
+          { tag: '#SPARK', color: 'text-cyan-400', bg: 'bg-cyan-500/10', border: 'border-cyan-500/20', label: '非邏輯閃光' },
+          { tag: '#EVO', color: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20', label: '系統演化' }
+        ].map((item) => (
+          <button
+            key={item.tag}
+            onClick={() => setText(prev => prev.includes(item.tag) ? prev.replace(item.tag, '').trim() : `${prev} ${item.tag}`.trim())}
+            className={`px-4 py-2 rounded-xl border text-xs font-black transition-all active:scale-90 flex items-center gap-2 ${text.includes(item.tag) ? `${item.bg} ${item.border} ${item.color} shadow-lg shadow-black/50` : 'bg-slate-900 border-slate-800 text-slate-500 hover:border-slate-700'}`}
+          >
+            <span className={item.color}>{item.tag}</span>
+            <span className="opacity-50 font-medium">{item.label}</span>
+          </button>
+        ))}
       </div>
 
-      {/* --- Phase 14: Dynamic Contextual Prompts --- */}
-      {isLoadingPrompts ? (
-        <div className="flex gap-2 mb-4 animate-pulse">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-8 bg-slate-800/50 rounded-full w-48 border border-slate-700/30"></div>
-          ))}
-        </div>
-      ) : contextualPrompts.length > 0 ? (
+      {/* 2. Contextual Prompts */}
+      {!isLoadingPrompts && contextualPrompts.length > 0 && (
         <div className="flex flex-wrap gap-2 mb-4">
-          {contextualPrompts.map((prompt, idx) => (
+          {[
+            "現在身體哪裡感到最緊繃？",
+            "這個卡點，能不能縮小成 10 分鐘的微實驗？",
+            "今天有什麼地方觸碰到了你的審美底線？"
+          ].map((p, idx) => (
             <button
-              key={idx}
-              onClick={() => setText(prev => prev ? prev + '\n' + prompt : prompt)}
-              className="px-4 py-1.5 text-sm bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 hover:border-indigo-500/40 rounded-full transition-all active:scale-95 text-left"
+              key={`sov-${idx}`}
+              onClick={() => setText(prev => prev ? prev + '\n' + p : p)}
+              className="px-4 py-1.5 text-sm bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 rounded-full transition-all"
             >
-              ✨ {prompt}
+              🎯 {p}
+            </button>
+          ))}
+          {contextualPrompts.slice(0, 1).map((p, i) => (
+            <button
+              key={i}
+              onClick={() => setText(prev => prev ? prev + '\n' + p : p)}
+              className="px-4 py-1.5 text-sm bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 rounded-full transition-all"
+            >
+              ✨ {p}
             </button>
           ))}
         </div>
-      ) : null}
+      )}
 
-      {/* --- Input Area --- */}
-      <div className="relative group mb-8 min-h-[200px]">
+      {/* 3. Input Area */}
+      <div className="relative group mb-8 min-h-[250px]">
         <textarea
           autoFocus
           value={text}
           onChange={(e) => setText(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onDrop={(e) => {
-            e.preventDefault();
-            const file = e.dataTransfer.files?.[0];
-            if (file) {
-              handleFileUpload(file);
-            }
-          }}
-          onDragOver={(e) => e.preventDefault()}
-          placeholder="Log your reality... (Drag & Drop images supported)"
-          className="w-full h-full bg-[#0f172a] text-lg text-slate-200 placeholder:text-slate-600 p-6 rounded-3xl border border-slate-800 focus:border-indigo-500/50 focus:ring-4 focus:ring-indigo-500/10 transition-all resize-none outline-none custom-scrollbar leading-relaxed"
+          placeholder="Capture a spark of sovereignty..."
+          className="w-full h-full min-h-[250px] bg-[#020617] text-xl text-slate-100 placeholder:text-slate-700 p-8 rounded-[30px] border-2 border-slate-900 focus:border-indigo-500/40 focus:ring-8 focus:ring-indigo-500/5 transition-all resize-none outline-none custom-scrollbar leading-relaxed"
         />
 
-        {/* Quick Actions */}
-        <div className="absolute bottom-4 right-4 flex gap-2">
+        <div className="absolute bottom-6 right-6 flex gap-3">
           <button
-            onClick={() => {
-              if (isRecording) {
-                setIsRecording(false);
-              } else {
-                setIsRecording(true);
-              }
-            }}
-            className={`p-3 rounded-full transition-all ${isRecording ? 'bg-red-500/20 text-red-400 animate-pulse' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'}`}
+            onClick={() => setIsRecording(!isRecording)}
+            className={`p-4 rounded-2xl transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'bg-slate-800 text-slate-400 hover:text-white'}`}
           >
-            <Mic size={20} />
+            <Mic size={24} />
           </button>
-          <input
-            type="file"
-            accept="image/*,.md,.txt,application/pdf"
-            className="hidden"
-            id="file-upload"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (file) handleFileUpload(file);
-            }}
-          />
+          <input type="file" className="hidden" id="file-upload" onChange={(e) => e.target.files?.[0] && handleFileUpload(e.target.files[0])} />
           <button
             onClick={() => document.getElementById('file-upload')?.click()}
-            className="p-3 rounded-full bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700 transition-all"
-            title="Upload Image, MD, or PDF"
+            className="p-4 rounded-2xl bg-slate-800 text-slate-400 hover:text-white transition-all"
           >
-            <ImageIcon size={20} />
+            <ImageIcon size={24} />
           </button>
         </div>
       </div>
 
-      {/* Cyberpunk Terminal Output */}
+      {/* 4. Analysis Output (Terminal) */}
       <AnimatePresence>
         {analysis && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.3 }}
-            className="mb-8 overflow-hidden relative z-10"
-          >
-            <div className="bg-black/80 border border-neon-blue/30 rounded-2xl p-6 shadow-[0_0_20px_rgba(0,243,255,0.1)]">
-              {/* Terminal Header */}
-              <div className="flex items-center justify-between mb-4 pb-3 border-b border-neon-blue/20">
-                <div className="flex items-center gap-3">
-                  <div className="flex gap-1.5">
-                    <div className="w-3 h-3 rounded-full bg-red-500/50" />
-                    <div className="w-3 h-3 rounded-full bg-yellow-500/50" />
-                    <div className="w-3 h-3 rounded-full bg-green-500/50" />
-                  </div>
-                  <span className="text-neon-blue text-xs font-mono uppercase tracking-wider">
-                    LifeOS v7.1 Analysis Terminal
-                  </span>
-                </div>
-                <button
-                  onClick={() => setAnalysis(null)}
-                  className="p-1 hover:bg-white/5 rounded transition-colors"
-                >
-                  <X className="text-gray-500 hover:text-white" size={16} />
-                </button>
-              </div>
-
-              {/* Terminal Content */}
-              <div className="overflow-y-auto custom-scrollbar">
-                <pre className="font-mono text-sm text-green-400 whitespace-pre-wrap leading-relaxed">
-                  {analysis}
-                </pre>
-              </div>
-
-              {/* Terminal Footer */}
-              <div className="mt-4 pt-3 border-t border-neon-blue/20 flex justify-between items-center bg-black/40 -mx-6 -mb-6 p-4">
-                <div className="flex gap-2">
-                  <button
-                    onClick={() => {
-                      setAnalysis(null);
-                      setDetectedDate(null);
-                      setText('');
-                      localStorage.removeItem('lifeos_capture_draft');
-                      setActiveHabits({});
-                    }}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-all text-xs font-bold"
-                  >
-                    DISCARD
-                  </button>
-
-                  <button
-                    onClick={async () => {
-                      try {
-                        await navigator.clipboard.writeText(analysis);
-                        setShowToast(true);
-                        setTimeout(() => setShowToast(false), 2000);
-                      } catch (e) {
-                        alert("Clipboard Error: " + e);
-                      }
-                    }}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white rounded-lg transition-all text-xs font-bold"
-                  >
-                    COPY
-                  </button>
-                </div>
-
-                <button
-                  onClick={() => {
-                    setAnalysis(null);
-                    setDetectedDate(null);
-                    setText('');
-                    localStorage.removeItem('lifeos_capture_draft');
-                    setActiveHabits({});
-                    setShowToast(false);
-                  }}
-                  className="px-6 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 rounded-lg transition-all text-xs font-bold uppercase tracking-wider flex items-center gap-2"
-                >
-                  <div className="flex items-center gap-2 text-green-400 font-bold text-xs uppercase tracking-wider mr-2">
-                    <CheckCircle size={14} /> Saved
-                  </div>
-                  <span>Start New Entry</span>
-                </button>
-              </div>
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="mb-8">
+            <div className="bg-[#020617] border-2 border-indigo-500/20 rounded-3xl p-6 relative">
+              <button onClick={() => setAnalysis(null)} className="absolute top-4 right-4 text-slate-600 hover:text-white">
+                <X size={20} />
+              </button>
+              <pre className="whitespace-pre-wrap font-mono text-sm text-indigo-100/90 max-h-[400px] overflow-y-auto">
+                {analysis}
+              </pre>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* --- Habit Selectors --- */}
+      {/* 5. Habits */}
       <div className="mb-8">
-        <h3 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3">Context & Habits</h3>
+        <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mb-3">Context & Habits</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {habits.filter((h: Habit) => h.active).map((habit: Habit) => {
-            const isActive = activeHabits[habit.id];
-            // Try to find an icon, fallback to Circle
-            const Icon = CoreEngine.getIconComponent(habit.icon) || CheckCircle;
-
-            return (
-              <button
-                key={habit.id}
-                onClick={() => setActiveHabits(prev => ({ ...prev, [habit.id]: !isActive }))}
-                className={`p-3 rounded-xl border transition-all flex items-center gap-3 ${isActive ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'}`}
-              >
-                <Icon size={18} className={isActive ? 'text-white' : 'text-slate-500'} />
-                <span className="text-xs font-bold">{habit.label}</span>
-              </button>
-            );
+          {habits.filter(h => h.active).map(h => {
+             const isActive = activeHabits[h.id];
+             const Icon = CoreEngine.getIconComponent(h.icon) || CheckCircle;
+             return (
+               <button
+                 key={h.id}
+                 onClick={() => setActiveHabits(prev => ({ ...prev, [h.id]: !isActive }))}
+                 className={`p-3 rounded-xl border transition-all flex items-center gap-3 ${isActive ? 'bg-indigo-600 border-indigo-500 text-white shadow-lg shadow-indigo-500/20' : 'bg-slate-900 border-slate-800 text-slate-400 hover:bg-slate-800'}`}
+               >
+                 <Icon size={16} />
+                 <span className="text-[11px] font-bold uppercase">{h.label}</span>
+               </button>
+             );
           })}
         </div>
       </div>
 
-      {/* --- Submit --- */}
-      <div className="flex justify-end items-center gap-4 relative z-10 mb-8">
-
-        {/* Quick Save Button */}
+      {/* 6. Footer Actions */}
+      <div className="flex justify-end gap-4 mb-8">
         <button
-          onClick={async () => {
-            // Basic Conflict Detection
-            const today = new Date().toLocaleDateString('en-CA');
-            // In a real app we'd fetch this, but for now we rely on the prompt or internal backend logic
-            // Let's implement a simple user prompt if we think there's a conflict
-            const choice = confirm("已有今日紀錄。點擊「確定」進行合併 (Merge)，點擊「取消」進行覆蓋 (Overwrite)。") ? 'append' : 'overwrite';
-            handleSubmit(true, choice);
-          }}
+          onClick={() => handleSubmit(true)}
           disabled={!text.trim() || isSubmitting}
           className="px-6 py-4 bg-slate-800 text-slate-300 rounded-2xl font-bold text-sm hover:bg-slate-700 hover:text-white transition-all shadow-lg disabled:opacity-50 flex items-center gap-2"
         >
           <Save size={18} /> SAVE
         </button>
-
-        {/* Ingest Button */}
         <button
           onClick={() => handleSubmit(false)}
           disabled={!text.trim() || isSubmitting}
-          className="px-8 py-4 bg-white text-slate-900 rounded-2xl font-black text-sm hover:scale-105 active:scale-95 transition-all shadow-xl disabled:opacity-50 disabled:hover:scale-100 flex items-center gap-2"
+          className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 flex items-center gap-2 uppercase tracking-wider"
         >
-          {isSubmitting ? (
-            <>
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                className="w-4 h-4 border-2 border-slate-900 border-t-transparent rounded-full"
-              />
-              PROCESSING...
-            </>
-          ) : (
-            <>
-              <Send size={18} /> INGEST & ANALYZE
-            </>
-          )}
+          {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />} ANALYZE & INGEST
         </button>
       </div>
 
-      {/* Task List */}
-      <div className="mt-4 mb-20 px-2">
-        <TaskList />
-      </div>
-
-      {/* Success Toast */}
-      <AnimatePresence>
-        {showToast && (
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 50 }}
-            className="fixed bottom-8 right-8 bg-indigo-600 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 z-50"
-          >
-            <CheckCircle size={24} className="text-green-300" />
-            <span className="font-bold">{toastMsg}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div >
+      {showToast && (
+        <motion.div initial={{ y: 50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} className="fixed bottom-32 left-1/2 -translate-x-1/2 bg-emerald-600 text-white px-6 py-3 rounded-full font-bold shadow-2xl z-50">
+          {toastMsg}
+        </motion.div>
+      )}
+    </div>
   );
 };

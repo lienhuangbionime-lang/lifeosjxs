@@ -9,7 +9,7 @@ export interface Project {
   description?: string;
   parent_id?: string;
   category?: 'macro' | 'micro' | 'daemon';
-  status: 'active' | 'archived' | 'completed' | 'idea' | 'on_hold';
+  status: 'active' | 'archived' | 'completed' | 'idea' | 'on_hold' | 'planning' | 'review' | 'execution';
   progress: number;
   meta: {
     vibe?: string;

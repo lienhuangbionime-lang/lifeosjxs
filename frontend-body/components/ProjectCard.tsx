@@ -20,8 +20,11 @@ interface ProjectCardProps {
 const STATUS_CONFIG: Record<string, { label: string; color: string; bar: string; dot: string }> = {
     active: { label: 'ACTIVE', color: 'text-cyan-400', bar: 'bg-cyan-500', dot: 'bg-cyan-400' },
     idea: { label: 'IDEA', color: 'text-violet-400', bar: 'bg-violet-500', dot: 'bg-violet-400' },
+    planning: { label: 'PLANNING', color: 'text-sky-400', bar: 'bg-sky-500', dot: 'bg-sky-400' },
+    review: { label: 'REVIEW', color: 'text-rose-400', bar: 'bg-rose-500', dot: 'bg-rose-400' },
+    execution: { label: 'PUMPING', color: 'text-amber-400', bar: 'bg-amber-500', dot: 'bg-amber-400' },
     on_hold: { label: 'ON HOLD', color: 'text-amber-400', bar: 'bg-amber-500', dot: 'bg-amber-400' },
-    completed: { label: 'DONE', color: 'text-emerald-400', bar: 'bg-emerald-500', dot: 'bg-emerald-400' },
+    completed: { label: 'SHIPPED', color: 'text-emerald-400', bar: 'bg-emerald-500', dot: 'bg-emerald-400' },
     archived: { label: 'ARCHIVED', color: 'text-slate-500', bar: 'bg-slate-600', dot: 'bg-slate-500' },
 };
 
@@ -35,12 +38,14 @@ function getLastActive(project: Project): string {
 }
 
 function getVibeLabel(progress: number, status: string): string {
-    if (status === 'completed') return '完成 ✓';
-    if (status === 'idea') return '構想中';
-    if (progress >= 80) return '衝刺 🔥';
-    if (progress >= 50) return '進行中';
-    if (progress >= 20) return '起步';
-    return '剛開始';
+    if (status === 'completed') return '已交付 🚀';
+    if (status === 'review') return '待審核 🚦';
+    if (status === 'execution') return '全力推進 🔥';
+    if (status === 'planning') return '規劃中 📝';
+    if (status === 'idea') return '構想中 💭';
+    if (progress >= 80) return '極限衝刺';
+    if (progress >= 50) return '穩步前行';
+    return '初始階段';
 }
 
 export const ProjectCard = ({
@@ -138,7 +143,7 @@ export const ProjectCard = ({
                 {/* Status Badge + Menu */}
                 <div className="flex items-center justify-between mb-3">
                     <span className={`text-[10px] font-black tracking-widest uppercase flex items-center gap-1.5 ${cfg.color}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot} animate-pulse`} />
+                        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot} ${(status as any) === 'execution' ? 'animate-ping' : 'animate-pulse'}`} />
                         {cfg.label}
                     </span>
 
@@ -200,6 +205,13 @@ export const ProjectCard = ({
                 <p className="text-xs text-slate-500 leading-relaxed mb-4 line-clamp-2 min-h-[2rem]">
                     {teaser}
                 </p>
+                
+                {project.meta?.primary_goal && (
+                    <div className="mb-4 p-2 bg-white/5 border border-white/10 rounded-lg">
+                        <span className="text-[9px] text-slate-400 block mb-1 uppercase tracking-tighter">🎯 Core Goal</span>
+                        <p className="text-[10px] text-cyan-100 font-medium italic line-clamp-1">"{project.meta.primary_goal}"</p>
+                    </div>
+                )}
 
                 {/* ── Metrics Row ── */}
                 <div className="flex items-center gap-3 text-[11px] text-slate-500 font-medium mb-4">
