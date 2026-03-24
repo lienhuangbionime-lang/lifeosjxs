@@ -95,10 +95,13 @@ def get_model(mode: Literal["fast", "smart"] = "fast") -> Dict[str, Any]:
                 if candidates:
                     # Logic: 3.1 or 2.0-flash-lite for 'fast', pro for 'smart'
                     if mode == "fast":
-                        fast_tier = [c for c in candidates if "flash" in c and "lite" in c] or candidates
+                        # Prefer 1.5-flash or 2.0-flash over 'lite' variants if present
+                        fast_tier = [c for c in candidates if "flash" in c and "lite" not in c] or \
+                                    [c for c in candidates if "flash" in c] or candidates
                         return {"model": sanitize_model_name(fast_tier[0]), "configured": bool(GEMINI_API_KEY)}
                     else:
-                        smart_tier = [c for c in candidates if "pro" in c] or [c for c in candidates if "3" in c] or candidates
+                        smart_tier = [c for c in candidates if "pro" in c] or \
+                                     [c for c in candidates if "2.0-flash" in c] or candidates
                         return {"model": sanitize_model_name(smart_tier[0]), "configured": bool(GEMINI_API_KEY)}
             except Exception as e:
                 logger.error(f"Failed to parse registry: {e}")
@@ -216,8 +219,9 @@ async def safe_generate_content(
         model_info = get_model(mode)
         model_id = model_info["model"]
         
-        # [v7.1 Turbo] Deeper Exponential Backoff for sustained 503/429 spikes
-        backoff_delays = [0, 2.0, 5.0, 10.0, 20.0]
+        # [v7.1 Turbo] Shallow Backoff for 503s to ensure fast failover to other tiers
+        # Mobile users cannot wait 40 seconds.
+        backoff_delays = [0, 1.0, 3.0]
         
         for delay in backoff_delays:
             if delay > 0:
