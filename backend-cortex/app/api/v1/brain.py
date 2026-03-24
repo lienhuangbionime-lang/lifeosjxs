@@ -242,25 +242,26 @@ async def get_node_context(http_request: Request, label: str, g_client: Any = No
         if not related_memories:
             logger.info(f"Vector search empty for '{label}', entering Multi-Stage Fallback")
             
-            # Stage 1: Broad Content Match
-            content_res = db.table("memories") \
-                .select("id,date,content,ai_insights,mood,focus,energy,tags") \
-                .or_(f"content.ilike.%{label}%,ai_insights.ilike.%{label}%") \
-                .order("date", desc=True) \
-                .limit(20) \
-                .execute()
-            
-            # Stage 2: Tag Array Match (Separate query for safety)
+            # Stage 1: Sovereign Tag Match (Highest Priority)
             tag_res = db.table("memories") \
                 .select("id,date,content,ai_insights,mood,focus,energy,tags") \
-                .overlaps("tags", [f"#{label}", label]) \
+                .contains("tags", [f"#{label}"]) \
+                .order("date", desc=True) \
+                .limit(30) \
+                .execute()
+            
+            # Stage 2: Broad Content Match (Filtered)
+            broad_res = db.table("memories") \
+                .select("id,date,content,ai_insights,mood,focus,energy,tags") \
+                .or_(f"content.ilike.%{label}%,ai_insights.ilike.%{label}%") \
+                .not_.contains("tags", ["#Personal", "#Somatic"]) \
                 .order("date", desc=True) \
                 .limit(20) \
                 .execute()
             
-            # Combine and Unify
+            # Combine and deduplicate
             seen_ids = set()
-            combined = (content_res.data or []) + (tag_res.data or [])
+            combined = (tag_res.data or []) + (broad_res.data or [])
             
             for m in combined:
                 if m["id"] not in seen_ids:
