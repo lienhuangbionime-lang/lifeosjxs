@@ -138,16 +138,16 @@ class ModelDiscoveryService:
     def _rank_score(self, model_name: str) -> float:
         """Heuristic to rank models higher if they are stable or newer versions."""
         score = 0.0
-        # Stability over Novelty for Production
-        if "1.5-flash" in model_name: score += 80 # Highly stable GA
-        elif "2.0-flash" in model_name and "lite" not in model_name: score += 90 # Fast & stable
-        elif "3.1" in model_name: score += 100 # Newest
+        # 2026 Milestone: 2.5 is the flagship stable production tier.
+        if "2.5-flash" in model_name: score += 150 
+        elif "2.5-pro" in model_name: score += 140
+        elif "2.0-flash" in model_name and "lite" not in model_name: score += 80 
+        elif "3.1" in model_name: score += 100 # Newest but likely preview
         elif "3.0" in model_name: score += 70
-        elif "2.0" in model_name: score += 50
         
-        # Penalties for high-demand experimental tiers
-        if "lite" in model_name: score -= 30 
-        if "preview" in model_name: score -= 20
+        # Penalties for experimental or high-demand tiers
+        if "lite" in model_name: score -= 60 
+        if "preview" in model_name: score -= 40
         
         return score
 
