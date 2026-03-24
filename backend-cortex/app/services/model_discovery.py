@@ -136,15 +136,18 @@ class ModelDiscoveryService:
             logger.error(f"[ERROR] Discovery process failed: {e}")
 
     def _rank_score(self, model_name: str) -> float:
-        """Heuristic to rank models higher if they are newer versions."""
+        """Heuristic to rank models higher if they are stable or newer versions."""
         score = 0.0
-        if "3.1" in model_name: score += 100
-        elif "3" in model_name: score += 50
-        elif "2.5" in model_name: score += 30
-        elif "2.0" in model_name: score += 20
+        # Stability over Novelty for Production
+        if "1.5-flash" in model_name: score += 80 # Highly stable GA
+        elif "2.0-flash" in model_name and "lite" not in model_name: score += 90 # Fast & stable
+        elif "3.1" in model_name: score += 100 # Newest
+        elif "3.0" in model_name: score += 70
+        elif "2.0" in model_name: score += 50
         
-        if "lite" in model_name: score -= 5 # Prefer full over lite if version same
-        if "preview" in model_name: score += 1 # Prefer newest previews
+        # Penalties for high-demand experimental tiers
+        if "lite" in model_name: score -= 30 
+        if "preview" in model_name: score -= 20
         
         return score
 
