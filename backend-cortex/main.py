@@ -95,7 +95,7 @@ if env_origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"] if os.getenv("DEBUG_MODE") == "True" else origins,
-    allow_origin_regex="https://lifeosjxs-.*\.vercel\.app" if os.getenv("DEBUG_MODE") != "True" else None,
+    allow_origin_regex=r"https://lifeosjxs-.*\.vercel\.app" if os.getenv("DEBUG_MODE") != "True" else None,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*", "X-Supabase-URL", "X-Supabase-Key", "X-Gemini-Key", "x-supabase-url", "x-supabase-key"],
