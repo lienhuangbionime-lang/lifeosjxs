@@ -1,25 +1,25 @@
 """
 Embedder Service - Vector Embedding Generation
-Purpose: Generate 1536-dimensional embeddings using Gemini API
+Purpose: Generate 1536-dimensional embeddings using Gemma API
 Usage: Called by ingest.py and rag.py for semantic search
 """
 
 import logging
 from typing import List, Optional, Any
-from app.core.gemini import gemini_client, types
+from app.core.gemini import gemma_client, types
 
 logger = logging.getLogger("cortex.embedder")
 
 
 async def generate_embedding(text: str, task_type: str = "retrieval_document", dimensionality: Optional[int] = 1536, client: Any = None) -> Optional[List[float]]:
     """
-    Generate vector embedding for given text using Gemini
+    Generate vector embedding for given text using Gemma
     
     Args:
         text: Input text to embed
         task_type: Task type for embedding
         dimensionality: Output dimension
-        client: Optional transient Gemini client
+        client: Optional transient Gemma client
     
     Returns:
         List of floats, or None if generation fails
@@ -29,16 +29,16 @@ async def generate_embedding(text: str, task_type: str = "retrieval_document", d
         return None
     
     try:
-        # Use provided client or fallback to global gemini_client
-        target_client = client or gemini_client
+        # Use provided client or fallback to global gemma_client
+        target_client = client or gemma_client
         
         if not target_client:
-            logger.error("[ERROR] No Gemini client available for embedding")
+            logger.error("[ERROR] No Gemma client available for embedding")
             return None
 
         # [v4.1 - v4.2 Resilience] Retry loop for 429 errors with Exponential Backoff
-        # [v4.3 Fix] Using gemini-embedding-2-preview (Output dimension 1536 requested)
-        models_to_try = ["gemini-embedding-2-preview"]
+        # [v4.3 Fix] Using gemma-embedding-2-preview (Output dimension 1536 requested)
+        models_to_try = ["gemma-embedding-2-preview"]
         backoff_delays = [0, 1.0, 2.0] # 0, 1s, 2s
         
         last_err = None
@@ -101,7 +101,7 @@ async def batch_generate_embeddings(texts: List[str], task_type: str = "retrieva
         embedding = await generate_embedding(text, task_type, dimensionality)
         embeddings.append(embedding)
         
-        # Rate limiting: Gemini free tier allows 1500 requests/day
+        # Rate limiting: Gemma free tier allows 1500 requests/day
         # Add small delay to avoid hitting rate limits
         if i < len(texts) - 1:
             import asyncio

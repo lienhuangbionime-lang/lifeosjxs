@@ -16,7 +16,7 @@ if env_path.exists():
 
 BASE = "http://127.0.0.1:8000"
 HEADERS = {
-    "X-Gemini-Key":    os.getenv("GEMINI_API_KEY", ""),
+    "X-gemma-Key":    os.getenv("GEMINI_API_KEY", ""),
     "X-Supabase-URL":  os.getenv("SUPABASE_URL", ""),
     "X-Supabase-Key":  os.getenv("SUPABASE_KEY", ""),
     "Content-Type":    "application/json",

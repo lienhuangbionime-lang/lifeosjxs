@@ -3,7 +3,7 @@ import json
 import logging
 from typing import List, Dict, Any, Optional
 from app.core.database import supabase
-from app.core.gemini import gemini_client, get_model
+from app.core.gemini import gemma_client, get_model
 from google.genai import types
 
 logger = logging.getLogger("cortex.services.crystallizer")
@@ -36,15 +36,15 @@ Output ONLY a JSON object:
         Process a single memory entry.
         Source for edges linked to the memory will be the date_id (YYYY-MM-DD).
         """
-        if not gemini_client:
-            logger.error("Gemini client not initialized")
+        if not gemma_client:
+            logger.error("Gemma client not initialized")
             return
 
         try:
-            # 1. Prompt Gemini via Safe Failover
+            # 1. Prompt Gemma via Safe Failover
             from app.core.gemini import safe_generate_content
             response = await safe_generate_content(
-                client=gemini_client,
+                client=gemma_client,
                 prefer_mode="fast",
                 contents=f"ENTRY DATE: {date}\nCONTENT: {content}",
                 config=types.GenerateContentConfig(

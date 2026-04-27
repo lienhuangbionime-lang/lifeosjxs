@@ -13,7 +13,7 @@ import json
 from typing import Optional
 from pydantic import BaseModel
 from app.core.database import supabase
-from app.core.gemini import get_model, gemini_client
+from app.core.gemini import get_model, gemma_client
 from google.genai import types
 
 router = APIRouter()
@@ -66,7 +66,7 @@ async def get_contextual_prompts():
         latest_ref = ref_res.data[0] if ref_res.data else None
         
         if not memories and not latest_ref:
-            return {"prompts": ["今天過得好嗎？", "有什麼值得記錄的嗎？", "寫下你現在的想法吧！"]}
+            return {"prompts": ["今天?��?好�?�?, "?��?麼值�?記�??��?�?, "寫�?你現?��??��??��?"]}
             
         # 3. Prepare Context
         context_parts = []
@@ -86,11 +86,11 @@ CRITICAL: If an "AI INSIGHT" is provided, at least 2 questions MUST follow up on
 Keep questions concise and supportive.
 Output JSON: {"prompts": ["Q1", "Q2", "Q3"]}'''
 
-        # 4. Call fast model (Gemini 2.0 Flash) with improved resiliency
+        # 4. Call fast model (Gemma 2.0 Flash) with improved resiliency
         from app.core.gemini import safe_generate_content
         try:
             ai_res = await safe_generate_content(
-                client=gemini_client,
+                client=gemma_client,
                 prefer_mode="fast",
                 contents=full_context,
                 config={
@@ -109,23 +109,23 @@ Output JSON: {"prompts": ["Q1", "Q2", "Q3"]}'''
         # 5. Final Fallback Logic: If AI failed, use recent activity titles or static defaults
         if not prompts:
             if latest_ref:
-                prompts = ["還記得早前的深度洞察嗎？點擊回顧...", "關於你的成長模式，有什麼新發現？"]
+                prompts = ["?��?得早?��?深度洞�??��?點�??�顧...", "?�於你�??�長模�?，�?什麼新?�現�?]
             elif memories:
                 # Use a specific recent memory topic if possible
                 latest_m = memories[0].get('content', '')[:20]
-                prompts = [f"關於『{latest_m}...』還有什麼想補充的？", "今天的進度如何？", "有什麼值得紀錄的嗎？"]
+                prompts = [f"?�於?�{latest_m}...?��??��?麼想補�??��?", "今天?�進度如�?�?, "?��?麼值�?紀?��??��?"]
             else:
-                prompts = ["今天過得好嗎？", "有什麼值得記錄的嗎？", "準備好開始新的一天了嗎？"]
+                prompts = ["今天?��?好�?�?, "?��?麼值�?記�??��?�?, "準�?好�?始新?��?天�??��?"]
         
-        return {"prompts": [p.replace("✨", "").strip() for p in prompts[:3]]}
+        return {"prompts": [p.replace("??, "").strip() for p in prompts[:3]]}
         
     except Exception as e:
         logger.error(f"Failed to generate contextual prompts (outer): {e}")
-        return {"prompts": ["今天過得好嗎？", "有什麼值得記錄的嗎？"]}
+        return {"prompts": ["今天?��?好�?�?, "?��?麼值�?記�??��?�?]}
 
 
 # ---------------------------------------------------------------------------
-# [Phase B] Growth Log Endpoints — AI Self-Reflection
+# [Phase B] Growth Log Endpoints ??AI Self-Reflection
 # ---------------------------------------------------------------------------
 
 @router.post("/growth/log-decision")

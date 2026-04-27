@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 import httpx
 from app.services.rag_service import rag_service
-from app.core.gemini import gemini_client, types
+from app.core.gemini import gemma_client, types
 
 logger = logging.getLogger("cortex.cron")
 
@@ -13,7 +13,7 @@ async def cron_watcher():
     cron_dir = os.path.expanduser(r"~\.hermes\cron")
     os.makedirs(cron_dir, exist_ok=True)
     
-    logger.info("🕒 [Cron Watcher] Started monitoring ~/.hermes/cron")
+    logger.info("?? [Cron Watcher] Started monitoring ~/.hermes/cron")
     
     while True:
         try:
@@ -28,7 +28,7 @@ async def cron_watcher():
                     scheduled_at = datetime.fromisoformat(payload["scheduled_at"])
                     if now >= scheduled_at:
                         if payload.get("is_subagent"):
-                            logger.info(f"🤖 [Cron Watcher] Running autonomous subagent mission: {payload['goal']}")
+                            logger.info(f"?? [Cron Watcher] Running autonomous subagent mission: {payload['goal']}")
                             
                             # 1. Load Protocol
                             protocol_path = os.path.join(os.getcwd(), "prompts", "subagent_protocol.md")
@@ -41,8 +41,8 @@ async def cron_watcher():
                             worker_input = f"{protocol}\n\nMISSION:\n{payload['goal']}\n\nCONTEXT:\n{payload.get('context', '')}"
                             
                             try:
-                                response = await gemini_client.aio.models.generate_content(
-                                    model="models/gemini-2.0-flash", # Use fast model for background tasks
+                                response = await gemma_client.aio.models.generate_content(
+                                    model="models/gemma-2.0-flash", # Use fast model for background tasks
                                     contents=worker_input,
                                     config=types.GenerateContentConfig(temperature=0.7, top_p=0.9)
                                 )
@@ -59,24 +59,24 @@ async def cron_watcher():
                                     },
                                     target="memories"
                                 )
-                                logger.info(f"✅ [Cron Watcher] Subagent mission archived to Supabase.")
+                                logger.info(f"??[Cron Watcher] Subagent mission archived to Supabase.")
                             except Exception as ai_e:
-                                logger.error(f"❌ [Cron Watcher] Subagent AI failure: {ai_e}")
+                                logger.error(f"??[Cron Watcher] Subagent AI failure: {ai_e}")
                         else:
-                            logger.info(f"🚀 [Cron Watcher] Triggering scheduled action: {payload['intent']}")
+                            logger.info(f"?? [Cron Watcher] Triggering scheduled action: {payload['intent']}")
                             
                             # Trigger the action asynchronously to the local chat endpoint
                             async with httpx.AsyncClient() as client:
                                 await client.post("http://localhost:8000/api/v1/chat/message", json={
                                     "message": f"[SYSTEM AUTOMATED CRON ACTION START]\nIntent: {payload['intent']}\n[Execute this intent immediately. Take necessary actions silently.]",
-                                    "model": "models/gemini-2.0-flash",
+                                    "model": "models/gemma-2.0-flash",
                                     "history": [],
                                     "platform": "cron"
                                 }, timeout=300.0)
                             
                         # Delete the file after triggering
                         os.remove(filepath)
-                        logger.info(f"✅ [Cron Watcher] Task {filename} executed and removed.")
+                        logger.info(f"??[Cron Watcher] Task {filename} executed and removed.")
                 except Exception as e:
                     logger.error(f"Error processing cron file {filename}: {e}")
         except Exception as e:

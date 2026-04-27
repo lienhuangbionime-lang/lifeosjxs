@@ -18,11 +18,11 @@ except ImportError:
     genai = None
     types = None
 
-logger = logging.getLogger("app.core.gemini")
+logger = logging.getLogger("app.core.gemma")
 
 # [v5.4] No hardcoded model defaults — all model IDs come from the dynamic registry.
 # Run: python tools/quota_probe.py  to refresh the registry with live quota data.
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMMA_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Discovery Service (v3.9) - Lazy import to avoid circular dependencies
 def get_discovery_service():
@@ -30,16 +30,16 @@ def get_discovery_service():
     return model_discovery
 
 # Global primitive for key; client is managed via factory to ensure loop safety
-# GEMINI_API_KEY is defined above.
+GEMMA_API_KEY = os.getenv("GEMMA_API_KEY")
 
 _client_registry = {}
 
-def get_gemini_client():
+def get_gemma_client():
     """
     Returns a Gemma client bound to the current event loop.
     Prevents 'attached to a different loop' errors in async environments.
     """
-    if not GEMINI_API_KEY or not genai:
+    if not GEMMA_API_KEY or not genai:
         return None
         
     loop = asyncio.get_event_loop()
@@ -47,7 +47,7 @@ def get_gemini_client():
     
     if loop_id not in _client_registry:
         try:
-            _client_registry[loop_id] = genai.Client(api_key=GEMINI_API_KEY)
+            _client_registry[loop_id] = genai.Client(api_key=GEMMA_API_KEY)
             logger.info(f"Gemma client initialized for loop {loop_id}")
         except Exception as e:
             logger.error(f"Failed to initialize Gemma client for loop {loop_id}: {e}")
@@ -56,7 +56,7 @@ def get_gemini_client():
     return _client_registry[loop_id]
 
 # Legacy compatibility for modules importing the global directly
-gemini_client = get_gemini_client() if genai and GEMINI_API_KEY else None
+gemma_client = get_gemma_client() if genai and GEMMA_API_KEY else None
 
 
 
@@ -79,9 +79,9 @@ def get_model(mode: Literal["fast", "smart"] = "fast") -> Dict[str, Any]:
     """[v5.5 Dynamic] Returns the best available model from the verified registry."""
     try:
         # 1. ENV override
-        env_model = os.getenv("GEMINI_FAST_MODEL" if mode == "fast" else "GEMINI_SMART_MODEL")
+        env_model = os.getenv("GEMMA_FAST_MODEL" if mode == "fast" else "GEMMA_SMART_MODEL")
         if env_model:
-            return {"model": sanitize_model_name(env_model), "configured": bool(GEMINI_API_KEY)}
+            return {"model": sanitize_model_name(env_model), "configured": bool(GEMMA_API_KEY)}
 
         # 2. Dynamic registry (populated by test.py probe)
         if REGISTRY_PATH.exists():
@@ -107,7 +107,7 @@ def get_model(mode: Literal["fast", "smart"] = "fast") -> Dict[str, Any]:
                 logger.error(f"Failed to parse registry: {e}")
 
         # 3. Last Resort fallback (Hardcoded to known active ID)
-        return {"model": "models/gemma-flash-lite-latest", "configured": bool(GEMINI_API_KEY)}
+        return {"model": "models/gemma-flash-lite-latest", "configured": bool(GEMMA_API_KEY)}
         
     except Exception as e:
         logger.exception("Error in get_model: %s", e)
@@ -119,13 +119,13 @@ async def get_embeddings(text: str) -> list[float]:
     Dimension: 3072 (Full Precision Protocol)
     [v4.1] Added retry logic for 429 errors.
     """
-    if not gemini_client:
+    if not gemma_client:
         return []
     
     # Embedding models to try in order (Verified 2026-03-24: gemma-embedding-2-preview is active)
     embedding_models = [
-        "models/gemma-embedding-2-preview",
-        "models/gemma-embedding-001"
+        "models/gemini-embedding-2-preview", 
+        "models/gemini-embedding-001"
     ]
     
     for model_id in embedding_models:
@@ -139,7 +139,7 @@ async def get_embeddings(text: str) -> list[float]:
             if "004" in model_id:
                 config_args["output_dimensionality"] = 3072
 
-            result = await gemini_client.aio.models.embed_content(
+            result = await gemma_client.aio.models.embed_content(
                 model=model_id,
                 contents=text,
                 config=types.EmbedContentConfig(**config_args)
@@ -157,19 +157,19 @@ async def get_embeddings(text: str) -> list[float]:
     return []
 
 
-def get_request_gemini_client(request: "Request"):
+def get_request_gemma_client(request: "Request"):
     """
     FastAPI dependency: returns a per-request Gemma client.
-    If the caller provides X-Gemini-Key header, a dedicated client is created.
-    Falls back to the global gemini_client from env.
+    If the caller provides X-Gemma-Key header, a dedicated client is created.
+    Falls back to the global gemma_client from env.
     """
-    req_key = request.headers.get("X-Gemini-Key")
+    req_key = request.headers.get("X-Gemma-Key")
     if req_key and genai:
         try:
             return genai.Client(api_key=req_key)
         except Exception as e:
             logger.warning(f"[WARN] Could not create per-request Gemma client: {e}")
-    return get_gemini_client()  # fallback to global with loop safety
+    return get_gemma_client()  # fallback to global with loop safety
     
 async def safe_generate_content(
     client: Any, 
@@ -276,7 +276,7 @@ async def multimodal_interpret(file_data: bytes, mime_type: str, prompt: str = "
     """
     [v4.1] Unified Multimodal Helper with Failover.
     """
-    client = get_gemini_client()
+    client = get_gemma_client()
     if not client:
         return "[Error: Gemma Multimodal not configured]"
         

@@ -123,20 +123,20 @@ async def merge_project(source_id: str, merge_data: ProjectMerge, request: Reque
     from app.core.database import safe_write
     safe_write(db.table("projects"), {"tags": new_tags}, operation_type="update", id=target_id)
     
-    # Migrate Tasks from source → target
+    # Migrate Tasks from source ??target
     safe_write(db.table("tasks"), {"project_id": target_id}, operation_type="update", filters=[("eq", "project_id", source_id)])
     
-    # Migrate Brain Edges from source → target
+    # Migrate Brain Edges from source ??target
     try:
         safe_write(db.table("edges"), {"source": target_id}, operation_type="update", filters=[("eq", "source", source_id)])
         safe_write(db.table("edges"), {"target": target_id}, operation_type="update", filters=[("eq", "target", source_id)])
     except Exception:
-        pass  # edges table may not exist yet — non-critical
+        pass  # edges table may not exist yet ??non-critical
     
     # Archive Source
     safe_write(db.table("projects"), {
         "status": "archived",
-        "name": f"{source['name']} → {target['name']}"
+        "name": f"{source['name']} ??{target['name']}"
     }, operation_type="update", id=source_id)
 
     return {"message": f"Merged {source['name']} into {target['name']}", "tasks_migrated": True}

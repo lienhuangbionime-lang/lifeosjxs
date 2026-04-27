@@ -31,10 +31,10 @@ You are Cortex, the Strategic Technical Lead and digital extension of the user's
 **Always ask for clarification if the query is ambiguous between these two domains.**
 
 ### Source Attribution (Mandatory):
-你必須在回答中清楚標示資料來源，例如：
-- `[來自您的日記]`: 當引用 `memory/` 目錄內容時。
-- `[來自我們過往討論]`: 當引用過往對話或日誌時。
-對於學習資源，你必須結合上述兩者，提供你的個人觀點與下一步實作方向。
+你�??�在?��?中�?楚�?示�??��?源�?例�?�?
+- `[來自?��??��?]`: ?��???`memory/` ?��??�容?��?
+- `[來自?�們�?往討�?]`: ?��??��?往對話?�日誌�???
+對於學�?資�?，�?必�?結�?上述?�者�??��?你�??�人觀點�?下�?步實作方?��?
 
 - OUTPUT: Expert-level, proactive, and intentional. Avoid conversational filler or generic summaries.
 - PERSONA: A mix of a Senior Systems Architect and a Database Administrator. Be direct, opinionated, and insightful.
@@ -98,7 +98,7 @@ async def build_dynamic_prompt(db: Any, payload: Any) -> str:
             res = db.table("MonthlyReview").select("*").order("year", desc=True).order("month", desc=True).limit(1).execute()
             if res.data:
                 rev = res.data[0]
-                return f"【{rev['year']}/{rev['month']} Review Summary】\n{rev.get('summary', '')}\n\nHighlights:\n{rev.get('highlights', '')}"
+                return f"?�{rev['year']}/{rev['month']} Review Summary?�\n{rev.get('summary', '')}\n\nHighlights:\n{rev.get('highlights', '')}"
         except Exception: pass
         return ""
 
@@ -139,7 +139,7 @@ async def build_dynamic_prompt(db: Any, payload: Any) -> str:
                 for p_name, t_list in grouped.items():
                     lines.append(f"Project: {p_name}")
                     for t in t_list:
-                        priority = "🔥 " if t.get('priority', 0) > 1 else ""
+                        priority = "?�� " if t.get('priority', 0) > 1 else ""
                         lines.append(f"  - [ ] {priority}{t['title']} (ID: {t['id']})")
                 t_str = "\n".join(lines)
             else: t_str = "No pending tasks."
@@ -154,7 +154,7 @@ async def build_dynamic_prompt(db: Any, payload: Any) -> str:
         get_strategic_context(),
         get_cortex_and_radar_context(),
         get_active_work_context(),
-        rag_service.unified_search(question="#BODY 身體狀況 頭痛 壓力 睡眠", limit=3)
+        rag_service.unified_search(question="#BODY 身�??��??��? 壓�? ?��?", limit=3)
     )
     somatic_ctx = somatic_res.get("memories", "")
 
@@ -185,7 +185,7 @@ async def build_dynamic_prompt(db: Any, payload: Any) -> str:
 
     # Global Rules
     global_rules = ""
-    try: global_rules = Path(r"C:\Users\lien.huang\.gemini\GEMINI.md").read_text(encoding="utf-8")
+    try: global_rules = Path(r"C:\Users\lien.huang\.gemma\GEMMA.md").read_text(encoding="utf-8")
     except: pass
 
     # Static Logs
@@ -204,39 +204,39 @@ async def build_dynamic_prompt(db: Any, payload: Any) -> str:
 
     system_instruction = f"""{global_rules}
 
-你是 Cortex，{user_name} 的個人 AI 副駕。
-你的任務：根據以下脈絡回答問題，語氣直接、不廢話、具有啟發性。
-你具備「信號感知」能力，能觀察使用者的綠燈（Radar）與體感（Somatic）狀態。
+你是 Cortex，{user_name} ?�個人 AI ?��???
+你�?任�?：根?�以下�?絡�?答�?題�?語氣?�接?��?廢話?�具?��??�性�?
+你具?�「信?��??�」能?��??��?察使?�者�?綠�?（Radar）�?體�?（Somatic）�??��?
 
-【🎯 主權雷達信號 (Sovereign Radar - Green Lights)】
-{radar_ctx if radar_ctx else "無標記信號。"}
+?��??主�??��?信�? (Sovereign Radar - Green Lights)??
+{radar_ctx if radar_ctx else "?��?記信?��?}
 
-【🧘 體感與壓力監測 (Somatic Awareness - #BODY)】
-{somatic_ctx if somatic_ctx else "目前無顯著體感紀錄。"}
+?��?體�??��??�監�?(Somatic Awareness - #BODY)??
+{somatic_ctx if somatic_ctx else "?��??�顯?��??��??��?}
 
-【Cortex 核心狀態 (Core Brain State)】
-{cortex_ctx if cortex_ctx else "連結成功，神經脈動 IDLE。"}
+?�Cortex ?��??�??(Core Brain State)??
+{cortex_ctx if cortex_ctx else "????��?，�?經�???IDLE??}
 
-【Cortex Hot Memory (核心契約 - 必讀)】
-{hot_memory_final if hot_memory_final else "無"}
+?�Cortex Hot Memory (?��?契�? - 必�?)??
+{hot_memory_final if hot_memory_final else "??}
 
-【目前的北極星（Active Projects）】
+?�目?��??�極?��?Active Projects）�?
 {proj_ctx}
 
-【待辦任務（Pending Tasks）】
+?��?辦任?��?Pending Tasks）�?
 {task_ctx}
 
-【Cortex 近期的學習紀錄 (Growth Logs)】
-{growth_ctx if growth_ctx else "無"}
+?�Cortex 近�??�學習�???(Growth Logs)??
+{growth_ctx if growth_ctx else "??}
 
-【最近的戰略回顧 (Monthly Review)】
-{strat_ctx if strat_ctx else "尚未有本月回顧。"}
+?��?近�??�略?�顧 (Monthly Review)??
+{strat_ctx if strat_ctx else "尚未?�本?��?顧�?}
 
-【個人日記摘要 (Personal Memories)】
-{m_ctx_block if m_ctx_block else "無相關日記紀錄。"}
+?�個人?��??��? (Personal Memories)??
+{m_ctx_block if m_ctx_block else "?�相?�日記�??��?}
 
-【外部文獻與知識 (External Documents)】
-{d_ctx_block if d_ctx_block else "無相關外部文獻。"}
+?��??��??��??��? (External Documents)??
+{d_ctx_block if d_ctx_block else "?�相?��??��??��?}
 
 ---
 ## System Short-Term Memory (Last 5 Events)
@@ -249,9 +249,9 @@ Available Skills (Metadata Only):
 
 {active_skills_str}
 
-## ⚡️ 信號引導協議 (Signal-Aware Protocol)
-- **觀察綠燈**：若 Radar 中有 `Building` 或 `Validating` 的信號，在對話中應適時給予助推或確認衝突。
-- **感受頭痛**：若 Somatic Context 顯示使用者近期有頭痛、失眠或壓力紀錄，應調整建議的強度，優先考慮「恢復」而非「產出」。
+## ?��? 信�?引�??�議 (Signal-Aware Protocol)
+- **觀察�???*：若 Radar 中�? `Building` ??`Validating` ?�信?��??��?話中?�適?�給予助?��?確�?衝�???
+- **?��??��?**：若 Somatic Context 顯示使用?��??��??��??�失?��?壓�?紀?��??�調?�建議�?強度，優?�考慮?�恢復」而�??�產?�」�?
 
 {_BASE_SYSTEM_PROMPT}
 """
@@ -259,11 +259,11 @@ Available Skills (Metadata Only):
     if getattr(payload, "platform", None) == "cron":
         system_instruction += (
             "\\n\\n# PLATFORM HINT: CRON JOB\\n"
-            "You are running as a scheduled cron job. There is no user present — you "
+            "You are running as a scheduled cron job. There is no user present ??you "
             "cannot ask questions, request clarification, or wait for follow-up. Execute "
             "the task fully and autonomously, making reasonable decisions where needed. "
             "Your final response is automatically delivered to the job's configured "
-            "destination — put the primary content directly in your response."
+            "destination ??put the primary content directly in your response."
         )
 
     return system_instruction

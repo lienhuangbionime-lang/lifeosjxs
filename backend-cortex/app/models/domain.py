@@ -6,10 +6,10 @@ from pydantic import BaseModel
 
 class LogEntry(BaseModel):
     """
-    LifeOS v3.1 的基礎日誌模型。
+    LifeOS v3.1 ?�基礎日誌模?��?
 
-    暫時只保留前端目前會送過來的欄位 (text, date)，
-    之後可以再依照原本 Prisma 的 schema 擴充。
+    ?��??��??��?端目?��??��?來�?欄�? (text, date)�?
+    之�??�以?��??��???Prisma ??schema ?��???
     """
 
     id: Optional[str] = None

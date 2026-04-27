@@ -1,11 +1,11 @@
 import os
 from typing import List, Dict, Any
 from app.services.memory_service import memory_service
-from app.core.gemini import get_gemini_client, safe_generate_content
+from app.core.gemini import get_gemma_client, safe_generate_content
 
 class RadarAgent:
     def __init__(self):
-        self.client = get_gemini_client()
+        self.client = get_gemma_client()
 
     async def scan_for_signals(self) -> List[Dict[str, Any]]:
         """

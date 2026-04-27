@@ -11,7 +11,7 @@ load_dotenv()
 class VectorEngine:
     """
     Handles all vector operations: Embedding Generation & Similarity Search.
-    Uses Google GenAI (Gemini) for embeddings.
+    Uses Google GenAI (Gemma) for embeddings.
     """
     
     def __init__(self):

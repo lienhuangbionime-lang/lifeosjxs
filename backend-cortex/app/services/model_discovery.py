@@ -11,7 +11,7 @@ logger = logging.getLogger("cortex.model_discovery")
 class ModelDiscoveryService:
     """
     Autonomous Model Discovery & Validation Service (v3.9).
-    Detects available Gemini models, runs sandbox health tests, and maintains a verified registry.
+    Detects available Gemma models, runs sandbox health tests, and maintains a verified registry.
     """
     
     def __init__(self, registry_path: str = None):
@@ -91,10 +91,10 @@ class ModelDiscoveryService:
         Main entry point: List models from API and run sandbox verification.
         """
         if not client:
-            logger.warning("[WARN] No Gemini client provided for discovery")
+            logger.warning("[WARN] No Gemma client provided for discovery")
             return
 
-        logger.info("üî≠ Starting autonomous model discovery...")
+        logger.info("?î≠ Starting autonomous model discovery...")
         
         discovered_fast = []
         discovered_smart = []
@@ -128,9 +128,9 @@ class ModelDiscoveryService:
                 self.pending_models["fast"] = new_pending_fast
                 self.pending_models["smart"] = new_pending_smart
                 self._save_registry()
-                logger.info(f"‚ú® Found {len(new_pending_fast) + len(new_pending_smart)} new compatible models. Awaiting user approval.")
+                logger.info(f"??Found {len(new_pending_fast) + len(new_pending_smart)} new compatible models. Awaiting user approval.")
             else:
-                logger.info("‚òÄÔ∏è No new models to report. Current verified set is up-to-date.")
+                logger.info("?ÄÔ∏?No new models to report. Current verified set is up-to-date.")
 
         except Exception as e:
             logger.error(f"[ERROR] Discovery process failed: {e}")

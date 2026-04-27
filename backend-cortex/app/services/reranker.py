@@ -8,7 +8,7 @@ import httpx
 import json
 import asyncio
 
-# [v5.4] Safe import — sentence_transformers is optional.
+# [v5.4] Safe import ??sentence_transformers is optional.
 # If not installed, reranker falls back to recency-only ordering (no crash).
 try:
     from sentence_transformers import CrossEncoder
@@ -35,7 +35,7 @@ class RerankerService:
 
     def initialize(self, model_id: str = "cross-encoder/ms-marco-MiniLM-L-6-v2"):
         if not _CROSS_ENCODER_AVAILABLE:
-            logger.warning("sentence_transformers not available — skipping CrossEncoder init.")
+            logger.warning("sentence_transformers not available ??skipping CrossEncoder init.")
             return
         if self._model is None:
             logger.info(f"Loading HuggingFace Reranker model: {model_id}...")
@@ -61,7 +61,7 @@ class RerankerService:
             if self._model is None:
                 # [v6.0] Local model unavailable, attempt remote rerank if configured
                 if self._remote_url:
-                    logger.info("Local reranker missing — delegating to Remote Reranker...")
+                    logger.info("Local reranker missing ??delegating to Remote Reranker...")
                     # Note: Since rerank is sync and rerank_remote is async, 
                     # we use an event loop wrapper or just keep it simple.
                     # Best is to make RerankerService methods mostly async in v6.0.

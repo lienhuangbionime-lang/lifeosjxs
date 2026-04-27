@@ -4,7 +4,7 @@ import re
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from app.core.database import supabase
-from app.core.gemini import get_model, gemini_client, types
+from app.core.gemini import get_model, gemma_client, types
 from app.services.embedder import generate_embedding
 from app.services.reranker import reranker
 
@@ -360,9 +360,9 @@ class UnifiedRAGService:
         3. documents (bulk knowledge)
         """
         # [v7.1] Forced Path Filtering for Diary/Reflection keywords
-        diary_keywords = ["æ—¥è¨˜", "åæ€", "å¿ƒè·¯æ­·ç¨‹", "diary", "reflection", "personal journey"]
+        diary_keywords = ["?¥è?", "?æ€?, "å¿ƒè·¯æ­·ç?", "diary", "reflection", "personal journey"]
         if any(kw in question.lower() for kw in diary_keywords):
-            logger.info(f"ðŸ”® Diary keyword detected. Forcing path_prefix='memory/' for retrieval.")
+            logger.info(f"?”® Diary keyword detected. Forcing path_prefix='memory/' for retrieval.")
             path_prefix = "memory/"
         
         # [PRORITY TRACK] Search vectorized markdown files (memory_embeddings)
@@ -437,7 +437,7 @@ class UnifiedRAGService:
     async def ingest_file(self, file: Any, target: str = "documents") -> int:
         """
         [NEW] Ingest a file into the knowledge base.
-        If it's an image, use Gemini Vision to interpret it.
+        If it's an image, use Gemma Vision to interpret it.
         """
         if not self.enabled: return 0
         
@@ -449,12 +449,12 @@ class UnifiedRAGService:
             # 1. Handle Multimodal Content (Images, PDFs)
             multimodal_mimes = ["image/", "application/pdf"]
             if any(content_type.startswith(m) for m in multimodal_mimes):
-                logger.info(f"ðŸ”® Multimodal content detected: {filename} ({content_type}). Using Gemini for interpretation...")
+                logger.info(f"?”® Multimodal content detected: {filename} ({content_type}). Using Gemma for interpretation...")
                 from app.core.gemini import multimodal_interpret
                 
                 interpretation = await multimodal_interpret(data, content_type)
                 text_content = f"### Multimodal Interpretation: {filename}\n\n{interpretation}"
-                logger.info(f"[OK] Gemini generated interpretation via Safe Failover.")
+                logger.info(f"[OK] Gemma generated interpretation via Safe Failover.")
             else:
                 # 2. Handle Text/PDF (Simplified for now - Title only)
                 # TODO: Implement full PDF/Doc parsing

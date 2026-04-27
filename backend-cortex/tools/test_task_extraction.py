@@ -17,7 +17,7 @@ async def test_ingest():
     
     # Mocking Request/BackgroundTasks
     mock_request = MagicMock()
-    mock_request.state.gemini_client = None # Will use default
+    mock_request.state.gemma_client = None # Will use default
     mock_request.state.supabase_client = None # Will use default
     
     bg_tasks = BackgroundTasks()

@@ -326,12 +326,12 @@ async def get_node_insight(http_request: Request, label: str):
     Generate an AI-driven observation based on the context of a node.
     Synthesizes why this label is significant across different memories.
     """
-    from app.core.gemini import get_request_gemini_client, types, safe_generate_content
+    from app.core.gemini import get_request_gemma_client, types, safe_generate_content
     
-    g_client = get_request_gemini_client(http_request)
+    g_client = get_request_gemma_client(http_request)
     if not g_client:
-        logger.warning(f"No Gemini client available for insight: {label}")
-        return {"insight": "無法產生語意分析 (未配置 API 金鑰)。"}
+        logger.warning(f"No Gemma client available for insight: {label}")
+        return {"insight": "?��??��?語�??��? (?��?�?API ?�鑰)??}
 
     db = get_request_client(http_request)
     
@@ -365,7 +365,7 @@ async def get_node_insight(http_request: Request, label: str):
                      project_data = proj_res.data[0]
              
              if not is_project:
-                 return {"insight": "此節點尚無足夠的上下文供分析。"}
+                 return {"insight": "此�?點�??�足夠�?上�??��??��???}
              
              # [v6.0] Define Project Cold Start Prompt
              sys_prompt = f"""You are the LifeOS Project Catalyst.
@@ -392,9 +392,9 @@ Language: Traditional Chinese. Under 100 words. Keep it inspiring.
              elif response and hasattr(response, 'candidates') and response.candidates:
                  ans = response.candidates[0].content.parts[0].text
              
-             return {"insight": ans.strip() if ans else "專案已啟動，等待您的第一則日記記錄來啟發更多洞察。"}
+             return {"insight": ans.strip() if ans else "專�?已�??��?等�??��?第�??�日記�??��??�發?��?洞�???}
 
-        # 2. Prepare context for Gemini (Increased to 10 for better synthesis)
+        # 2. Prepare context for Gemma (Increased to 10 for better synthesis)
         snippets = []
         for m in memories[:10]:
             content = m.get('content') or ""
@@ -425,13 +425,13 @@ Review the provided context for the sovereign project '{label}'.
 3. **Anti-Hallucination**: If no specific project data is found, admit it. Do not use generic system history.
 
 STRUCTURE:
-1. **主題與趨勢** (Technical Themes)
-2. **關鍵里程碑** (Project Milestones)
-3. **現況觀測** (Technical Status / Impediments)
+1. **主�??�趨??* (Technical Themes)
+2. **?�鍵?��?�?* (Project Milestones)
+3. **?��?觀�?* (Technical Status / Impediments)
 
 Format: Markdown, Traditional Chinese, < 150 words.
 """
-        elif label == "Cortex-Audit" or "了解甚麼" in label:
+        elif label == "Cortex-Audit" or "了解?�麼" in label:
             sys_prompt = f"""Hello. I am Cortex, your digital assistant.
 (Capacity Reached. Switching to High-Efficiency mode...)
 
@@ -445,9 +445,9 @@ Your mission is to analyze the Commander's life trajectory, identifying #SPARK (
 4. **Specific Citations**: ALWAYS cite specific dates and events (e.g., [2026-01-02]) from the provided context.
 
 # Structure
-1. **核心矛盾與對立** (Core Contradictions)
-2. **技術與產品動能** (#SPARK Analysis)
-3. **生命校準建議** (Axiomatic Calibration)
+1. **?��??�盾?��?�?* (Core Contradictions)
+2. **?�術�??��??�能** (#SPARK Analysis)
+3. **?�命?��?建議** (Axiomatic Calibration)
 
 Format: Markdown, Traditional Chinese, Analytical, Strategic.
 """
@@ -458,20 +458,20 @@ Review the provided context for the personal topic '{label}'.
 # Directive (Mandatory Rule 10.3)
 1. **Objective Reflection**: Describe the events and activities from the context using a natural, reflective diary tone. 
 2. **No Interpretation Layering**: STRICTLY FORBIDDEN to add external meaning, "woven love," or "mental growth" not explicitly stated.
-3. **Natural Vocabulary**: Avoid clinical terms. Do NOT use "system," "switching" (切換), "execution," or "bottleneck."
+3. **Natural Vocabulary**: Avoid clinical terms. Do NOT use "system," "switching" (?��?), "execution," or "bottleneck."
 4. **Fluid Narrative**: Prefer a gentle, descriptive flow over a rigid data report.
 
 # Structure
-1. **近期生活印記** (Recent Life Imprints)
-2. **時間流轉紀錄** (Flow of Time)
-3. **生活中的觀察** (Observations & Facts)
+1. **近�??�活?��?** (Recent Life Imprints)
+2. **?��?流�?紀??* (Flow of Time)
+3. **?�活中�?觀�?* (Observations & Facts)
 
 Format: Markdown, Traditional Chinese, < 120 words. Be objective yet human-centric.
 """
         
         # 5. Smart Synthesis with Failover
         if not context_snippets:
-            return {"insight": "此主題尚無歷史日記記錄。建議您在日記中提及此主題，以啟動 AI 關聯分析。"}
+            return {"insight": "此主題�??�歷?�日記�??�。建議您?�日記中?��?此主題�?以�???AI ?�聯?��???}
 
         # Use the new v4.1 Safe Failover Protocol
         response = await safe_generate_content(
@@ -492,15 +492,15 @@ Format: Markdown, Traditional Chinese, < 120 words. Be objective yet human-centr
         if not ans:
             # [v7.1 Fail-Safe] Provide Direct Structural Summary if AI fails
             logger.warning(f"AI Synthesis failed for {label}, generating structural summary fallback.")
-            summary_parts = [f"### [系統摘要] {label}"]
+            summary_parts = [f"### [系統?��?] {label}"]
             if "Project Description" in context_snippets:
-                summary_parts.append("\n**專案定義**: 已從系統架構中找到專案描述。")
+                summary_parts.append("\n**專�?定義**: 已�?系統?��?中找?��?案�?述�?)
             
-            summary_parts.append(f"\n**數據狀態**: 已從記憶庫中檢索到 {len(memories)} 筆關聯資料。")
+            summary_parts.append(f"\n**?��??�??*: 已�?記憶庫中檢索??{len(memories)} 筆�??��??��?)
             if snippets:
-                summary_parts.append("\n**近期提及**:\n" + "\n".join(snippets[:3]))
+                summary_parts.append("\n**近�??��?**:\n" + "\n".join(snippets[:3]))
             
-            summary_parts.append("\n\n> ⚠️ *註：由於 AI 目前負載較重，此內容由系統結構自動產生。*")
+            summary_parts.append("\n\n> ?��? *註�??�於 AI ?��?負�?較�?，此?�容?�系統�?構自?�產?��?")
             return {"insight": "\n".join(summary_parts)}
             
         return {"insight": ans.strip()}
@@ -508,4 +508,4 @@ Format: Markdown, Traditional Chinese, < 120 words. Be objective yet human-centr
     except Exception as e:
         logger.error(f"Insight Generation Error ({label}): {str(e)}")
         # Provide more context in the error for debugging while developing
-        return {"insight": f"無法產生語意分析 (系統錯誤: {str(e)[:50]}...)"}
+        return {"insight": f"?��??��?語�??��? (系統?�誤: {str(e)[:50]}...)"}

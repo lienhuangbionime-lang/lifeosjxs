@@ -12,16 +12,26 @@ node_modules/
 .next/
 dist/
 build/
-backend-cortex/venv/
+venv/
+.venv/
+**/venv/
+**/.venv/
 
 # Python Cache
 __pycache__/
 backend-cortex/__pycache__/
 *.pyc
 
-# IDE
+# IDEs
 .vscode/
 .idea/
+
+# Large Files & Media
+*.pdf
+*.epub
+*.mp4
+*.zip
+Greenlights*
 
 # Local backups
 # (In Open Mode, sync_brain is officially version controlled and shared)

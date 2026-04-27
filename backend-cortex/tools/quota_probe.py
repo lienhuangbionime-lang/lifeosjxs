@@ -1,6 +1,6 @@
 """
 Quota-Aware Dynamic Model Probe (v5.4)
-Replaces all hardcoded model IDs in gemini.py with live-discovered, sandbox-verified models.
+Replaces all hardcoded model IDs in gemma.py with live-discovered, sandbox-verified models.
 
 Strategy:
 1. Call client.models.list() to get ALL available models (same as test.py)

@@ -12,8 +12,8 @@ class ThinkingResult(BaseModel):
 
 class ThinkerAgent:
     def __init__(self):
-        from app.core.gemini import get_gemini_client
-        self.client = get_gemini_client()
+        from app.core.gemini import get_gemma_client
+        self.client = get_gemma_client()
 
     async def process(self, user_input: str) -> ThinkingResult:
         # Load System Prompt from external file

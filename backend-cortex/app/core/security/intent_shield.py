@@ -27,7 +27,7 @@ class IntentValidator:
         if intent not in self.DANGEROUS_INTENTS:
             return {"valid": True, "reason": "Non-destructive intent."}
         
-        logger.warning(f"üõ°Ô∏è [SECURITY] Destructive Intent Detected: {intent} - {action_summary}")
+        logger.warning(f"?õ°Ô∏?[SECURITY] Destructive Intent Detected: {intent} - {action_summary}")
         
         # 1. Fetch last 2 hours of memories (Context Check)
         two_hours_ago = (datetime.utcnow() - timedelta(hours=2)).isoformat()
@@ -53,10 +53,10 @@ class IntentValidator:
                 logger.error(f"[SECURITY ERROR] Failed to fetch context for validation: {e}")
         
         if context_verified:
-            logger.info(f"üõ°Ô∏è [SECURITY] Intent Validated by Context: {justification_found}")
+            logger.info(f"?õ°Ô∏?[SECURITY] Intent Validated by Context: {justification_found}")
             return {"valid": True, "reason": "Contextual justification found."}
         else:
-            logger.error(f"üö® [SECURITY] CONTEXT MISMATCH! No justification found for {intent}.")
+            logger.error(f"?ö® [SECURITY] CONTEXT MISMATCH! No justification found for {intent}.")
             return {
                 "valid": False,
                 "reason": "Context Mismatch: No recent discussion found about this destructive action.",

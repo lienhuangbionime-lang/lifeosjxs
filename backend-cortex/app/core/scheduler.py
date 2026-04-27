@@ -14,7 +14,7 @@ class SubconsciousScheduler:
         if self.is_running:
             return
 
-        # [Phase B+] Autonomous Reflection — every 12 hours
+        # [Phase B+] Autonomous Reflection ??every 12 hours
         self.scheduler.add_job(
             self._run_reflection,
             trigger=IntervalTrigger(hours=12),
@@ -23,7 +23,7 @@ class SubconsciousScheduler:
             misfire_grace_time=300
         )
 
-        # [Phase B] Growth Log Analysis — every 12 hours (offset 30 min)
+        # [Phase B] Growth Log Analysis ??every 12 hours (offset 30 min)
         self.scheduler.add_job(
             self._run_growth_analysis,
             trigger=IntervalTrigger(hours=12, jitter=1800),
@@ -32,7 +32,7 @@ class SubconsciousScheduler:
             misfire_grace_time=300
         )
 
-        # [Phase E] Knowledge Decay (Brain Cleanup) — every 12 hours (offset 60 min)
+        # [Phase E] Knowledge Decay (Brain Cleanup) ??every 12 hours (offset 60 min)
         self.scheduler.add_job(
             self._run_knowledge_decay,
             trigger=IntervalTrigger(hours=12, jitter=3600),

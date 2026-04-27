@@ -23,7 +23,7 @@ class PatternEvaluator:
                 "pattern": "focus_degradation",
                 "risk_level": "high",
                 "evidence": score_history[-3:],
-                "message": "警告：專注度已連續三天處於低谷。建議啟動環境清理或任務簡化程序。"
+                "message": "警�?：�?注度已�??三天?�於低谷?�建議�??�環境�??��?任�?簡�?程�???
             }
         return None
 
@@ -102,17 +102,17 @@ class ScoringEngine:
         energy_facts = []
 
         # Focus signals
-        if any(w in content_lower for w in ["專注", "deep work", "完成", "finished", "milestone"]):
+        if any(w in content_lower for w in ["專注", "deep work", "完�?", "finished", "milestone"]):
             focus_facts.append({"type": "deep_work_session", "count": 1})
-        if any(w in content_lower for w in ["分心", "拖延", "procrastinate", "distracted"]):
+        if any(w in content_lower for w in ["?��?", "?�延", "procrastinate", "distracted"]):
             focus_facts.append({"type": "procrastination_mention", "count": 1})
 
         # Energy signals
-        if any(w in content_lower for w in ["睡好", "睡眠充足", "睡了", "7小時", "8小時"]):
+        if any(w in content_lower for w in ["?�好", "?��??�足", "?��?", "7小�?", "8小�?"]):
             energy_facts.append({"type": "sleep_hours_over_7", "count": 1})
-        if any(w in content_lower for w in ["加班", "overtime", "累", "疲憊", "exhausted"]):
+        if any(w in content_lower for w in ["?�班", "overtime", "�?, "?��?", "exhausted"]):
             energy_facts.append({"type": "work_overtime", "count": 1})
-        if any(w in content_lower for w in ["運動", "exercise", "gym", "workout"]):
+        if any(w in content_lower for w in ["?��?", "exercise", "gym", "workout"]):
             energy_facts.append({"type": "regular_exercise", "count": 1})
 
         engine_focus = self.calculate_score("focus", focus_facts)["score"] if focus_facts else None

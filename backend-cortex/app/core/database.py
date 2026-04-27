@@ -120,13 +120,13 @@ def safe_write(table_query, payload: dict, operation_type: str = "insert", max_r
 
 def get_request_client(request: "Request"):
     """
-    [v5.4] Privacy Sandbox — per-request Supabase client.
+    [v5.4] Privacy Sandbox ??per-request Supabase client.
 
     ONLY creates a client from user-supplied X-Supabase-URL / X-Supabase-Key headers.
     Does NOT fall back to the server's own env-var Supabase client.
 
     This ensures that anonymous visitors (no keys in headers) get None back,
-    and all user-facing endpoints return 503 Database unavailable — protecting
+    and all user-facing endpoints return 503 Database unavailable ??protecting
     the owner's data from being exposed to third parties.
 
     Background tasks (subconscious scheduler, crystallizer, etc.) use the
@@ -161,5 +161,5 @@ def get_request_client(request: "Request"):
         wrapped_client._is_guest_mode = True
         return wrapped_client
         
-    logger.debug("[SANDBOX] No headers and no server fallback available — returning None.")
+    logger.debug("[SANDBOX] No headers and no server fallback available ??returning None.")
     return None

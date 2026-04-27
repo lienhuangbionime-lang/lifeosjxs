@@ -169,19 +169,19 @@ async def update_prompt(name: str, request: PromptRequest):
 
 
 # ============================================================================
-# [NEW] One-Click Supabase Setup — runs full LifeOS schema on user's DB
+# [NEW] One-Click Supabase Setup ??runs full LifeOS schema on user's DB
 # ============================================================================
 from fastapi import Request
 from pydantic import BaseModel as _BaseModel
 
 LIFEOS_SETUP_SQL = """
 -- LifeOS v3.8.1 Unified Schema Setup (High-Signal Baseline)
--- 🚨 Initial setup requires the 'exec' RPC function in Supabase.
+-- ?�� Initial setup requires the 'exec' RPC function in Supabase.
 
 -- 0. Extensions
 create extension if not exists vector;
 
--- 1. Memories (日記與核心記錄 - Forensic Enabled)
+-- 1. Memories (?��??�核心�???- Forensic Enabled)
 create table if not exists public.memories (
   id uuid default gen_random_uuid() primary key,
   content text not null,
@@ -203,7 +203,7 @@ create table if not exists public.memories (
 create index if not exists idx_memories_date on public.memories(date);
 create index if not exists idx_memories_tags on public.memories using gin(tags);
 
--- 2. Documents (知識與文獻隔離層)
+-- 2. Documents (?��??��??��??�層)
 create table if not exists public.documents (
   id uuid default gen_random_uuid() primary key,
   title text,
@@ -218,7 +218,7 @@ create table if not exists public.documents (
 );
 create index if not exists idx_documents_url on public.documents(url);
 
--- 3. Projects (專案管理)
+-- 3. Projects (專�?管�?)
 create table if not exists public.projects (
   id uuid default gen_random_uuid() primary key,
   name text not null,
@@ -233,7 +233,7 @@ create table if not exists public.projects (
   updated_at timestamptz default now()
 );
 
--- 4. Tasks (行動清單)
+-- 4. Tasks (行�?清單)
 create table if not exists public.tasks (
   id uuid default gen_random_uuid() primary key,
   title text not null,
@@ -246,7 +246,7 @@ create table if not exists public.tasks (
   updated_at timestamptz default now()
 );
 
--- 5. MonthlyReview (回顧系統)
+-- 5. MonthlyReview (?�顧系統)
 create table if not exists public."MonthlyReview" (
     id uuid default gen_random_uuid() primary key,
     year int not null,
@@ -258,7 +258,7 @@ create table if not exists public."MonthlyReview" (
     unique(year, month)
 );
 
--- 6. Neural Graph (節點與連線)
+-- 6. Neural Graph (節點�????)
 create table if not exists public.nodes (
   id uuid default gen_random_uuid() primary key,
   label text not null unique,
@@ -276,7 +276,7 @@ create table if not exists public.edges (
   constraint unique_edge unique (source_id, target_id, relation)
 );
 
--- 7. Cortex Growth Logs (AI 自我成長日誌)
+-- 7. Cortex Growth Logs (AI ?��??�長?��?)
 create table if not exists public.cortex_growth_logs (
   id uuid default gen_random_uuid() primary key,
   decision_context text not null,
@@ -492,7 +492,7 @@ async def setup_database(request: Request):
         success_count = 0
         for stmt in statements:
             try:
-                # 🚨 Dependency: User MUST have an 'exec' RPC function defined in Supabase 
+                # ?�� Dependency: User MUST have an 'exec' RPC function defined in Supabase 
                 db.rpc("exec", {"sql": stmt}).execute()
                 success_count += 1
             except Exception as e:
@@ -505,7 +505,7 @@ async def setup_database(request: Request):
                         detail="Missing 'exec' function. Run bootstrap SQL in Supabase Editor first."
                     )
                 else:
-                    errors.append(f"{stmt[:60]}... → {err_msg[:100]}")
+                    errors.append(f"{stmt[:60]}... ??{err_msg[:100]}")
         
         return {
             "success": True,

@@ -23,7 +23,7 @@ async def test_user_case():
     # Mocking Request
     mock_request = MagicMock()
     # Ensure it uses the real API key from .env
-    mock_request.state.gemini_client = None 
+    mock_request.state.gemma_client = None 
     mock_request.state.supabase_client = None 
     
     bg_tasks = BackgroundTasks()
@@ -53,7 +53,7 @@ async def test_user_case():
 
 ## 1. Highlights
 - **Day Summary**: 今日核心聚焦於「老婆 AI 短影音專案」的架構啟動，並明確定義了首席架構師 Claude 的角色邊界。透過將開發 LifeOS 的嚴謹架構邏輯引入服飾專案，實現了技術跨專案的資產遷移。
-- **Signals Detected**: 系統內部發生了「語義聯想」，確認了專案任務板與潛意識引擎的同步性。同時完成 `claude_brain/` 的靈魂文件建構，明確了各 AI 角色（Claude, Gemini Pro, Gemini Flash）的權責劃分。
+- **Signals Detected**: 系統內部發生了「語義聯想」，確認了專案任務板與潛意識引擎的同步性。同時完成 `claude_brain/` 的靈魂文件建構，明確了各 AI 角色（Claude, Gemma Pro, Gemma Flash）的權責劃分。
 
 ## 2. Gratitude
 - 感謝系統架構的完整性，讓我可以將複雜的情感與任務轉化為高效率的協作協議。
@@ -63,7 +63,7 @@ async def test_user_case():
   1. 任務提取（老婆服飾宣傳）
   2. 技術映射（套用 LifeOS 工具鏈）
   3. 角色定位（確立 Claude 首席架構師地位）
-  4. 協作定義（確立與 Gemini 的職責邊界）
+  4. 協作定義（確立與 Gemma 的職責邊界）
 - **Anti-Cognitive Closure**: 承認目前對「服飾專案」的市場屬性尚無定義，需補足風格、賣點與視覺邏輯。
 - **Blind Spot Question**: 是否因為專案與 LifeOS 工具鏈相同，而低估了服飾品牌對「感性素材」處理的複雜度？
 - **Self-Deception Trigger**: 避免將「設計架構」誤認為「完成產出」，需警惕架構過度設計（Over-engineering）。

@@ -102,11 +102,11 @@ class MemoryService:
         import asyncio
 
         # 1. Detect Dual-Query Intent (Decision / Plan)
-        dual_keywords = ["決策", "計畫", "想", "打算", "decision", "plan", "intent", "strategy"]
+        dual_keywords = ["決�?", "計畫", "??, "?��?", "decision", "plan", "intent", "strategy"]
         is_dual = any(kw in question.lower() for kw in dual_keywords)
 
         if is_dual:
-            logger.info(f"🚀 Dual-Query triggered for intent: '{question}'")
+            logger.info(f"?? Dual-Query triggered for intent: '{question}'")
             # Parallel Execution
             tasks = [
                 # Track 1: Personal Diary (Files in memory/)
@@ -120,7 +120,7 @@ class MemoryService:
             diary_text = "\n\n".join([f"[{r.get('metadata', {}).get('file_name', 'Entry')}] {r.get('content', '')}" for r in diary_results])
             session_text = "\n\n".join([f"[{r.get('date', 'Discussion')}] {r.get('content', '')}" for r in session_results])
 
-            combined_memories = f"### [來自您的日記 (Personal Diary)]\n{diary_text or '無相關紀錄'}\n\n### [來自我們過往討論 (Previous Discussions)]\n{session_text or '無相關紀錄'}"
+            combined_memories = f"### [來自?��??��? (Personal Diary)]\n{diary_text or '?�相?��???}\n\n### [來自?�們�?往討�? (Previous Discussions)]\n{session_text or '?�相?��???}"
             
             return {
                 "memories": combined_memories.strip()
@@ -130,21 +130,21 @@ class MemoryService:
         if namespace == "session":
             results = await rag_service.search_and_rerank(question, recall_limit=30, top_k=limit)
             text = "\n\n".join([f"[{r.get('date', 'Discussion')}] {r.get('content', '')}" for r in results])
-            return {"memories": f"### [來自我們過往討論]\n{text}"}
+            return {"memories": f"### [來自?�們�?往討�?]\n{text}"}
         else:
             # Default to personal namespace (memory/ prefix)
             results = await rag_service.search_memory_embeddings(question, limit=limit, path_prefix="memory/")
             text = "\n\n".join([f"[{r.get('metadata', {}).get('file_name', 'Entry')}] {r.get('content', '')}" for r in results])
-            return {"memories": f"### [來自您的日記]\n{text}"}
+            return {"memories": f"### [來自?��??��?]\n{text}"}
 
     async def ask_brain(self, question: str, limit: int = 5) -> str:
         """
         Ask the brain a question:
         1. Search for relevant memories
-        2. Use Gemini Pro to generate an answer based on context
+        2. Use Gemma Pro to generate an answer based on context
         """
         try:
-            # Import Gemini LLM
+            # Import Gemma LLM
             from langchain_google_genai import ChatGoogleGenerativeAI
             from langchain_core.prompts import ChatPromptTemplate
             
@@ -172,8 +172,8 @@ Please provide a helpful answer based on the context above. If the context doesn
             
             prompt = ChatPromptTemplate.from_template(template)
             
-            # 4. Initialize Gemini Pro
-            llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.7)
+            # 4. Initialize Gemma Pro
+            llm = ChatGoogleGenerativeAI(model="gemma-2.0-flash", temperature=0.7)
             
             # 5. Generate response
             chain = prompt | llm

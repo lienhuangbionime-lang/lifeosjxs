@@ -12,7 +12,7 @@ backend_dir = os.path.abspath(os.path.join(curr_dir, '..'))
 sys.path.append(backend_dir)
 
 from app.core.database import get_supabase_client
-from app.core.gemini import get_model, gemini_client, safe_generate_content
+from app.core.gemini import get_model, gemma_client, safe_generate_content
 
 # We import the exact same prompt from ingest.py so the migration uses the literal latest brain
 from app.api.v1.ingest import LIFEOS_V7_PROMPT
@@ -53,9 +53,9 @@ async def migrate_old_memories():
         print("No memories to migrate.")
         return
         
-    client = gemini_client
+    client = gemma_client
     if not client:
-        print("[ERROR] Gemini AI client not initialized (check GOOGLE_API_KEY). Cannot perform retro-processing.")
+        print("[ERROR] Gemma AI client not initialized (check GOOGLE_API_KEY). Cannot perform retro-processing.")
         return
 
     success_count = 0
@@ -88,7 +88,7 @@ async def migrate_old_memories():
         prompt = f"{LIFEOS_V7_PROMPT}\n\n{user_context}[USER LOG - {date_str}]:\n{content}"
         
         try:
-            # Send to Gemini
+            # Send to Gemma
             response = await safe_generate_content(
                 client=client,
                 prefer_mode="fast", # Use flash for batch processing
@@ -152,7 +152,7 @@ async def migrate_old_memories():
             print(f"  [OK] Successfully updated record {mem_id}")
             success_count += 1
             
-            # Rate limiting safety for script (avoid hitting Gemini API limits)
+            # Rate limiting safety for script (avoid hitting Gemma API limits)
             await asyncio.sleep(2)
             
         except Exception as e:

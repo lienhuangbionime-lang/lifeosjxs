@@ -6,7 +6,7 @@ import sys
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 from typing import Optional, List, Dict
-from app.core.gemini import get_model, gemini_client, sanitize_model_name
+from app.core.gemini import get_model, gemma_client, sanitize_model_name
 from app.core.database import supabase
 from app.core.time_utils import get_current_iso_taipei
 
@@ -25,7 +25,7 @@ class MicroSyncWorker:
     def __init__(self):
         self.shutdown_event = asyncio.Event()
         self.last_sync_time = datetime.now(timezone.utc)
-        self.model_name = sanitize_model_name("gemini-2.0-flash-lite")
+        self.model_name = sanitize_model_name("gemma-2.0-flash-lite")
         
     def setup_signal_handlers(self):
         """Register signal handlers for graceful shutdown."""
@@ -37,7 +37,7 @@ class MicroSyncWorker:
                 logger.warning(f"Could not register handler for {sig}: {e}")
 
     def _handle_signal(self, sig, frame):
-        logger.info(f"üö® Shutdown signal ({sig}) received. Initiating 15-minute handover protocol...")
+        logger.info(f"?ö® Shutdown signal ({sig}) received. Initiating 15-minute handover protocol...")
         self.shutdown_event.set()
 
     async def fetch_recent_data(self, hours: int = 3) -> str:
@@ -98,16 +98,16 @@ Analyze the following recent session data and extract ONLY:
   "architecture_shifts": ["..."],
   "summary": "3 brief sentences describing the session state."
 }}
-- Language: Traditional Chinese (ÁπÅÈ´î‰∏≠Êñá).
+- Language: Traditional Chinese (ÁπÅÈ?‰∏≠Ê?).
 """
-        if not gemini_client:
-            logger.warning("gemini_client is None. Skipping LLM crystallization.")
+        if not gemma_client:
+            logger.warning("gemma_client is None. Skipping LLM crystallization.")
             return
 
         try:
             from app.core.gemini import safe_generate_content
             response = await safe_generate_content(
-                client=gemini_client,
+                client=gemma_client,
                 prefer_mode="fast",
                 contents=prompt,
                 config={"temperature": 0.2, "response_mime_type": "application/json"}
@@ -123,7 +123,7 @@ Analyze the following recent session data and extract ONLY:
             if mode == "shutdown":
                 self._update_cortex_state(data["summary"])
                 
-            logger.info(f"‚úÖ Micro-Sync success. Mode: {mode}")
+            logger.info(f"??Micro-Sync success. Mode: {mode}")
             
         except Exception as e:
             logger.error(f"Crystallization failed: {e}")
@@ -166,7 +166,7 @@ Analyze the following recent session data and extract ONLY:
 
     async def start(self):
         """Main Loop."""
-        logger.info("üöÄ Micro-Sync Worker starting in CONTINUOUS mode...")
+        logger.info("?? Micro-Sync Worker starting in CONTINUOUS mode...")
         self.setup_signal_handlers()
         
         while not self.shutdown_event.is_set():
@@ -179,9 +179,9 @@ Analyze the following recent session data and extract ONLY:
                 continue # Normal loop
                 
         # --- SHUTDOWN HANDOVER PROTOCOL ---
-        logger.info("‚è≥ EXECUTION HANDOVER: Starting final 15-minute crystallization...")
+        logger.info("??EXECUTION HANDOVER: Starting final 15-minute crystallization...")
         await self.crystallize_and_persist(mode="shutdown")
-        logger.info("üí§ Micro-Sync Worker entering dormancy. System sync complete.")
+        logger.info("?í§ Micro-Sync Worker entering dormancy. System sync complete.")
 
 if __name__ == "__main__":
     from datetime import timedelta # Missing import for fetch_recent_data

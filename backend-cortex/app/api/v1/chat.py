@@ -6,7 +6,7 @@ import logging
 import json
 import asyncio
 from pathlib import Path
-from app.core.gemini import get_model, gemini_client, get_request_gemini_client, get_discovery_service, sanitize_model_name
+from app.core.gemma import get_model, gemma_client, get_request_gemma_client, get_discovery_service, sanitize_model_name
 from app.services.skills import orchestrator
 from app.services.search import search_web, format_search_results
 from google import genai
@@ -144,33 +144,33 @@ class ChatRequest(BaseModel):
 # ---------------------------------------------------------------------------
 @router.post("/message")
 async def stream_chat(request: Request, payload: ChatRequest):
-    """Stream chat with Gemini, using per-user Gemini Key if provided via X-Gemini-Key header."""
-    req_gemini = get_request_gemini_client(request)
+    """Stream chat with Gemma, using per-user Gemma Key if provided via X-gemma-Key header."""
+    req_gemma = get_request_gemma_client(request)
     logger.info(f"💬 Chat Request: {payload.message}")
     
     try:
         model_config = get_model("smart")
-        if not model_config.get("configured") or not req_gemini:
+        if not model_config.get("configured") or not req_gemma:
              raise HTTPException(status_code=503, detail="Cortex AI not configured (API Key missing)")
 
-        from app.core.gemini import sanitize_model_name
+        from app.core.gemma import sanitize_model_name
         model_name = sanitize_model_name(payload.model or model_config.get("model"))
         
         # [v3.5 Phase 11] URL Discussion Model Interceptor
-        # URL content easily exhausts Gemini 3 Pro (experimental) low tier quota
+        # URL content easily exhausts Gemma 3 Pro (experimental) low tier quota
         # We intercept URL requests and route them to 1.5 Pro / Flash series which 
         # have 1M-2M context windows and proven 'summarization' capability parity 
         # with LifeOSvs-main.
-        if payload.url_context and "gemini-3" in model_name:
+        if payload.url_context and "gemma-3" in model_name:
             logger.info("🔗 URL Context detected. Routing to verified 2.0 Flash for Context Length resilience.")
-            model_name = sanitize_model_name("gemini-2.0-flash")
+            model_name = sanitize_model_name("gemma-2.0-flash")
             
-        # Convert history to Gemini format using new genai.types
+        # Convert history to Gemma format using new genai.types
         from google.genai import types
-        gemini_history = []
+        gemma_history = []
         for msg in payload.history:
              role = "user" if msg.role == "user" else "model"
-             gemini_history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg.content)]))
+             gemma_history.append(types.Content(role=role, parts=[types.Part.from_text(text=msg.content)]))
              
         # [Phase 7] Dynamic Prompt Assembly (Hermes Style)
         from app.core.prompt_builder import build_dynamic_prompt
@@ -192,9 +192,9 @@ async def stream_chat(request: Request, payload: ChatRequest):
 
         chat = _get_cached_chat(cache_key, system_hash)
         if chat is None:
-            chat = req_gemini.aio.chats.create(
+            chat = req_gemma.aio.chats.create(
                 model=model_name, 
-                history=gemini_history,
+                history=gemma_history,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
                     tools=cortex_tools
@@ -316,14 +316,14 @@ Type: {url_data.get("type", 'webpage')}
                                     )
                                     fallbacks = [m for m in fallbacks if sanitize_model_name(m) != model_name]
                                 except Exception:
-                                    fallbacks = ["gemini-2.0-flash"]
+                                    fallbacks = ["gemma-2.0-flash"]
                                 
                                 success_fallback = False
                                 for fallback_name in fallbacks:
                                     if fallback_name == model_name: continue
                                     try:
                                         logger.warning(f"🔄 Retrying with fallback: {fallback_name}")
-                                        fallback_chat = req_gemini.aio.chats.create(model=fallback_name, config=types.GenerateContentConfig(system_instruction=system_instruction))
+                                        fallback_chat = req_gemma.aio.chats.create(model=fallback_name, config=types.GenerateContentConfig(system_instruction=system_instruction))
                                         fallback_resp = await fallback_chat.send_message_stream(full_input)
                                         async for chunk in fallback_resp:
                                             if chunk.text: yield chunk.text

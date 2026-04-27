@@ -15,7 +15,7 @@ scheduler: AsyncIOScheduler = AsyncIOScheduler()
 async def scheduled_monthly_consolidation():
     """Trigger the Monthly Consolidator skill."""
     try:
-        logger.info("📅 [Scheduler] Commencing Monthly Strategic Consolidation...")
+        logger.info("?? [Scheduler] Commencing Monthly Strategic Consolidation...")
         consolidator = MonthlyConsolidator()
         await consolidator.run_consolidation()
     except Exception as e:
@@ -24,7 +24,7 @@ async def scheduled_monthly_consolidation():
 async def scheduled_reflection():
     """Wrapper to run reflection in the background."""
     try:
-        logger.info("🧠 [Scheduler] Triggering scheduled autonomous reflection...")
+        logger.info("?? [Scheduler] Triggering scheduled autonomous reflection...")
         await run_autonomous_reflection(hours_lookback=48)
     except Exception as e:
         logger.error(f"Scheduled reflection failed: {e}")

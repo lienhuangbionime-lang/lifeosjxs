@@ -192,22 +192,22 @@ async def get_monthly_review(year: int, month: int, request: Request):
 @router.post("/review/{year}/{month}/generate")
 async def trigger_monthly_review(year: int, month: int, request: Request, force: bool = True):
     """
-    [v5.4] Trigger Monthly Review generation — always upserts (force regenerate by default).
+    [v5.4] Trigger Monthly Review generation ??always upserts (force regenerate by default).
     Runs inline in FastAPI as a background task. No subprocess required.
     Uses dynamic model selection from registry (zero hardcoded model IDs).
     """
     import asyncio
     import calendar as cal
     from app.core.database import get_request_client
-    from app.core.gemini import get_request_gemini_client, safe_generate_content, types
+    from app.core.gemini import get_request_gemma_client, safe_generate_content, types
 
     db = get_request_client(request)
-    g_client = get_request_gemini_client(request)
+    g_client = get_request_gemma_client(request)
 
     if not db:
         raise HTTPException(status_code=503, detail="Database unavailable")
     if not g_client:
-        raise HTTPException(status_code=503, detail="Gemini client unavailable — check API key")
+        raise HTTPException(status_code=503, detail="Gemma client unavailable ??check API key")
 
     async def _run_generation():
         try:
@@ -251,19 +251,19 @@ Structure your response in Markdown:
 
 # Monthly Review: {month_name} {year}
 
-## 🏆 Key Achievements
+## ?? Key Achievements
 - ...
 
-## 🧗 Challenges & Roadblocks
+## ?? Challenges & Roadblocks
 - ...
 
-## 💡 Insights & Lessons Learned
+## ?�� Insights & Lessons Learned
 - ...
 
-## 🔋 Energy & Mood Trends
+## ?? Energy & Mood Trends
 - ...
 
-## 🎯 Focus for Next Month
+## ?�� Focus for Next Month
 - ...
 
 ---
@@ -285,7 +285,7 @@ Daily Summaries ({len(memories)} entries):
 
             review_text = response.text.strip()
 
-            # 5. Upsert (overwrites existing review — this is the key for re-generation)
+            # 5. Upsert (overwrites existing review ??this is the key for re-generation)
             payload = {
                 "year": year,
                 "month": month,

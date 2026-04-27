@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, MessageSquare, X, Bot, User, Loader2, Maximize2, Minimize2, Trash2, Settings, Terminal, Sparkles, Link2, Zap, Brain, Mic } from 'lucide-react';
+import { Send, Paperclip, MessageSquare, X, Bot, User, Loader2, Maximize2, Minimize2, Trash2, Settings, Terminal, Sparkles, Link2, Zap, Brain, Mic, MicOff, Tv } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cortex, EvolutionStatus } from '@/lib/api/client';
 import { CaptureView } from './CaptureView';
@@ -12,8 +12,8 @@ interface Message {
     content: string;
 }
 
-export const CortexChat = ({ isInline = false, initialOpen = false }: { isInline?: boolean, initialOpen?: boolean }) => {
-    const [isOpen, setIsOpen] = useState(initialOpen || isInline);
+export const CortexChat = () => {
+    const [isOpen, setIsOpen] = useState(false);
     const [isMaximized, setIsMaximized] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
         { role: 'assistant', content: 'Hello. I am **Cortex**, your digital assistant. How can I help you manage your projects and memories today?' }
@@ -25,7 +25,7 @@ export const CortexChat = ({ isInline = false, initialOpen = false }: { isInline
     const [learningStatus, setLearningStatus] = useState<{ total: number; accuracy: number | null; count: number } | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string }>>([]);
-    const [selectedModel, setSelectedModel] = useState('models/gemma-4-31b-it');
+    const [selectedModel, setSelectedModel] = useState('models/gemini-flash-lite-latest');
     const [isRefreshingModels, setIsRefreshingModels] = useState(false);
     const [apiKey, setApiKey] = useState('');
     const [activeTab, setActiveTab] = useState<'chat'>('chat');
@@ -34,7 +34,9 @@ export const CortexChat = ({ isInline = false, initialOpen = false }: { isInline
     const [isSavingPrompt, setIsSavingPrompt] = useState(false);
     const [brainContext, setBrainContext] = useState<any | null>(null); // [New] Sovereign Context
     const [currentThought, setCurrentThought] = useState(''); // [New] Thinking Stream
-    const [isRecording, setIsRecording] = useState(false);
+    const [isConversationMode, setIsConversationMode] = useState(false); // [New] Immersive Mode
+    const [isListening, setIsListening] = useState(false); // [New] Voice Input
+    const recognitionRef = useRef<any>(null);
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -47,13 +49,12 @@ export const CortexChat = ({ isInline = false, initialOpen = false }: { isInline
         if (savedModel) {
             // [Hotfix] Reset if model is deprecated or corrupted
             if (savedModel.includes('pro-exp-02-05') || savedModel.includes('2.5') || savedModel.includes('-33') || savedModel.includes('1.5')) {
-                setSelectedModel('models/gemini-2.0-flash-lite');
-                localStorage.setItem('CORTEX_MODEL', 'models/gemini-2.0-flash-lite');
+                setSelectedModel('models/gemma-4-31b-it');
+                localStorage.setItem('CORTEX_MODEL', 'models/gemma-4-31b-it');
             } else if (savedModel.includes('gemini-3.0')) {
-                // [Hotfix] Fix incorrect 3.0 version appearing in cache
-                const fixed = savedModel.replace('gemini-3.0', 'gemini-3');
-                setSelectedModel(fixed);
-                localStorage.setItem('CORTEX_MODEL', fixed);
+                // [Hotfix] Preferred Gemma-4 over experimental Gemini versions
+                setSelectedModel('models/gemma-4-26b-a4b-it');
+                localStorage.setItem('CORTEX_MODEL', 'models/gemma-4-26b-a4b-it');
             } else {
                 setSelectedModel(savedModel);
             }
@@ -110,45 +111,6 @@ export const CortexChat = ({ isInline = false, initialOpen = false }: { isInline
     };
 
 
-    // Voice Recognition
-    useEffect(() => {
-        let recognition: any;
-        if (isRecording) {
-            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-                // @ts-ignore
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                recognition = new SpeechRecognition();
-                recognition.continuous = true;
-                recognition.interimResults = true;
-                recognition.lang = 'zh-TW';
-
-                recognition.onresult = (event: any) => {
-                    let finalTranscript = '';
-                    for (let i = event.resultIndex; i < event.results.length; ++i) {
-                        if (event.results[i].isFinal) {
-                            finalTranscript += event.results[i][0].transcript;
-                        }
-                    }
-                    if (finalTranscript) {
-                        setInput(prev => prev + (prev ? ' ' : '') + finalTranscript);
-                    }
-                };
-
-                recognition.onerror = (event: any) => {
-                    setIsRecording(false);
-                };
-
-                recognition.start();
-            } else {
-                alert("Voice recognition not supported.");
-                setIsRecording(false);
-            }
-        }
-        return () => {
-            if (recognition) recognition.stop();
-        };
-    }, [isRecording]);
-
 
     const handleSavePrompt = async () => {
         if (!prompts[selectedPrompt]) return;
@@ -161,6 +123,38 @@ export const CortexChat = ({ isInline = false, initialOpen = false }: { isInline
             alert('Failed to update prompt.');
         } finally {
             setIsSavingPrompt(false);
+        }
+    };
+
+    const toggleListening = () => {
+        if (isListening) {
+            recognitionRef.current?.stop();
+            setIsListening(false);
+        } else {
+            const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("Browser does not support Speech Recognition.");
+                return;
+            }
+            
+            const recognition = new SpeechRecognition();
+            recognition.continuous = false;
+            recognition.interimResults = false;
+            recognition.lang = 'zh-TW';
+            
+            recognition.onstart = () => setIsListening(true);
+            recognition.onend = () => setIsListening(false);
+            recognition.onresult = (event: any) => {
+                const transcript = event.results[0][0].transcript;
+                setInput(prev => prev ? prev + ' ' + transcript : transcript);
+            };
+            recognition.onerror = (err: any) => {
+                console.error("Speech Error:", err);
+                setIsListening(false);
+            };
+            
+            recognition.start();
+            recognitionRef.current = recognition;
         }
     };
 
@@ -323,127 +317,6 @@ export const CortexChat = ({ isInline = false, initialOpen = false }: { isInline
         );
     }
 
-    if (isInline) {
-        return (
-            <div className="flex flex-col w-full h-[calc(100vh-120px)] bg-white border border-slate-200 rounded-[32px] overflow-hidden shadow-sm">
-                <div className="bg-slate-50 border-b border-slate-200 p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
-                            <Bot size={20} />
-                        </div>
-                        <div>
-                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Cortex Sovereign Engine</h3>
-                            <div className="flex items-center gap-1.5">
-                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                                <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Active • Neural Linked</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition-colors">
-                            <Settings size={18} />
-                        </button>
-                        <button onClick={clearChat} className="p-2 text-slate-400 hover:text-red-600 hover:bg-slate-100 rounded-xl transition-colors">
-                            <Trash2 size={18} />
-                        </button>
-                    </div>
-                </div>
-
-                {/* Tab Navigation (Simple) */}
-                <div className="flex bg-slate-50/50 border-b border-slate-100 px-6 py-2 gap-8 overflow-x-auto no-scrollbar">
-                    <button
-                        className="text-[11px] font-black uppercase tracking-[0.2em] pb-1 border-b-2 text-indigo-600 border-indigo-600"
-                    >
-                        Neural Dialogue
-                    </button>
-                </div>
-
-                {isSettingsOpen && (
-                    <div className="absolute inset-x-0 top-[110px] bottom-0 bg-white/95 backdrop-blur-md z-50 p-8 flex flex-col animate-in fade-in slide-in-from-top-2 duration-200">
-                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] mb-6">Sovereign Configurations</h4>
-                        {/* reuse setting content or just link it */}
-                        <div className="space-y-6 max-w-md">
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-500 uppercase mb-2">Neural Model</label>
-                                <select
-                                    value={selectedModel}
-                                    onChange={(e) => setSelectedModel(e.target.value)}
-                                    className="w-full bg-slate-900 border border-slate-800 text-white rounded-2xl p-3 text-sm outline-none"
-                                >
-                                    {availableModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
-                                </select>
-                            </div>
-                        </div>
-                        <button onClick={saveSettings} className="mt-8 bg-indigo-600 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-xs">Authorize Changes</button>
-                    </div>
-                )}
-
-                {/* Chat content - flex-1 */}
-                <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-white scroll-smooth" ref={scrollRef}>
-                    {messages.map((m, i) => (
-                        <div key={i} className={`flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                            <div className={`shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg ${m.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-300'}`}>
-                                {m.role === 'user' ? <User size={20} /> : <Bot size={20} />}
-                            </div>
-                            <div className={`max-w-[80%] rounded-[24px] p-5 text-sm leading-relaxed shadow-xl border
-                                ${m.role === 'user'
-                                    ? 'bg-indigo-600 text-white rounded-tr-none border-indigo-500'
-                                    : 'bg-slate-50 text-slate-800 border-slate-100 rounded-tl-none'}`}
-                            >
-                                {m.role === 'assistant' ? (
-                                    <div className="markdown-content">
-                                        <ReactMarkdown
-                                            components={{
-                                                h1: ({ ...props }) => <h1 className="text-slate-900 font-bold text-lg mb-2" {...props} />,
-                                                p: ({ ...props }) => <p className="mb-2 last:mb-0" {...props} />,
-                                                code: ({ ...props }) => <code className="bg-slate-200 text-indigo-700 rounded px-1" {...props} />,
-                                                pre: ({ ...props }) => <pre className="bg-slate-900 text-slate-100 p-4 rounded-2xl my-3 overflow-x-auto text-xs" {...props} />
-                                            }}
-                                        >
-                                            {m.content}
-                                        </ReactMarkdown>
-                                    </div>
-                                ) : (
-                                    <div className="whitespace-pre-wrap">{m.content}</div>
-                                )}
-                            </div>
-                        </div>
-                    ))}
-                    {isLoading && (
-                        <div className="text-xs text-indigo-500 font-black tracking-widest uppercase flex items-center gap-2 animate-pulse pl-14">
-                            <Sparkles size={14} /> Neural processing...
-                        </div>
-                    )}
-                </div>
-
-                {/* Input area */}
-                <div className="p-6 bg-slate-50/30 border-t border-slate-100">
-                    <div className="bg-white border-2 border-slate-100 rounded-[28px] p-2 flex items-end gap-3 shadow-lg focus-within:border-indigo-500/30 transition-all">
-                        <button onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 hover:text-indigo-600 rounded-2xl transition-all"><Paperclip size={20} /></button>
-                        <button onClick={() => setIsRecording(!isRecording)} className={`p-3 rounded-2xl transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg' : 'text-slate-400 hover:text-indigo-600'}`}><Mic size={20} /></button>
-                        <textarea
-                            value={input}
-                            onChange={e => { setInput(e.target.value); checkUrlInInput(e.target.value); }}
-                            placeholder="Interrogate Cortex..."
-                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
-                            className="flex-1 bg-transparent border-0 px-3 py-3 text-sm text-slate-800 outline-none resize-none h-12 max-h-48"
-                        />
-                        <button onClick={handleSend} disabled={isLoading || (!input.trim() && !urlContext)} className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center hover:bg-indigo-700 transition-all shadow-lg active:scale-95 disabled:opacity-30"><Send size={20} /></button>
-                    </div>
-                    {(urlContext || isAnalyzingUrl) && (
-                        <div className="mt-4 p-3 bg-indigo-600/5 border border-indigo-500/10 rounded-2xl flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                                <Link2 size={16} className="text-indigo-500" />
-                                <span className="text-xs font-bold text-indigo-900 truncate">{urlContext?.title || 'Analyzing URL...'}</span>
-                            </div>
-                            <button onClick={() => setUrlContext(null)} className="text-indigo-400 hover:text-indigo-600"><X size={16} /></button>
-                        </div>
-                    )}
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div
             className={`fixed transition-all duration-300 z-[100] shadow-2xl flex flex-col bg-white border border-slate-200 overflow-hidden
@@ -459,23 +332,36 @@ export const CortexChat = ({ isInline = false, initialOpen = false }: { isInline
                     </div>
                     <div>
                         <h3 className="text-sm font-bold text-slate-800">Cortex AI</h3>
-                        <div className="flex items-center gap-1.5">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                            <span className="text-[10px] text-slate-500 font-medium uppercase tracking-tight">Active</span>
-                        </div>
+                        {!isConversationMode && (
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                <span className="text-[10px] text-slate-500 font-medium uppercase tracking-tight">Active</span>
+                            </div>
+                        )}
                     </div>
                 </div>
 
                 <div className="flex items-center gap-1">
-                    <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors">
-                        <Settings size={16} />
+                    <button
+                        onClick={() => setIsConversationMode(!isConversationMode)}
+                        className={`p-1.5 rounded-lg transition-all ${isConversationMode ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-100'}`}
+                        title={isConversationMode ? "Exit Conversation Mode" : "Enter Conversation Mode"}
+                    >
+                        <Tv size={16} />
                     </button>
-                    <button onClick={() => setIsMaximized(!isMaximized)} className="hidden sm:block p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors">
-                        {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-                    </button>
-                    <button onClick={clearChat} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-slate-100 rounded-lg transition-colors">
-                        <Trash2 size={16} />
-                    </button>
+                    {!isConversationMode && (
+                        <>
+                            <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors">
+                                <Settings size={16} />
+                            </button>
+                            <button onClick={() => setIsMaximized(!isMaximized)} className="hidden sm:block p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors">
+                                {isMaximized ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                            </button>
+                            <button onClick={clearChat} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-slate-100 rounded-lg transition-colors">
+                                <Trash2 size={16} />
+                            </button>
+                        </>
+                    )}
                     <button onClick={() => setIsOpen(false)} className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors ml-1">
                         <X size={18} />
                     </button>
@@ -483,7 +369,8 @@ export const CortexChat = ({ isInline = false, initialOpen = false }: { isInline
             </div>
 
             {/* Tab Navigation */}
-            <div className="flex bg-slate-50/50 border-b border-slate-100 px-3 py-1 gap-4 shrink-0 overflow-x-auto no-scrollbar">
+            {!isConversationMode && (
+                <div className="flex bg-slate-50/50 border-b border-slate-100 px-3 py-1 gap-4 shrink-0 overflow-x-auto no-scrollbar">
                 <button
                     onClick={() => setActiveTab('chat')}
                     className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all shrink-0 ${activeTab === 'chat' ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
@@ -491,6 +378,7 @@ export const CortexChat = ({ isInline = false, initialOpen = false }: { isInline
                     Chat
                 </button>
             </div>
+            )}
 
             {/* Settings Overlay */}
             {isSettingsOpen && (
@@ -634,13 +522,6 @@ export const CortexChat = ({ isInline = false, initialOpen = false }: { isInline
                             >
                                 <Paperclip size={18} />
                             </button>
-                            <button
-                                onClick={() => setIsRecording(!isRecording)}
-                                className={`p-2 rounded-xl transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'text-slate-400 hover:text-indigo-600 hover:bg-white'}`}
-                                title="Voice input"
-                            >
-                                <Mic size={18} />
-                            </button>
                             <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,.txt,.md,.jpg,.jpeg,.png,.webp,.svg" />
 
                             <textarea
@@ -654,6 +535,14 @@ export const CortexChat = ({ isInline = false, initialOpen = false }: { isInline
                                 className="flex-1 bg-transparent border-0 px-2 py-2 text-sm text-slate-700 outline-none resize-none h-10 max-h-32 font-sans"
                                 rows={1}
                             />
+
+                            <button
+                                onClick={toggleListening}
+                                className={`p-2 transition-all rounded-xl ${isListening ? 'bg-red-50 text-red-500 animate-pulse' : 'text-slate-400 hover:text-indigo-600 hover:bg-white'}`}
+                                title={isListening ? "Stop Listening" : "Voice Input"}
+                            >
+                                {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+                            </button>
 
                             <button
                                 onClick={handleSend}
@@ -692,25 +581,27 @@ export const CortexChat = ({ isInline = false, initialOpen = false }: { isInline
                         )}
 
                         {/* Stats */}
-                        <div className="flex justify-between items-center px-2 mt-2">
-                            <div className="flex gap-4">
-                                <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest shrink-0" title="Current Model">
-                                    {systemStatus?.current_model?.replace('models/', '') || 'GEMINI-PRO'}
-                                </div>
-                                {learningStatus && (
-                                    <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest hidden sm:flex gap-2" title="AI Evolution Metrics">
-                                        <span>🧠 MEM: {learningStatus.total}</span>
-                                        <span>|</span>
-                                        <span className={learningStatus.accuracy && learningStatus.accuracy > 70 ? 'text-emerald-500' : ''}>
-                                            ACC: {learningStatus.accuracy !== null ? `${learningStatus.accuracy}%` : 'N/A'}
-                                        </span>
+                        {!isConversationMode && (
+                            <div className="flex justify-between items-center px-2 mt-2">
+                                <div className="flex gap-4">
+                                    <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest shrink-0" title="Current Model">
+                                        {systemStatus?.current_model?.replace('models/', '') || 'GEMINI-PRO'}
                                     </div>
-                                )}
+                                    {learningStatus && (
+                                        <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest hidden sm:flex gap-2" title="AI Evolution Metrics">
+                                            <span>🧠 MEM: {learningStatus.total}</span>
+                                            <span>|</span>
+                                            <span className={learningStatus.accuracy && learningStatus.accuracy > 70 ? 'text-emerald-500' : ''}>
+                                                ACC: {learningStatus.accuracy !== null ? `${learningStatus.accuracy}%` : 'N/A'}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest shrink-0 text-right">
+                                    {systemStatus?.remaining_requests || '0'} REQ LEFT
+                                </div>
                             </div>
-                            <div className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest shrink-0 text-right">
-                                {systemStatus?.remaining_requests || '0'} REQ LEFT
-                            </div>
-                        </div>
+                        )}
                     </div>
 
 

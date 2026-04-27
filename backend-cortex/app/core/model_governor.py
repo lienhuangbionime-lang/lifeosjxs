@@ -11,23 +11,23 @@ class ModelGovernor:
     """
     
     LIMITS = {
-        "gemini-flash-lite": {"rpm": 15, "tpm": 250000, "rpd": 500},
+        "gemma-4-26b-lite": {"rpm": 15, "tpm": 250000, "rpd": 500},
         "gemma-3-27b": {"rpm": 30, "tpm": 150000, "rpd": 14400}
     }
 
     # Task Affinity Mapping
     TASK_MAP = {
-        "DIARY_INGEST": "gemini-flash-lite",
-        "WEB_SCOUT": "gemini-flash-lite",
-        "SUMMARY": "gemini-flash-lite",
+        "DIARY_INGEST": "gemma-4-26b-lite",
+        "WEB_SCOUT": "gemma-4-26b-lite",
+        "SUMMARY": "gemma-4-26b-lite",
         "DEEP_REASONING": "gemma-3-27b",
         "MEMORY_MERGE": "gemma-3-27b",
         "CODE_REFACTOR": "gemma-3-27b"
     }
 
     def get_best_model(self, task_type: str) -> str:
-        model = self.TASK_MAP.get(task_type, "gemini-flash-lite")
-        logger.info(f"âš–ï¸ Governor: Routing task '{task_type}' to model '{model}'")
+        model = self.TASK_MAP.get(task_type, "gemma-4-26b-lite")
+        logger.info(f"?–ï? Governor: Routing task '{task_type}' to model '{model}'")
         return model
 
     def check_capacity(self, model: str) -> bool:

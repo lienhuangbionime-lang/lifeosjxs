@@ -1,15 +1,15 @@
 import os
 from google import genai
 from dotenv import load_dotenv
-from app.models.gemini import LogEntry
+from app.models.gemma import LogEntry
 
 load_dotenv()
 
 class SorterAgent:
     def __init__(self):
         # Using loop-safe client and dynamic models from core
-        from app.core.gemini import get_gemini_client
-        self.client = get_gemini_client()
+        from app.core.gemini import get_gemma_client
+        self.client = get_gemma_client()
 
     async def process(self, user_input: str) -> LogEntry:
         # Load System Prompt from external file
@@ -31,15 +31,15 @@ class SorterAgent:
         
         Current Date: {current_date}
         --------------------------------------------------
-        使用者輸入: {user_input}
+        使用?�輸?? {user_input}
         --------------------------------------------------
-        直接輸出完整的 Markdown 內容，不需要包裹在 JSON 中。
-        確保 Daily Metrics 區塊格式正確以便解析。
+        ?�接輸出完整??Markdown ?�容，�??�要�?裹在 JSON 中�?
+        確�? Daily Metrics ?�塊格式正確以便解?��?
         
-        重要指南：
-        1. 優先使用使用者輸入標題中的日期（例如 # 2026-02-01）作為輸出的標題日期。
-        2. 只有在使用者完全沒提供日期時，才使用目前的日期 ({current_date})。
-        3. 輸出標題格式維持為 # [YYYY-MM-DD] 日記。
+        ?��??��?�?
+        1. ?��?使用使用?�輸?��?題中?�日?��?例�? # 2026-02-01）�??�輸?��?標�??��???
+        2. ?��??�使?�者�??��??��??��??��??�使?�目?��??��? ({current_date})??
+        3. 輸出標�??��?維�???# [YYYY-MM-DD] ?��???
         """
         
         from app.core.gemini import safe_generate_content
@@ -121,7 +121,7 @@ class SorterAgent:
                 print(f"[WARN] JSON Parsing failed: {e}. Falling back to Regex.")
         
         # 2. Extract Date (Search for # [YYYY-MM-DD] header first, then fallback to any date)
-        # 支持 # YYYY-MM-DD, # [YYYY-MM-DD], # 2024/01/01, # 2024-1-1 等格式
+        # ?��? # YYYY-MM-DD, # [YYYY-MM-DD], # 2024/01/01, # 2024-1-1 等格�?
         header_date_match = re.search(r"#\s*\[?(\d{4}[-/]\d{1,2}[-/]\d{1,2})\]?", text)
         if header_date_match:
              raw_date = header_date_match.group(1).replace("/", "-")

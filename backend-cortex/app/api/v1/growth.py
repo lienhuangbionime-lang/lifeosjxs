@@ -1,5 +1,5 @@
 """
-growth.py — Phase B: Cortex Growth Logs API
+growth.py ??Phase B: Cortex Growth Logs API
 Enables AI to write its own decision history and read past lessons.
 """
 from fastapi import APIRouter, Request, HTTPException
@@ -9,7 +9,7 @@ import logging
 import json
 
 from app.core.database import get_request_client
-from app.core.gemini import get_request_gemini_client
+from app.core.gemini import get_request_gemma_client
 
 router = APIRouter()
 logger = logging.getLogger("cortex.growth")

@@ -17,7 +17,7 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
     """
     try:
         payload = await request.json()
-        logger.info(f"📥 [WEBHOOK] Received payload: {json.dumps(payload)[:200]}")
+        logger.info(f"?�� [WEBHOOK] Received payload: {json.dumps(payload)[:200]}")
         
         # 1. Basic Validation (HMAC or Token)
         # TODO: Implement robust verification
@@ -36,7 +36,7 @@ async def receive_webhook(request: Request, background_tasks: BackgroundTasks):
         return {"status": "accepted", "source": source}
         
     except Exception as e:
-        logger.error(f"❌ [WEBHOOK ERROR] {e}")
+        logger.error(f"??[WEBHOOK ERROR] {e}")
         raise HTTPException(status_code=400, detail="Invalid payload")
 
 async def process_webhook_payload(payload: Dict):
@@ -58,6 +58,6 @@ async def process_webhook_payload(payload: Dict):
             },
             target="memories"
         )
-        logger.info(f"✅ [WEBHOOK] Signal ingested into memories from {source}")
+        logger.info(f"??[WEBHOOK] Signal ingested into memories from {source}")
     except Exception as e:
-        logger.error(f"❌ [WEBHOOK INGEST ERROR] {e}")
+        logger.error(f"??[WEBHOOK INGEST ERROR] {e}")

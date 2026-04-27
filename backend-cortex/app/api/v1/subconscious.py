@@ -12,7 +12,7 @@ async def manual_reflection():
     Manually triggers the Subconscious Reflection process.
     """
     try:
-        logger.info("🧠 [API] Manual Subconscious Reflection triggered by user.")
+        logger.info("?? [API] Manual Subconscious Reflection triggered by user.")
         result = await run_autonomous_reflection(hours_lookback=168)
         
         if result:

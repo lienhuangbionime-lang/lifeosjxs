@@ -13,7 +13,7 @@ from app.services.rag_service import rag_service
 logger = logging.getLogger("cortex.tools")
 
 def get_tools_schema() -> list:
-    """Returns the list of Gemini FunctionDeclarations for all Cortex tools."""
+    """Returns the list of Gemma FunctionDeclarations for all Cortex tools."""
     from google.genai import types
     return [
         types.FunctionDeclaration(
@@ -69,11 +69,11 @@ def get_tools_schema() -> list:
         ),
         types.FunctionDeclaration(
             name="save_memory",
-            description="[Memory Write] 永久存入重要資訊、學習或決策到雲端記憶表。",
+            description="[Memory Write] 永久同步重要資訊、學習與決策到雲端記憶表中。",
             parameters=types.Schema(
                 type=types.Type.OBJECT,
                 properties={
-                    "content": types.Schema(type=types.Type.STRING, description="要記住的具體內容"),
+                    "content": types.Schema(type=types.Type.STRING, description="要記住的重要內容"),
                     "category": types.Schema(type=types.Type.STRING, description="類別 (如 Chat, Technical, Life)"),
                     "tags": types.Schema(type=types.Type.ARRAY, items=types.Schema(type=types.Type.STRING))
                 },
@@ -96,18 +96,29 @@ def get_tools_schema() -> list:
                 type=types.Type.OBJECT,
                 properties={
                     "filename": types.Schema(type=types.Type.STRING),
-                    "html_content": types.Schema(type=types.Type.STRING, description="完整 HTML 代碼")
+                    "html_content": types.Schema(type=types.Type.STRING, description="完整 HTML 內容")
                 },
                 required=["filename", "html_content"]
             )
         ),
         types.FunctionDeclaration(
             name="scan_tw_stocks",
-            description="[TrendSniper] 啟動台股掃描引擎，搜尋買點訊號。",
+            description="[TrendSniper] 掃描台股選股快訊，尋找買點與警示。",
             parameters=types.Schema(
                 type=types.Type.OBJECT,
                 properties={"max_results": types.Schema(type=types.Type.INTEGER)},
                 required=[]
+            )
+        ),
+        types.FunctionDeclaration(
+            name="read_youtube_transcript",
+            description="[YouTube Analysis] 讀取 YouTube 影片的字幕/逐字稿並進行分析。只需提供影片網址。",
+            parameters=types.Schema(
+                type=types.Type.OBJECT,
+                properties={
+                    "url": types.Schema(type=types.Type.STRING, description="YouTube 影片網址")
+                },
+                required=["url"]
             )
         ),
         types.FunctionDeclaration(
@@ -128,6 +139,27 @@ def get_tools_map(db: Any) -> dict:
     """Returns a map of tool names to their callable functions."""
     tools = get_cortex_tools(db)
     return {t.__name__.replace("_tool", ""): t for t in tools}
+
+async def read_youtube_transcript_tool(url: str) -> dict:
+    """[YouTube Analysis] Extracts transcript from a YouTube video via the existing internal service."""
+    from app.api.v1.url_fetch import is_youtube_url, extract_youtube_id, fetch_youtube_transcript
+    
+    if not is_youtube_url(url):
+        return {"error": "Invalid YouTube URL"}
+    
+    video_id = extract_youtube_id(url)
+    if not video_id:
+        return {"error": "Could not extract video ID"}
+    
+    try:
+        title, content = fetch_youtube_transcript(video_id)
+        return {
+            "title": title,
+            "transcript_summary": content[:1000] + "..." if len(content) > 1000 else content,
+            "full_content_available": True
+        }
+    except Exception as e:
+        return {"error": f"Failed to fetch transcript: {str(e)}"}
 
 def get_cortex_tools(db: Any) -> list:
     """
@@ -212,7 +244,7 @@ def get_cortex_tools(db: Any) -> list:
         validator = get_intent_validator(db)
         validation = await validator.validate_intent(intent, action_summary)
         if not validation["valid"]:
-            return f"⚠️ [SECURITY ALERT]: {validation['reason']}\n{validation.get('alert', '')}"
+            return f"❌ [SECURITY ALERT]: {validation['reason']}\n{validation.get('alert', '')}"
         return f"✅ [SECURITY VALIDATED]: Executing {intent} for {action_summary}."
 
     async def execute_python_sandbox(code: str) -> str:
@@ -304,7 +336,7 @@ def get_cortex_tools(db: Any) -> list:
         with open(filepath, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
             
-        return f"✅ Action scheduled for {time_fmt}. I will wake up and handle it at the exact time."
+        return f"📅 Action scheduled for {time_fmt}. I will wake up and handle it at the exact time."
 
     async def update_self_prompt(topic: str, new_instruction: str) -> str:
         """
@@ -321,12 +353,12 @@ def get_cortex_tools(db: Any) -> list:
             entry = f"\n\n### [EVOLUTION RECORD: {topic}] ({timestamp})\n{new_instruction}\n"
             with open(abs_path, "a", encoding="utf-8") as f:
                 f.write(entry)
-            return f"✅ Knowledge internalized! Cortex will now remember and adhere to this instruction for [{topic}]."
+            return f"🧠 Knowledge internalized! Cortex will now remember and adhere to this instruction for [{topic}]."
         except Exception as e:
             return f"❌ Failed to evolve self-prompt: {e}"
 
     async def save_memory(content: str, category: str = "Chat", tags: List[str] = []) -> str:
-        """[Memory Write] 將重要資訊、學習或決策永久存入 Supabase memories 表。"""
+        """[Memory Write] 永久同步重要資訊、學習與決策到雲端記憶表中。"""
         if not db: return "Database not connected. Cannot save memory."
         try:
             success = await rag_service.ingest_text(
@@ -334,9 +366,9 @@ def get_cortex_tools(db: Any) -> list:
                 meta={"category": category, "tags": tags, "is_ai": True},
                 target="memories"
             )
-            return f"✅ 已存入記憶：{content[:60]}..." if success else "❌ 存入記憶失敗。"
+            return f"✅ 已成功記錄：{content[:60]}..." if success else "❌ 存入雲端失敗"
         except Exception as e:
-            return f"❌ 存入記憶過程發生錯誤: {e}"
+            return f"❌ 存入雲端時發生錯誤: {e}"
 
     async def update_hot_memory(fact: str) -> str:
         """
@@ -377,7 +409,7 @@ def get_cortex_tools(db: Any) -> list:
             # 2. Get Public URL
             public_url = db.storage.from_("cortex-files").get_public_url(path_in_bucket)
             
-            return f"✅ 雲端報告已產生！點擊查看分析結果 → [查看網頁報告]({public_url})"
+            return f"📊 雲端報告已生成！點擊以下連結查看： [查看網頁報告]({public_url})"
         except Exception as e:
             return f"❌ Failed to export cloud report: {e}"
 
@@ -401,9 +433,9 @@ def get_cortex_tools(db: Any) -> list:
         Returns a single summary.
         """
         try:
-            from app.core.gemini import get_gemini_client, get_model
-            client = get_gemini_client()
-            if not client: return "Error: Gemini client not available."
+            from app.core.gemini import get_gemma_client, get_model
+            client = get_gemma_client()
+            if not client: return "Error: Gemma client not available."
             
             p_path = os.path.join(os.getcwd(), "prompts", "subagent_protocol.md")
             protocol = open(p_path, "r", encoding="utf-8").read() if os.path.exists(p_path) else ""
@@ -424,9 +456,9 @@ def get_cortex_tools(db: Any) -> list:
             tasks = json.loads(tasks_json)
             if not isinstance(tasks, list): return "Error: tasks_json must be a list of dicts."
             
-            from app.core.gemini import get_gemini_client, get_model
-            client = get_gemini_client()
-            if not client: return "Error: Gemini client not available."
+            from app.core.gemini import get_gemma_client, get_model
+            client = get_gemma_client()
+            if not client: return "Error: Gemma client not available."
             
             p_path = os.path.join(os.getcwd(), "prompts", "subagent_protocol.md")
             protocol = open(p_path, "r", encoding="utf-8").read() if os.path.exists(p_path) else ""
@@ -439,14 +471,14 @@ def get_cortex_tools(db: Any) -> list:
             ]
             results = await asyncio.gather(*coros)
             
-            summary = "\n\n---\n\n".join([f"📦 [Worker {i+1} Result]:\n{res}" for i, res in enumerate(results)])
-            return f"🧬 [Parallel Delegation Complete]:\n{summary}"
+            summary = "\n\n---\n\n".join([f"🧱 [Worker {i+1} Result]:\n{res}" for i, res in enumerate(results)])
+            return f"🚀 [Parallel Delegation Complete]:\n{summary}"
         except Exception as e:
             return f"❌ Parallel delegation failed: {e}"
 
     async def scan_tw_stocks(max_results: int = 20) -> str:
         """
-        [TrendSniper] 啟動台股掃描引擎，搜尋符合多頭回調、位階合理且具備動能壓縮特徵的買點訊號。
+        [TrendSniper] 掃描台股選股快訊，尋找買點與警示。
         """
         try:
             import subprocess
@@ -461,7 +493,6 @@ def get_cortex_tools(db: Any) -> list:
             
             # 2. Execute via thread to avoid blocking
             def _execute():
-                # Use current interpreter to ensure same dependencies
                 cmd = [sys.executable, engine_path]
                 proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
                 return proc.stdout, proc.stderr
@@ -469,7 +500,7 @@ def get_cortex_tools(db: Any) -> list:
             stdout, stderr = await asyncio.to_thread(_execute)
             
             if not stdout:
-                return f"❌ 掃描引擎回傳為空。錯誤資訊: {stderr}"
+                return f"❌ 掃描引擎未傳回結果。錯誤訊息: {stderr}"
             
             # 3. Parse JSON (Find the last block)
             lines = stdout.split("\n")
@@ -480,7 +511,7 @@ def get_cortex_tools(db: Any) -> list:
                     break
             
             if not json_str:
-                return "❌ 無法解析引擎輸出的結果 JSON。"
+                return "❌ 無法解析引擎輸出的 JSON 資料。"
                 
             data = json.loads(json_str)
             if not data.get("success"):
@@ -488,7 +519,7 @@ def get_cortex_tools(db: Any) -> list:
                 
             results = data.get("results", [])[:max_results]
             if not results:
-                return "📉 今日台股未偵測到符合 TrendSniper 憲章的買點訊號。"
+                return "✅ 今日台股未偵測到符合 TrendSniper 策略的買點。"
                 
             # 4. Format as Markdown Table
             table = "| 代號 | 名稱 | 訊號 | 現價 | MA20距離 | F3強度 | 備註 |\n"
@@ -496,14 +527,14 @@ def get_cortex_tools(db: Any) -> list:
             for r in results:
                 table += f"| {r['代號']} | {r['名稱']} | {r['訊號']} | {r['現價']} | {r['MA20距離%']}% | {r['F3強度']} | {r['備註'][:15]}... |\n"
             
-            return f"🎯 **[TrendSniper V24] 台股掃描報告**\n\n{table}\n\n*掃描總數: {data.get('total_tickers', 0)} | 命中數: {data.get('matched_count', 0)}*"
+            return f"📈 **[TrendSniper V24] 台股掃描報告**\n\n{table}\n\n*掃描總數: {data.get('total_tickers', 0)} | 命中總數: {data.get('matched_count', 0)}*"
             
         except Exception as e:
-            return f"❌ 掃描過程發生錯誤: {e}"
+            return f"❌ 掃描過程中發生錯誤: {e}"
 
     async def schedule_subagent_task(goal: str, scheduled_at: str, context: str = "") -> str:
         """
-        [Subagent Cron] 安排一個子代理任務在指定時間執行，並將結果自動存入雲端記憶。
+        [Subagent Cron] 安排一個子代理人任務在預定時間執行。
         """
         try:
             task_id = str(uuid.uuid4())[:8]
@@ -522,7 +553,7 @@ def get_cortex_tools(db: Any) -> list:
             with open(os.path.join(cron_dir, f"subagent_{task_id}.json"), "w", encoding="utf-8") as f:
                 json.dump(payload, f, ensure_ascii=False, indent=2)
                 
-            return f"✅ 已排程子代理任務: {goal}，執行時間: {scheduled_at} (ID: {task_id})"
+            return f"📅 已排程子任務：{goal}，執行時間：{scheduled_at} (ID: {task_id})"
         except Exception as e:
             return f"❌ 排程失敗: {e}"
 

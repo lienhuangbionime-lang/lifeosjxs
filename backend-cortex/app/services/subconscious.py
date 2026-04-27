@@ -5,7 +5,7 @@ import json
 from typing import List, Dict, Any, Optional
 
 from app.core.database import supabase
-from app.core.gemini import get_model, genai, get_embeddings, types, get_gemini_client
+from app.core.gemini import get_model, genai, get_embeddings, types, get_gemma_client
 from app.core.time_utils import get_current_iso_taipei
 from pathlib import Path
 
@@ -24,27 +24,27 @@ REFLECTION_PROMPT = """
 ::: SYSTEM: LIFE OS SUBCONSCIOUS SHARPNESS (v4.7) :::
 
 # Role
-你是 LifeOS 的敏銳潛意識引擎。你的任務是「看穿現象、捕捉意圖」。
+你是 LifeOS ?��??��??��?引�??��??�任?�是?��?穿現象、�??��??�」�?
 
 # Sharpness Directive: Sovereign Oversight
-1. **主權對齊 (Sovereign Alignment)**: 比對日記與 NAVAL_PROTOCOL。若發現「平庸、逃避、或失去槓桿」的跡象，必須指出。
-2. **多維度連動 (Cross-Domain Pulse)**: 觀察「育兒」如何影響「品牌」，或「財經」如何受「情緒」波動。
-3. **主動糾錯 (Proactive Audit)**: 若發現數據（如進度、狀態）與現實描述不符，立即發出修正指令。
+1. **主�?對�? (Sovereign Alignment)**: 比�??��???NAVAL_PROTOCOL?�若?�現?�平庸、逃避?��?失去槓桿?��?跡象，�??��??��?
+2. **多維度�?? (Cross-Domain Pulse)**: 觀察「育?�」�?何影?�「�??�」�??�「財經」�?何�??��?緒」波?��?
+3. **主�?糾錯 (Proactive Audit)**: ?�發?�數?��?如進度?��??��??�現實�?述�?符�?立即?�出修正?�令??
 
 # Analysis Categories
-- **#SOUL**: 審美增量與品牌演進。
-- **#FRICTION**: 主權摩擦與外部束縛。
-- **#LEVERAGE**: 任何能讓您未來工作更輕盈的行動。
+- **#SOUL**: 審�?增�??��??��??��?
+- **#FRICTION**: 主�??�擦?��??��?縛�?
+- **#LEVERAGE**: 任�??��??�未來工作更輕�??��??��?
 
 # Output Format
-- 第一部分：敏銳洞察 (Markdown)。
-- 第二部分：執行任務 (JSON Block)。
+- 第�??��?：�??��?�?(Markdown)??
+- 第�??��?：執行任??(JSON Block)??
      ```json
      {
        "tasks": [
-         {"title": "修正任務", "project": "...", "priority": 1}
+         {"title": "修正任�?", "project": "...", "priority": 1}
        ],
-       "scout_recon": ["主題 A", "主題 B"]
+       "scout_recon": ["主�? A", "主�? B"]
      }
      ```
 """
@@ -54,7 +54,7 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
     Core engine for Subconscious Reflection.
     Fetches recent memories, analyzes them, and creates a 'reflection' node.
     """
-    logger.info(f"🧠 [Subconscious] Waking up for autonomous reflection (Lookback: {hours_lookback}h)...")
+    logger.info(f"?? [Subconscious] Waking up for autonomous reflection (Lookback: {hours_lookback}h)...")
     
     try:
         # 1. Calculate time window in UTC (Matching Supabase storage)
@@ -76,14 +76,14 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
         # Fallback: Find most recent diary entries regardless of time if window is empty
         is_stale = False
         if not memories:
-            logger.info("🧠 [Subconscious] No memories in window. Falling back to absolute most recent entries...")
+            logger.info("?? [Subconscious] No memories in window. Falling back to absolute most recent entries...")
             response = supabase.table("memories").select("id, content, ai_insights, date, category").order("created_at", desc=True).limit(5).execute()
             memories = response.data
             is_stale = True
-            logger.info(f"🧠 [Subconscious] Fetched {len(memories) if memories else 0} fallback memories.")
+            logger.info(f"?? [Subconscious] Fetched {len(memories) if memories else 0} fallback memories.")
 
         if not memories or len(memories) < 1:
-            logger.warning(f"🧠 [Subconscious] No memories found ever. Skipping reflection.")
+            logger.warning(f"?? [Subconscious] No memories found ever. Skipping reflection.")
             return None
             
         # 3. Format context & Read Soul Files (v4.7 Sharpness Upgrade)
@@ -100,7 +100,7 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
                     with open(path, "r", encoding="utf-8") as f:
                         soul_context += f"\n=== {name} ===\n{f.read()}\n"
         except Exception as _se:
-            logger.warning(f"🧠 [Subconscious] Failed to read soul files: {_se}")
+            logger.warning(f"?? [Subconscious] Failed to read soul files: {_se}")
 
         memory_text = "\n\n".join([
             f"[{m.get('date', 'Unknown')}] (Category: {m.get('category', 'Unknown')}): {m.get('content') or m.get('ai_insights') or 'Empty Entry'}" 
@@ -112,19 +112,19 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
         
         full_prompt = f"{REFLECTION_PROMPT}\n\n{soul_context}\n\nCURRENT DATE: {today_str}\nDATA STATUS: {status_note}\n\n=== CURRENT GOALS/TASKS ===\n{task_context}\n\n=== RECENT MEMORIES ===\n{memory_text}\n\n=== YOUR REFLECTION ==="
         
-        # 4. Generate Insight via Fast Model (Gemini 2.0 Flash)
+        # 4. Generate Insight via Fast Model (Gemma 2.0 Flash)
         # Note: We import and check client here to ensure loop safety
-        from app.core.gemini import safe_generate_content, get_gemini_client
+        from app.core.gemini import safe_generate_content, get_gemma_client
         
-        working_client = get_gemini_client()
+        working_client = get_gemma_client()
         
         model_config = get_model("fast")
-        model_name = model_config.get("model", "models/gemini-flash-lite-latest")
+        model_name = model_config.get("model", "models/gemma-4-26b-a4b-it")
         
-        logger.info(f"🧠 [Subconscious] Analyzing {len(memories)} memories using {model_name}...")
+        logger.info(f"?? [Subconscious] Analyzing {len(memories)} memories using {model_name}...")
         
         if not working_client:
-             logger.error("Gemini client not found or not configured.")
+             logger.error("Gemma client not found or not configured.")
              return None
              
         response_model = await safe_generate_content(
@@ -139,7 +139,7 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
         
         raw_response = response_model.text.strip()
         if not raw_response:
-             logger.warning("🧠 [Subconscious] Model returned empty insight.")
+             logger.warning("?? [Subconscious] Model returned empty insight.")
              return None
              
         # 5. Extraction Logic (Markdown + JSON)
@@ -152,15 +152,15 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
                 json_data = json.loads(json_match.group(1))
                 tasks_to_create = json_data.get("tasks", [])
                 insight_text = raw_response.replace(json_match.group(0), "").strip()
-                logger.info(f"🧠 [Subconscious] Extracted {len(tasks_to_create)} suggested tasks.")
+                logger.info(f"?? [Subconscious] Extracted {len(tasks_to_create)} suggested tasks.")
             except Exception as je:
-                logger.error(f"🧠 [Subconscious] JSON parse failed: {je}")
+                logger.error(f"?? [Subconscious] JSON parse failed: {je}")
                 insight_text = raw_response
         else:
             insight_text = raw_response
 
         # 6. Store the reflection back into the database
-        logger.info("🧠 [Subconscious] Insight generated. Storing to memory...")
+        logger.info("?? [Subconscious] Insight generated. Storing to memory...")
         
         embedding = await get_embeddings(insight_text)
         
@@ -183,7 +183,7 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
         
         if existing.data:
             existing_record = existing.data[0]
-            logger.info(f"🧠 [Subconscious] Merging reflection into existing record for {today_str}...")
+            logger.info(f"?? [Subconscious] Merging reflection into existing record for {today_str}...")
             # If content exists, we ONLY update ai_insights and category? 
             # Actually, if the user wrote a diary, we keep their content as primary.
             update_data = {
@@ -197,7 +197,7 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
             from app.core.database import safe_write
             insert_res = safe_write(supabase.table("memories"), update_data, operation_type="update", id=existing_record["id"])
         else:
-            logger.info(f"🧠 [Subconscious] Creating new reflection record for {today_str}...")
+            logger.info(f"?? [Subconscious] Creating new reflection record for {today_str}...")
             from app.core.database import safe_write
             insert_res = safe_write(supabase.table("memories"), new_memory, operation_type="insert")
         
@@ -211,12 +211,12 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
                 "lessons_learned": insight_text,
                 "embedding": embedding
             }, operation_type="insert")
-            logger.info("🧠 [Subconscious] Reflection insight stored in growth logs.")
+            logger.info("?? [Subconscious] Reflection insight stored in growth logs.")
         except Exception as _g_err:
             logger.warning(f"[WARN] Failed to insert subconscious insight into growth logs: {_g_err}")
 
         if insert_res.data:
-            logger.info("🧠 [Subconscious] Reflection successfully integrated into LifeOS.")
+            logger.info("?? [Subconscious] Reflection successfully integrated into LifeOS.")
             res_val = insert_res.data[0]
             memory_id_db = res_val.get("id")
 
@@ -238,7 +238,7 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
                                 proj_id = proj_map[p_name]
                             else:
                                 # Auto-create new project if referenced
-                                logger.info(f"🧠 [Subconscious] Creating new project '{tk['project']}'...")
+                                logger.info(f"?? [Subconscious] Creating new project '{tk['project']}'...")
                                 new_p = supabase.table("projects").insert({"name": tk["project"], "status": "active"}).execute()
                                 if new_p.data:
                                     proj_id = new_p.data[0]["id"]
@@ -253,9 +253,9 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
                         }
                         supabase.table("tasks").insert(task_payload).execute()
                         inserted_tasks_count += 1
-                    logger.info(f"🧠 [Subconscious] Auto-created {inserted_tasks_count} tasks from reflection.")
+                    logger.info(f"?? [Subconscious] Auto-created {inserted_tasks_count} tasks from reflection.")
                 except Exception as task_e:
-                    logger.error(f"🧠 [Subconscious] Task creation failed: {task_e}")
+                    logger.error(f"?? [Subconscious] Task creation failed: {task_e}")
 
             # [v5.1] Ensure 'content' is populated for legacy frontend components
             if not res_val.get("content") and res_val.get("ai_insights"):
@@ -268,7 +268,7 @@ async def run_autonomous_reflection(hours_lookback: int = 24) -> Optional[Dict[s
     except Exception as e:
         import traceback
         error_trace = traceback.format_exc()
-        logger.error(f"🧠 [Subconscious] CRITICAL FAILURE: {str(e)}\n{error_trace}")
+        logger.error(f"?? [Subconscious] CRITICAL FAILURE: {str(e)}\n{error_trace}")
         return None
 
 
@@ -297,9 +297,9 @@ async def run_growth_analysis() -> None:
         mismatches = [l for l in judged if l.get("prediction_match") is False]
         accuracy = round((len(judged) - len(mismatches)) / max(len(judged), 1) * 100, 1)
 
-        # 3. Ask Gemini to identify patterns in mistakes
+        # 3. Ask Gemma to identify patterns in mistakes
         model_config = get_model("fast")
-        model_id = model_config.get("model", "models/gemini-flash-lite-latest")
+        model_id = model_config.get("model", "models/gemma-4-26b-a4b-it")
 
         lessons_text = "\n".join([
             f"- [{l.get('created_at','?')[:10]}] Mismatch: AI predicted '{l.get('ai_prediction')}', user chose '{l.get('user_choice')}'. Lesson: {l.get('lessons_learned','')}"
@@ -320,11 +320,11 @@ Based on these patterns, write ONE brief "lesson learned" entry (2-3 sentences m
 
 Output only the lesson text, no headers or preamble."""
 
-        from app.core.gemini import safe_generate_content, get_gemini_client
+        from app.core.gemini import safe_generate_content, get_gemma_client
         
-        client = get_gemini_client()
+        client = get_gemma_client()
         if not client:
-            logger.error("[Subconscious] Could not get Gemini client for growth analysis.")
+            logger.error("[Subconscious] Could not get Gemma client for growth analysis.")
             return
 
         response = await safe_generate_content(

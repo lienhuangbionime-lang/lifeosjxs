@@ -52,10 +52,10 @@ async def chat_message(body: ChatMessage, request: Request):
                 yield "\n[HEARTBEAT] System Cortex Active. Agentic Loop Healthy. Memory Database Connected.\n"
                 return
 
-            from app.core.gemini import get_request_gemini_client, types, get_model
-            client = get_request_gemini_client(request)
+            from app.core.gemini import get_request_gemma_client, types, get_model
+            client = get_request_gemma_client(request)
             if not client:
-                yield "Error: Gemini client is not configured."
+                yield "Error: Gemma client is not configured."
                 return
                 
             model_info = get_model("fast")
