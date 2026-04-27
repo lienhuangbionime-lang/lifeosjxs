@@ -28,3 +28,7 @@ pytz
 httpx
 duckduckgo-search
 pyyaml
+yfinance
+pandas
+numpy
+chardet

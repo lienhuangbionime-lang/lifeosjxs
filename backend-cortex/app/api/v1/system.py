@@ -364,6 +364,50 @@ begin
 end;
 $$;
 
+-- 11. Memory Embeddings RPCs (1536 dim)
+create or replace function match_memory_embeddings (
+  query_embedding vector(1536),
+  match_threshold float,
+  match_count int
+)
+returns table (
+  id uuid,
+  content text,
+  metadata jsonb,
+  similarity float,
+  created_at timestamptz,
+  last_accessed_at timestamptz,
+  access_count int
+)
+language plpgsql as $$
+begin
+  return query
+  select
+    m.id,
+    m.content,
+    m.metadata,
+    1 - (m.embedding <=> query_embedding) as similarity,
+    m.created_at,
+    m.last_accessed_at,
+    m.access_count
+  from memory_embeddings m
+  where m.embedding is not null
+    and 1 - (m.embedding <=> query_embedding) > match_threshold
+  order by similarity desc
+  limit match_count;
+end;
+$$;
+
+create or replace function increment_memory_embeddings_access(ids uuid[])
+returns void as $$
+begin
+  update memory_embeddings
+  set access_count = access_count + 1,
+      last_accessed_at = now()
+  where id = any(ids);
+end;
+$$ language plpgsql;
+
 -- 10. Security Policies
 alter table public.memories enable row level security;
 alter table public.projects enable row level security;

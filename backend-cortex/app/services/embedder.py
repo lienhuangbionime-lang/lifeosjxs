@@ -1,6 +1,6 @@
 """
 Embedder Service - Vector Embedding Generation
-Purpose: Generate 3072-dimensional embeddings using Gemini API
+Purpose: Generate 1536-dimensional embeddings using Gemini API
 Usage: Called by ingest.py and rag.py for semantic search
 """
 
@@ -11,7 +11,7 @@ from app.core.gemini import gemini_client, types
 logger = logging.getLogger("cortex.embedder")
 
 
-async def generate_embedding(text: str, task_type: str = "retrieval_document", dimensionality: Optional[int] = 3072, client: Any = None) -> Optional[List[float]]:
+async def generate_embedding(text: str, task_type: str = "retrieval_document", dimensionality: Optional[int] = 1536, client: Any = None) -> Optional[List[float]]:
     """
     Generate vector embedding for given text using Gemini
     
@@ -37,8 +37,8 @@ async def generate_embedding(text: str, task_type: str = "retrieval_document", d
             return None
 
         # [v4.1 - v4.2 Resilience] Retry loop for 429 errors with Exponential Backoff
-        # [v4.3 Fix] User environment restricted to gemini-embedding-001 (Outputs 3072 dim native)
-        models_to_try = ["gemini-embedding-001"]
+        # [v4.3 Fix] Using gemini-embedding-2-preview (Output dimension 1536 requested)
+        models_to_try = ["gemini-embedding-2-preview"]
         backoff_delays = [0, 1.0, 2.0] # 0, 1s, 2s
         
         last_err = None
@@ -91,7 +91,7 @@ async def generate_embedding(text: str, task_type: str = "retrieval_document", d
         return None
 
 
-async def batch_generate_embeddings(texts: List[str], task_type: str = "retrieval_document", dimensionality: int = 3072) -> List[Optional[List[float]]]:
+async def batch_generate_embeddings(texts: List[str], task_type: str = "retrieval_document", dimensionality: int = 1536) -> List[Optional[List[float]]]:
     """
     Generate embeddings for multiple texts
     """

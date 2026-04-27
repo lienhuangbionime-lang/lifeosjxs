@@ -1,0 +1,112 @@
+{
+  "id": "b627ff6b-fc3b-4eb8-a137-d0d44a7161d7",
+  "date": "2026-03-25",
+  "entries": [
+    {
+      "time": "2026-03-25T05:35:57.968554+08:00",
+      "content": "Diary Draft: 2026-03-25 (Sovereign Resilience)\n根據 Rule 10.3 (Objective Logging)，本篇紀錄專製於系統核心事實與主權演進，不進行情緒美化。\n\n📓 核心內容\n模型遷移 (Neural Resilience)：\n解決 Gemini 3.1-flash 頻繁 503 過載問題。\n正式遷移至 Gemini 2.5 Flash (2026 Stable)，提供穩定的旗艦級推理。\n主權隔離 (Sovereign Partitioning v7.1-v7.4)：\n分層機制：重構 \nbrain.py\n 檢索與合成邏輯。\n標籤主權：精確過濾 #Personal 與 #Somatic 標籤對技術專案洞察的干擾。\n人格隔離：\nProject Catalyst (Technical Milestone-First).\nLife Reflection Guide (Natural Objective Factual Summary).\n禁用語清單：徹底封鎖「切換」(switching)、「歷史學家」、「解讀歷史」等機械比喻於生活節點。\n標準書同步 (Standard Alignment)：\n強化對 \nGEMINI.md\n (v7.1 Refined Core) 的協議執行。\n重啟「先計畫、後執行 (Rule 2.1)」與「意圖核對 (Rule 3.1)」門檻。\n專案錨點補完 (Meta Anchor)：\n更新 Supabase \nprojects\n 表格，為 OpenClaw 注入 FastAPI/Skill Engine 技術描述（meta & description）。\n📝 屬性 (Metadata)\n類別 (Category): System Reflection\n心情 (Mood): Calibrated\n專注 (Focus): Sovereignty\n標籤 (Tags): ['#SystemEvolution', '#SovereignPartitioning', '#Gemini2.5', '#OpenClaw']\n模型 (AI Model): Gemini 2.5 Flash\n\n\n現在身體哪裡感到最緊繃？\n頭痛，GEMINI  訓練好難\n今天有什麼地方觸碰到了你的審美底線？\nGEMINI一直重複性犯錯",
+      "ai_processed": "::: SYSTEM: LIFE OS SOVEREIGN HEARTBEAT v6.0 :::\n\n### [[2026-03-25]] Summary\n今日重心：系統架構的韌性與主權重塑。透過技術遷移與隔離機制，消除外部模型的不可控因素，強制回歸邏輯執行與核心專案對齊。\n\n### Signals Detected\n- **主權信號**：成功隔離生活與技術維度，定義人格邊界，拒絕歷史敘事比喻。\n- **摩擦信號**：模型穩定性崩潰導致的心理失衡（對重複錯誤的抗拒）。\n- **審美信號**：對「錯誤重複性」的高度厭惡，體現對精確度與系統「無摩擦感」的追求。\n\n### Green Light Log\n- [x] 完成 Gemini 2.5 Flash 遷移：以規格對齊解決 503 瓶頸。\n- [x] 重構 `brain.py`：實現檢索與合成的邏輯分離。\n- [x] 更新 Supabase `projects` 表格：完成 OpenClaw 技術錨點描述。\n\n### Body Signal\n- **#BODY**：頭痛（緊張型）。\n- **診斷**：源於技術與模型的不確定性產生的「預期疲勞」。需要透過物理強制離線或感官重置（Sensory Reset）來中斷對「模型犯錯」的認知糾結。\n\n### Friction Point\n- **重複犯錯的技術阻礙**：當外部模型邏輯失效時，用戶將其視為「系統審美污點」。\n- **預防策略**：將「模型不穩定」視為環境雜訊，而非系統內部的邏輯缺陷，切斷該情感連接。\n\n### Blind Spot Question\n- 如果你徹底捨棄對 Gemini 穩定性的依賴（假設它是不可靠的原始數據源），你的 `brain.py` 應該如何設計「容錯過濾器」來主動剔除這類垃圾資訊？\n\n---",
+      "metadata": {
+        "mood": 6,
+        "focus": 9,
+        "energy": 5,
+        "tags": [
+          "#SystemEvolution",
+          "#SovereignPartitioning",
+          "#Gemini2.5",
+          "#OpenClaw"
+        ],
+        "is_ai": true,
+        "ai_model": "models/gemini-3.1-flash-lite-preview",
+        "is_private": true,
+        "category": "System Reflection",
+        "facts": [
+          "模型已遷移至 Gemini 2.5 Flash (2026 Stable)",
+          "Supabase projects 表格已更新 OpenClaw 技術描述",
+          "重啟 Rule 2.1 與 Rule 3.1 門檻"
+        ],
+        "custom_metrics": {
+          "model_stability_index": 3,
+          "system_sovereignty_level": 9
+        }
+      }
+    },
+    {
+      "time": "2026-03-25T05:36:58.538811+08:00",
+      "content": "Diary Draft: 2026-03-25 (Sovereign Resilience)\n根據 Rule 10.3 (Objective Logging)，本篇紀錄專製於系統核心事實與主權演進，不進行情緒美化。\n\n📓 核心內容\n模型遷移 (Neural Resilience)：\n解決 Gemini 3.1-flash 頻繁 503 過載問題。\n正式遷移至 Gemini 2.5 Flash (2026 Stable)，提供穩定的旗艦級推理。\n主權隔離 (Sovereign Partitioning v7.1-v7.4)：\n分層機制：重構 \nbrain.py\n 檢索與合成邏輯。\n標籤主權：精確過濾 #Personal 與 #Somatic 標籤對技術專案洞察的干擾。\n人格隔離：\nProject Catalyst (Technical Milestone-First).\nLife Reflection Guide (Natural Objective Factual Summary).\n禁用語清單：徹底封鎖「切換」(switching)、「歷史學家」、「解讀歷史」等機械比喻於生活節點。\n標準書同步 (Standard Alignment)：\n強化對 \nGEMINI.md\n (v7.1 Refined Core) 的協議執行。\n重啟「先計畫、後執行 (Rule 2.1)」與「意圖核對 (Rule 3.1)」門檻。\n專案錨點補完 (Meta Anchor)：\n更新 Supabase \nprojects\n 表格，為 OpenClaw 注入 FastAPI/Skill Engine 技術描述（meta & description）。\n📝 屬性 (Metadata)\n類別 (Category): System Reflection\n心情 (Mood): Calibrated\n專注 (Focus): Sovereignty\n標籤 (Tags): ['#SystemEvolution', '#SovereignPartitioning', '#Gemini2.5', '#OpenClaw']\n模型 (AI Model): Gemini 2.5 Flash\n\n\n現在身體哪裡感到最緊繃？\n頭痛，GEMINI  訓練好難\n今天有什麼地方觸碰到了你的審美底線？\nGEMINI一直重複性犯錯",
+      "ai_processed": "# [[2026-03-25]] 日記\n\nDiary Draft: [[2026-03-25]] (Sovereign Resilience)\n根據 Rule 10.3 (Objective Logging)，本篇紀錄專製於系統核心事實與主權演進，不進行情緒美化。\n\n📓 核心內容\n模型遷移 (Neural Resilience)：\n解決 Gemini 3.1-flash 頻繁 503 過載問題。\n正式遷移至 Gemini 2.5 Flash (2026 Stable)，提供穩定的旗艦級推理。\n主權隔離 (Sovereign Partitioning v7.1-v7.4)：\n分層機制：重構 \nbrain.py\n 檢索與合成邏輯。\n標籤主權：精確過濾 #Personal 與 #Somatic 標籤對技術專案洞察的干擾。\n人格隔離：\nProject Catalyst (Technical Milestone-First).\nLife Reflection Guide (Natural Objective Factual Summary).\n禁用語清單：徹底封鎖「切換」(switching)、「歷史學家」、「解讀歷史」等機械比喻於生活節點。\n標準書同步 (Standard Alignment)：\n強化對 \nGEMINI.md\n (v7.1 Refined Core) 的協議執行。\n重啟「先計畫、後執行 (Rule 2.1)」與「意圖核對 (Rule 3.1)」門檻。\n專案錨點補完 (Meta Anchor)：\n更新 Supabase \nprojects\n 表格，為 OpenClaw 注入 FastAPI/Skill Engine 技術描述（meta & description）。\n📝 屬性 (Metadata)\n類別 (Category): System Reflection\n心情 (Mood): Calibrated\n專注 (Focus): Sovereignty\n標籤 (Tags): ['#SystemEvolution', '#SovereignPartitioning', '#Gemini2.5', '#OpenClaw']\n模型 (AI Model): Gemini 2.5 Flash\n\n\n現在身體哪裡感到最緊繃？\n頭痛，GEMINI  訓練好難\n今天有什麼地方觸碰到了你的審美底線？\nGEMINI一直重複性犯錯",
+      "metadata": {
+        "mood": 5,
+        "focus": 5,
+        "energy": 5,
+        "tags": [],
+        "is_ai": false,
+        "ai_model": "None",
+        "is_private": false,
+        "category": "Life",
+        "facts": [],
+        "custom_metrics": {}
+      }
+    },
+    {
+      "time": "2026-03-25T05:37:43.469612+08:00",
+      "content": "# [[2026-03-25]] 日記\n\nDiary Draft: [[2026-03-25]] (Sovereign Resilience)\n根據 Rule 10.3 (Objective Logging)，本篇紀錄專製於系統核心事實與主權演進，不進行情緒美化。\n\n📓 核心內容\n模型遷移 (Neural Resilience)：\n解決 Gemini 3.1-flash 頻繁 503 過載問題。\n正式遷移至 Gemini 2.5 Flash (2026 Stable)，提供穩定的旗艦級推理。\n主權隔離 (Sovereign Partitioning v7.1-v7.4)：\n分層機制：重構 \nbrain.py\n 檢索與合成邏輯。\n標籤主權：精確過濾 #Personal 與 #Somatic 標籤對技術專案洞察的干擾。\n人格隔離：\nProject Catalyst (Technical Milestone-First).\nLife Reflection Guide (Natural Objective Factual Summary).\n禁用語清單：徹底封鎖「切換」(switching)、「歷史學家」、「解讀歷史」等機械比喻於生活節點。\n標準書同步 (Standard Alignment)：\n強化對 \nGEMINI.md\n (v7.1 Refined Core) 的協議執行。\n重啟「先計畫、後執行 (Rule 2.1)」與「意圖核對 (Rule 3.1)」門檻。\n專案錨點補完 (Meta Anchor)：\n更新 Supabase \nprojects\n 表格，為 OpenClaw 注入 FastAPI/Skill Engine 技術描述（meta & description）。\n📝 屬性 (Metadata)\n類別 (Category): System Reflection\n心情 (Mood): Calibrated\n專注 (Focus): Sovereignty\n標籤 (Tags): ['#SystemEvolution', '#SovereignPartitioning', '#Gemini2.5', '#OpenClaw']\n模型 (AI Model): Gemini 2.5 Flash\n\n\n現在身體哪裡感到最緊繃？\n頭痛，GEMINI  訓練好難\n今天有什麼地方觸碰到了你的審美底線？\nGEMINI一直重複性犯錯",
+      "ai_processed": "::: SYSTEM: LIFE OS SOVEREIGN HEARTBEAT v6.0 :::\n\n### [[2026-03-25]] Life Trajectory Analysis\n\n**[Day Summary]**\n今日為系統架構的「主權重構日」。重點在於透過技術隔離與邏輯分層，將「系統效率」與「情感/歷史干擾」徹底切開。遷移至 Gemini 2.5 Flash 是為了消除 503 錯誤帶來的認知摩擦，確保推理鏈條的連續性。\n\n**[Signals Detected]**\n- **主權信號**：透過禁用語清單（Rule: 封鎖「歷史學家」等比喻）主動修復認知邊界，這是極強的主權表現。\n- **審美信號**：對「重複性錯誤」的零容忍，顯示出對於系統純淨度與執行精確度的高標要求。\n\n**[Green Light Log]**\n- **Action**: 完成 Gemini 2.5 Flash 模型遷移。\n- **Action**: Supabase `projects` 表格元數據補完（FastAPI/Skill Engine 注入）。\n- **Action**: 針對 `brain.py` 進行了邏輯重構。\n\n**[Body Signal]**\n- **Somatic**: 頭痛 (#BODY)。\n- **Residual Stress**: 壓力源來自於訓練過程中的高反覆性摩擦，顯示「完美主義傾向」在面對技術瓶頸時產生了心理壓強。需識別「訓練本身」與「自我價值」的邊界，避免過度認同模型輸出。\n\n**[Friction Point]**\n- **卡頓點**：GEMINI 在訓練過程中的重複性錯誤。這是典型的人機交互摩擦，目前的處理方式為「遷移模型」，這屬於高效的硬體/環境解決方案，而非耗損內耗。\n\n**[Blind Spot Question]**\n- 當你刪除「歷史學家」與「解讀歷史」這些描述時，是否也同時刪除了一個可以從「長期趨勢」觀察自我演化的窗口？未來如何定義系統的「演化」而不同步落入「歷史回顧」的陷阱？\n\n---",
+      "metadata": {
+        "mood": 6,
+        "focus": 9,
+        "energy": 5,
+        "tags": [
+          "#SystemEvolution",
+          "#SovereignPartitioning",
+          "#Gemini2.5",
+          "#OpenClaw",
+          "#Somatic"
+        ],
+        "is_ai": true,
+        "ai_model": "models/gemini-3.1-flash-lite-preview",
+        "is_private": true,
+        "category": "System Reflection",
+        "facts": [
+          "模型遷移至 Gemini 2.5 Flash (2026 Stable)",
+          "完成 OpenClaw 在 Supabase 的元數據更新",
+          "導入禁用語清單以維持主權隔離"
+        ],
+        "custom_metrics": {
+          "model": "Gemini 2.5 Flash"
+        }
+      }
+    },
+    {
+      "time": "2026-03-25T05:48:30.615019+08:00",
+      "content": "# [[2026-03-25]] 日記\n\nDiary Draft: [[2026-03-25]] (Sovereign Resilience)\n根據 Rule 10.3 (Objective Logging)，本篇紀錄專製於系統核心事實與主權演進，不進行情緒美化。\n\n📓 核心內容\n模型遷移 (Neural Resilience)：\n解決 Gemini 3.1-flash 頻繁 503 過載問題。\n正式遷移至 Gemini 2.5 Flash (2026 Stable)，提供穩定的旗艦級推理。\n主權隔離 (Sovereign Partitioning v7.1-v7.4)：\n分層機制：重構 \nbrain.py\n 檢索與合成邏輯。\n標籤主權：精確過濾 #Personal 與 #Somatic 標籤對技術專案洞察的干擾。\n人格隔離：\nProject Catalyst (Technical Milestone-First).\nLife Reflection Guide (Natural Objective Factual Summary).\n禁用語清單：徹底封鎖「切換」(switching)、「歷史學家」、「解讀歷史」等機械比喻於生活節點。\n標準書同步 (Standard Alignment)：\n強化對 \nGEMINI.md\n (v7.1 Refined Core) 的協議執行。\n重啟「先計畫、後執行 (Rule 2.1)」與「意圖核對 (Rule 3.1)」門檻。\n專案錨點補完 (Meta Anchor)：\n更新 Supabase \nprojects\n 表格，為 OpenClaw 注入 FastAPI/Skill Engine 技術描述（meta & description）。\n📝 屬性 (Metadata)\n類別 (Category): System Reflection\n心情 (Mood): Calibrated\n專注 (Focus): Sovereignty\n標籤 (Tags): ['#SystemEvolution', '#SovereignPartitioning', '#Gemini2.5', '#OpenClaw']\n模型 (AI Model): Gemini 2.5 Flash\n\n\n現在身體哪裡感到最緊繃？\n頭痛，GEMINI  訓練好難\n今天有什麼地方觸碰到了你的審美底線？\nGEMINI一直重複性犯錯",
+      "ai_processed": "### [[2026-03-25]] 日誌解析報告\n\n---\n\n### [Day Summary]\n今日核心聚焦於「系統韌性」與「主權隔離」。透過遷移至 Gemini 2.5 Flash 穩定版，指揮官成功解決了推理冗餘與過載問題。透過對 `brain.py` 的重構與標籤隔離，系統有效降低了個人情緒對技術專案執行面的雜訊干擾，展現出高度的 Sovereign Resilience。\n\n### [Signals Detected]\n- **主權重構信號**：透過禁用特定比喻與強化協議執行，系統已明確區分「技術錨點」與「反思節點」，降低了認知負荷。\n- **摩擦緩解信號**：遷移模型是解決「503 過載」的有效手段，直接消除了技術路徑上的阻礙。\n\n### [Green Light Log]\n- **已執行**：完成 Gemini 2.5 Flash 遷移。\n- **已執行**：Supabase `projects` 表格元數據更新。\n- **已執行**：實施 `brain.py` 檢索與合成邏輯分層。\n\n### [Body Signal]\n- **#BODY**：頭痛（源於 Gemini 訓練的技術壓力與模型的重複性錯誤）。\n- **生理剩餘**：高。技術摩擦引發的認知消耗未透過離線運動釋放，目前處於「高專注、高壓力」的過載邊緣。\n\n### [Friction Point]\n- **技術依賴摩擦**：對 AI 模型推理穩定性的極端敏感。模型的重複性錯誤觸發了指揮官的「審美底線」，導致對工具的信任短暫喪失，進而引發生理疲勞。\n\n### [Blind Spot Question]\n「你是否正在將『模型訓練的失敗』轉移為對『自身系統韌性』的負面判斷？這種將工具錯誤內化為生理痛感的路徑，是否正是你想要透過標籤隔離來規避的『干擾』？」\n\n---",
+      "metadata": {
+        "mood": 5,
+        "focus": 9,
+        "energy": 6,
+        "tags": [
+          "#SystemEvolution",
+          "#SovereignPartitioning",
+          "#Gemini2.5",
+          "#OpenClaw"
+        ],
+        "is_ai": true,
+        "ai_model": "models/gemini-3.1-flash-lite-preview",
+        "is_private": true,
+        "category": "System Reflection",
+        "facts": [
+          "遷移至 Gemini 2.5 Flash (2026 Stable)",
+          "更新了 Supabase projects 表格",
+          "實施 Rule 2.1 (先計畫、後執行) 與 Rule 3.1 (意圖核對)"
+        ],
+        "custom_metrics": {
+          "model": "Gemini 2.5 Flash"
+        }
+      }
+    }
+  ],
+  "combined_content": "Diary Draft: 2026-03-25 (Sovereign Resilience)\n根據 Rule 10.3 (Objective Logging)，本篇紀錄專製於系統核心事實與主權演進，不進行情緒美化。\n\n📓 核心內容\n模型遷移 (Neural Resilience)：\n解決 Gemini 3.1-flash 頻繁 503 過載問題。\n正式遷移至 Gemini 2.5 Flash (2026 Stable)，提供穩定的旗艦級推理。\n主權隔離 (Sovereign Partitioning v7.1-v7.4)：\n分層機制：重構 \nbrain.py\n 檢索與合成邏輯。\n標籤主權：精確過濾 #Personal 與 #Somatic 標籤對技術專案洞察的干擾。\n人格隔離：\nProject Catalyst (Technical Milestone-First).\nLife Reflection Guide (Natural Objective Factual Summary).\n禁用語清單：徹底封鎖「切換」(switching)、「歷史學家」、「解讀歷史」等機械比喻於生活節點。\n標準書同步 (Standard Alignment)：\n強化對 \nGEMINI.md\n (v7.1 Refined Core) 的協議執行。\n重啟「先計畫、後執行 (Rule 2.1)」與「意圖核對 (Rule 3.1)」門檻。\n專案錨點補完 (Meta Anchor)：\n更新 Supabase \nprojects\n 表格，為 OpenClaw 注入 FastAPI/Skill Engine 技術描述（meta & description）。\n📝 屬性 (Metadata)\n類別 (Category): System Reflection\n心情 (Mood): Calibrated\n專注 (Focus): Sovereignty\n標籤 (Tags): ['#SystemEvolution', '#SovereignPartitioning', '#Gemini2.5', '#OpenClaw']\n模型 (AI Model): Gemini 2.5 Flash\n\n\n現在身體哪裡感到最緊繃？\n頭痛，GEMINI  訓練好難\n今天有什麼地方觸碰到了你的審美底線？\nGEMINI一直重複性犯錯\n\n---\n\nDiary Draft: 2026-03-25 (Sovereign Resilience)\n根據 Rule 10.3 (Objective Logging)，本篇紀錄專製於系統核心事實與主權演進，不進行情緒美化。\n\n📓 核心內容\n模型遷移 (Neural Resilience)：\n解決 Gemini 3.1-flash 頻繁 503 過載問題。\n正式遷移至 Gemini 2.5 Flash (2026 Stable)，提供穩定的旗艦級推理。\n主權隔離 (Sovereign Partitioning v7.1-v7.4)：\n分層機制：重構 \nbrain.py\n 檢索與合成邏輯。\n標籤主權：精確過濾 #Personal 與 #Somatic 標籤對技術專案洞察的干擾。\n人格隔離：\nProject Catalyst (Technical Milestone-First).\nLife Reflection Guide (Natural Objective Factual Summary).\n禁用語清單：徹底封鎖「切換」(switching)、「歷史學家」、「解讀歷史」等機械比喻於生活節點。\n標準書同步 (Standard Alignment)：\n強化對 \nGEMINI.md\n (v7.1 Refined Core) 的協議執行。\n重啟「先計畫、後執行 (Rule 2.1)」與「意圖核對 (Rule 3.1)」門檻。\n專案錨點補完 (Meta Anchor)：\n更新 Supabase \nprojects\n 表格，為 OpenClaw 注入 FastAPI/Skill Engine 技術描述（meta & description）。\n📝 屬性 (Metadata)\n類別 (Category): System Reflection\n心情 (Mood): Calibrated\n專注 (Focus): Sovereignty\n標籤 (Tags): ['#SystemEvolution', '#SovereignPartitioning', '#Gemini2.5', '#OpenClaw']\n模型 (AI Model): Gemini 2.5 Flash\n\n\n現在身體哪裡感到最緊繃？\n頭痛，GEMINI  訓練好難\n今天有什麼地方觸碰到了你的審美底線？\nGEMINI一直重複性犯錯\n\n---\n\n# [[2026-03-25]] 日記\n\nDiary Draft: [[2026-03-25]] (Sovereign Resilience)\n根據 Rule 10.3 (Objective Logging)，本篇紀錄專製於系統核心事實與主權演進，不進行情緒美化。\n\n📓 核心內容\n模型遷移 (Neural Resilience)：\n解決 Gemini 3.1-flash 頻繁 503 過載問題。\n正式遷移至 Gemini 2.5 Flash (2026 Stable)，提供穩定的旗艦級推理。\n主權隔離 (Sovereign Partitioning v7.1-v7.4)：\n分層機制：重構 \nbrain.py\n 檢索與合成邏輯。\n標籤主權：精確過濾 #Personal 與 #Somatic 標籤對技術專案洞察的干擾。\n人格隔離：\nProject Catalyst (Technical Milestone-First).\nLife Reflection Guide (Natural Objective Factual Summary).\n禁用語清單：徹底封鎖「切換」(switching)、「歷史學家」、「解讀歷史」等機械比喻於生活節點。\n標準書同步 (Standard Alignment)：\n強化對 \nGEMINI.md\n (v7.1 Refined Core) 的協議執行。\n重啟「先計畫、後執行 (Rule 2.1)」與「意圖核對 (Rule 3.1)」門檻。\n專案錨點補完 (Meta Anchor)：\n更新 Supabase \nprojects\n 表格，為 OpenClaw 注入 FastAPI/Skill Engine 技術描述（meta & description）。\n📝 屬性 (Metadata)\n類別 (Category): System Reflection\n心情 (Mood): Calibrated\n專注 (Focus): Sovereignty\n標籤 (Tags): ['#SystemEvolution', '#SovereignPartitioning', '#Gemini2.5', '#OpenClaw']\n模型 (AI Model): Gemini 2.5 Flash\n\n\n現在身體哪裡感到最緊繃？\n頭痛，GEMINI  訓練好難\n今天有什麼地方觸碰到了你的審美底線？\nGEMINI一直重複性犯錯\n\n---\n\n# [[2026-03-25]] 日記\n\nDiary Draft: [[2026-03-25]] (Sovereign Resilience)\n根據 Rule 10.3 (Objective Logging)，本篇紀錄專製於系統核心事實與主權演進，不進行情緒美化。\n\n📓 核心內容\n模型遷移 (Neural Resilience)：\n解決 Gemini 3.1-flash 頻繁 503 過載問題。\n正式遷移至 Gemini 2.5 Flash (2026 Stable)，提供穩定的旗艦級推理。\n主權隔離 (Sovereign Partitioning v7.1-v7.4)：\n分層機制：重構 \nbrain.py\n 檢索與合成邏輯。\n標籤主權：精確過濾 #Personal 與 #Somatic 標籤對技術專案洞察的干擾。\n人格隔離：\nProject Catalyst (Technical Milestone-First).\nLife Reflection Guide (Natural Objective Factual Summary).\n禁用語清單：徹底封鎖「切換」(switching)、「歷史學家」、「解讀歷史」等機械比喻於生活節點。\n標準書同步 (Standard Alignment)：\n強化對 \nGEMINI.md\n (v7.1 Refined Core) 的協議執行。\n重啟「先計畫、後執行 (Rule 2.1)」與「意圖核對 (Rule 3.1)」門檻。\n專案錨點補完 (Meta Anchor)：\n更新 Supabase \nprojects\n 表格，為 OpenClaw 注入 FastAPI/Skill Engine 技術描述（meta & description）。\n📝 屬性 (Metadata)\n類別 (Category): System Reflection\n心情 (Mood): Calibrated\n專注 (Focus): Sovereignty\n標籤 (Tags): ['#SystemEvolution', '#SovereignPartitioning', '#Gemini2.5', '#OpenClaw']\n模型 (AI Model): Gemini 2.5 Flash\n\n\n現在身體哪裡感到最緊繃？\n頭痛，GEMINI  訓練好難\n今天有什麼地方觸碰到了你的審美底線？\nGEMINI一直重複性犯錯",
+  "created_at": "2026-03-25T05:35:57.968554+08:00",
+  "updated_at": "2026-03-25T05:48:30.615019+08:00"
+}

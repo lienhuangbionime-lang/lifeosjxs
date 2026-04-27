@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites name="pytest tests"><testsuite name="pytest" errors="1" failures="0" skipped="0" tests="1" time="3.102" timestamp="2026-04-25T02:47:27.386320+08:00" hostname="2H1-01-02559"><testcase classname="" name="tests.test_sorter_signals" time="0.000"><error message="collection failure">ImportError while importing test module 'C:\Users\lien.huang\AppData\lifeosjxs\backend-cortex\tests\test_sorter_signals.py'.
+Hint: make sure your test modules/packages have valid Python names.
+Traceback:
+C:\Program Files\WindowsApps\PythonSoftwareFoundation.Python.3.13_3.13.3568.0_x64__qbz5n2kfra8p0\Lib\importlib\__init__.py:88: in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tests\test_sorter_signals.py:8: in &lt;module&gt;
+    from app.agents.sorter import SorterAgent
+app\agents\sorter.py:2: in &lt;module&gt;
+    from google import genai
+E   ModuleNotFoundError: No module named 'google'</error></testcase></testsuite></testsuites>

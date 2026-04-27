@@ -3,11 +3,14 @@ import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import uvicorn
 from contextlib import asynccontextmanager
 
-# Load environment variables
-load_dotenv()
+# Load environment variables relative to this script
+from pathlib import Path
+env_path = Path(__file__).parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 # Map GEMINI_API_KEY to GOOGLE_API_KEY for LangChain if missing
 gemini_key = os.getenv("GEMINI_API_KEY")
@@ -44,9 +47,20 @@ async def lifespan(app: FastAPI):
         subconscious_scheduler.start_scheduler()
     except Exception as e:
         logger.error(f"Scheduler error: {e}")
+    # [New] Start Cron Watcher for ~/.hermes/cron
+    cron_task = None
+    try:
+        from app.core.cron import cron_watcher
+        import asyncio
+        cron_task = asyncio.create_task(cron_watcher())
+    except Exception as e:
+        logger.error(f"Failed to start Cron Watcher: {e}")
+
     yield
     # Shutdown
     logger.info("💤 Cortex is sleeping...")
+    if cron_task:
+        cron_task.cancel()
     try:
         subconscious_scheduler.stop_scheduler()
     except Exception as e:
@@ -102,6 +116,12 @@ app.include_router(subconscious_router_mod.router, prefix="/api/v1/subconscious"
 app.include_router(radar_router_mod.router, prefix="/api/v1/radar", tags=["Radar"])
 app.include_router(growth_router_mod.router, prefix="/api/v1/growth", tags=["Growth"])
 app.include_router(enav_router_mod.router, prefix="/api/v1/enav", tags=["E-Nav"])
+
+# Static Reports
+static_reports_dir = os.path.join(os.getcwd(), "static", "reports")
+if not os.path.exists(static_reports_dir):
+    os.makedirs(static_reports_dir, exist_ok=True)
+app.mount("/reports", StaticFiles(directory=static_reports_dir), name="reports")
 
 # Root Route
 @app.get("/")

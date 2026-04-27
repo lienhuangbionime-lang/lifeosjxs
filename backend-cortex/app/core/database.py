@@ -2,6 +2,12 @@
 from typing import Optional
 import os
 import logging
+from dotenv import load_dotenv
+from pathlib import Path
+
+# Load environment variables relative to this script's backend-cortex root
+env_path = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(dotenv_path=env_path)
 
 try:
     from fastapi import Request
@@ -148,7 +154,7 @@ def get_request_client(request: "Request"):
         from types import SimpleNamespace
         wrapped_client = SimpleNamespace()
         # Proxy attributes
-        for attr in ['table', 'rpc', 'auth', 'postgrest']:
+        for attr in ['table', 'rpc', 'auth', 'postgrest', 'storage']:
             if hasattr(supabase, attr):
                 setattr(wrapped_client, attr, getattr(supabase, attr))
         

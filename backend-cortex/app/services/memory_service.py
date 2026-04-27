@@ -8,18 +8,7 @@ from supabase.client import Client, create_client
 # Init Logger
 logger = logging.getLogger("cortex.memory")
 
-# Lazy load or safe init embeddings
-embeddings = None
-try:
-    # Check if key is available (it should be if main.py ran, but for direct import safety)
-    gemini_key = os.getenv("GEMINI_API_KEY")
-    if not os.getenv("GOOGLE_API_KEY") and gemini_key:
-        os.environ["GOOGLE_API_KEY"] = gemini_key
-        
-    embeddings = GoogleGenerativeAIEmbeddings(model="models/text-embedding-004")
-except Exception as e:
-    logger.error(f"Failed to init Gemini Embeddings: {e}")
-    embeddings = None
+from app.services.embedder import generate_embedding
 
 class MemoryService:
     def __init__(self):
@@ -47,11 +36,11 @@ class MemoryService:
             return False
 
         try:
-            # 1. Generate Embedding
-            if not embeddings:
-                logger.error("MemoryService: Embeddings not initialized.")
+            # 1. Generate Embedding (1536 Dimensions)
+            vector = await generate_embedding(content, dimensionality=1536)
+            if not vector:
+                logger.error("MemoryService: Embedding generation failed.")
                 return False
-            vector = embeddings.embed_query(content)
 
             # 2. Prepare Payload
             payload = {
@@ -61,7 +50,7 @@ class MemoryService:
             }
 
             # 3. Insert
-            client.table("documents").insert(payload).execute()
+            client.table("memory_embeddings").insert(payload).execute()
             
             # Safe Logging
             import textwrap
@@ -81,15 +70,15 @@ class MemoryService:
             return []
 
         try:
-            # 1. Embed Query
-            if not embeddings:
-                logger.error("MemoryService: Embeddings not initialized.")
+            # 1. Embed Query (1536 Dimensions)
+            vector = await generate_embedding(query, task_type="retrieval_query", dimensionality=1536)
+            if not vector:
+                logger.error("MemoryService: Embedding generation failed.")
                 return []
-            vector = embeddings.embed_query(query)
 
             # 2. RPC Call
             response = client.rpc(
-                'match_documents',
+                'match_memories',
                 {
                     'query_embedding': vector,
                     'match_threshold': threshold,
@@ -101,6 +90,52 @@ class MemoryService:
         except Exception as e:
             logger.error(f"MemoryService: Search failed: {e}")
             return []
+
+    async def unified_search(self, question: str, limit: int = 5, namespace: str = "personal"):
+        """
+        [v7.2] Refactored Master Search with Namespace Isolation & Dual-Query.
+        - namespace="personal": Force path filtering for 'memory/' (Diary).
+        - namespace="session": Target 'session_history' (Daily Logs).
+        - Dual-Query: Parallel search if 'decision/plan' detected.
+        """
+        from app.services.rag_service import rag_service
+        import asyncio
+
+        # 1. Detect Dual-Query Intent (Decision / Plan)
+        dual_keywords = ["決策", "計畫", "想", "打算", "decision", "plan", "intent", "strategy"]
+        is_dual = any(kw in question.lower() for kw in dual_keywords)
+
+        if is_dual:
+            logger.info(f"🚀 Dual-Query triggered for intent: '{question}'")
+            # Parallel Execution
+            tasks = [
+                # Track 1: Personal Diary (Files in memory/)
+                rag_service.search_memory_embeddings(question, limit=limit, path_prefix="memory/"),
+                # Track 2: Session History (Daily Logs / memories table)
+                rag_service.search_and_rerank(question, recall_limit=30, top_k=limit)
+            ]
+            diary_results, session_results = await asyncio.gather(*tasks)
+
+            # Attribution Grouping
+            diary_text = "\n\n".join([f"[{r.get('metadata', {}).get('file_name', 'Entry')}] {r.get('content', '')}" for r in diary_results])
+            session_text = "\n\n".join([f"[{r.get('date', 'Discussion')}] {r.get('content', '')}" for r in session_results])
+
+            combined_memories = f"### [來自您的日記 (Personal Diary)]\n{diary_text or '無相關紀錄'}\n\n### [來自我們過往討論 (Previous Discussions)]\n{session_text or '無相關紀錄'}"
+            
+            return {
+                "memories": combined_memories.strip()
+            }
+        
+        # 2. Single Namespace Mode
+        if namespace == "session":
+            results = await rag_service.search_and_rerank(question, recall_limit=30, top_k=limit)
+            text = "\n\n".join([f"[{r.get('date', 'Discussion')}] {r.get('content', '')}" for r in results])
+            return {"memories": f"### [來自我們過往討論]\n{text}"}
+        else:
+            # Default to personal namespace (memory/ prefix)
+            results = await rag_service.search_memory_embeddings(question, limit=limit, path_prefix="memory/")
+            text = "\n\n".join([f"[{r.get('metadata', {}).get('file_name', 'Entry')}] {r.get('content', '')}" for r in results])
+            return {"memories": f"### [來自您的日記]\n{text}"}
 
     async def ask_brain(self, question: str, limit: int = 5) -> str:
         """

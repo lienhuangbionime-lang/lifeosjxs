@@ -205,7 +205,7 @@ class UnifiedRAGService:
             logger.error(f"Search and rerank failed: {e}")
             return []
 
-    async def search_documents(self, query: str, limit: int = 5) -> List[Dict]:
+    async def search_documents(self, query: str, limit: int = 5, path_prefix: Optional[str] = None) -> List[Dict]:
         """Search 'documents' table for external knowledge with Phase E Knowledge Decay."""
         if not self.enabled: return []
         
@@ -226,6 +226,10 @@ class UnifiedRAGService:
             if not docs:
                 return []
                 
+            # Filter by path_prefix if provided (metadata->>source)
+            if path_prefix:
+                docs = [d for d in docs if str(d.get("metadata", {}).get("source", "")).startswith(path_prefix)]
+
             # --- Phase E: Knowledge Decay Scoring ---
             processed_docs = []
             for d in docs:
@@ -259,6 +263,55 @@ class UnifiedRAGService:
             
         except Exception as e:
             logger.error(f"Document search failed: {e}")
+            return []
+
+    async def search_memory_embeddings(self, query: str, limit: int = 5, path_prefix: Optional[str] = "memory/") -> List[Dict]:
+        """Search 'memory_embeddings' table (1536 dim) for prioritized personal content."""
+        if not self.enabled: return []
+        
+        try:
+            # Table uses 1536 dim (v2 Preview)
+            query_embedding = await generate_embedding(query, dimensionality=1536, task_type="retrieval_query")
+            if not query_embedding: return []
+
+            rpc_params = {
+                "query_embedding": query_embedding,
+                "match_threshold": 0.4,
+                "match_count": limit * 2
+            }
+            
+            # This RPC must be created in Supabase (see implementation_plan.md)
+            response = supabase.rpc("match_memory_embeddings", rpc_params).execute()
+            results = response.data or []
+            
+            if not results:
+                return []
+                
+            # Filter by path_prefix logic (CRITICAL PRIORITY: files in memory/ directory)
+            if path_prefix:
+                # We normalize the prefix and the source for comparison
+                results = [r for r in results if path_prefix.lower() in str(r.get("metadata", {}).get("source", "")).lower()]
+            
+            # Apply Decay logic (similar to memories/documents)
+            processed = []
+            for r in results:
+                r["similarity"] = calculate_decay_score(r.get("similarity", 0.0), r.get("access_count", 0), r.get("last_accessed_at"))
+                processed.append(r)
+            
+            processed.sort(key=lambda x: x["similarity"], reverse=True)
+            final_results = processed[:limit]
+            
+            # Increment access counts
+            try:
+                ids = [r["id"] for r in final_results]
+                if ids:
+                    supabase.rpc("increment_memory_embeddings_access", {"ids": ids}).execute()
+            except Exception as rpc_e:
+                logger.warning(f"Failed to increment memory_embeddings access: {rpc_e}")
+                
+            return final_results
+        except Exception as e:
+            logger.error(f"Memory embeddings search failed: {e}")
             return []
 
     async def _fallback_search(self, query: str, limit: int) -> List[Memory]:
@@ -298,23 +351,44 @@ class UnifiedRAGService:
             ))
         return memories
 
-    async def unified_search(self, question: str, limit: int = 5) -> Dict[str, str]:
+    async def unified_search(self, question: str, limit: int = 5, path_prefix: Optional[str] = "memory/") -> Dict[str, str]:
         """
         The Master Search Entrance.
-        Retrieves from both Memories (Atomic) and Documents (Bulk Knowledge).
+        Retrieves from:
+        1. memories (Daily Log / Chat Intake)
+        2. memory_embeddings (Vectorized Markdown Files - Prioritized)
+        3. documents (bulk knowledge)
         """
-        # [v6.0] Reranking-First Search (Atomic Memories)
-        # We increase the recall limit to 40 and take top 5 after semantic reranking
+        # [v7.1] Forced Path Filtering for Diary/Reflection keywords
+        diary_keywords = ["日記", "反思", "心路歷程", "diary", "reflection", "personal journey"]
+        if any(kw in question.lower() for kw in diary_keywords):
+            logger.info(f"🔮 Diary keyword detected. Forcing path_prefix='memory/' for retrieval.")
+            path_prefix = "memory/"
+        
+        # [PRORITY TRACK] Search vectorized markdown files (memory_embeddings)
+        embedded_memories = await self.search_memory_embeddings(question, limit=limit, path_prefix=path_prefix)
+        
+        # [SYNC TRACK] Reranking-First Search (Atomic Daily Memories)
         memories_results = await self.search_and_rerank(question, recall_limit=40, top_k=limit)
         
-        # Search documents separately (Reranking can be added here too in the future)
+        # [KNOWLEDGE TRACK] Search documents separately
         documents = await self.search_documents(question, limit=limit)
 
+        # Build Contexts
+        # 1. Embedded memories (prioritized by instruction but here they get their own block)
+        emb_text = "\n\n".join([f"[{m.get('metadata', {}).get('file_name', 'File')}] {m.get('content', '')}" for m in embedded_memories])
+        
+        # 2. Daily Log memories
         mem_text = "\n\n".join([f"[{m.get('date', 'unknown')}] {m.get('content', '')}" for m in memories_results])
+        
+        # 3. Documents
         doc_text = "\n\n".join([f"[{d.get('title', 'Doc')}] {d.get('content', '')}" for d in documents])
 
+        # Combine embedded and daily memories for the 'memories' key to ensure AI sees them as one prioritize track
+        combined_memories = f"--- [Vectorized Workspace Files (Prioritized)] ---\n{emb_text}\n\n--- [Daily Intake Logs] ---\n{mem_text}"
+
         return {
-            "memories": mem_text,
+            "memories": combined_memories.strip(),
             "documents": doc_text
         }
 
@@ -323,21 +397,38 @@ class UnifiedRAGService:
         if not self.enabled: return 0
         
         try:
-            # Unified Architecture: All tables target 3072 (Gemini Embedding v1)
-            embedding = await generate_embedding(text, dimensionality=3072)
+            embedding = await generate_embedding(text, dimensionality=1536)
             payload = {
                 "content": text,
                 "metadata": meta,
-                "embedding": embedding,
                 "created_at": datetime.now().isoformat()
             }
+            
             if target == "documents":
                 payload["title"] = meta.get("title", f"Note {datetime.now().strftime('%Y-%m-%d %H:%M')}")
-                # Ensure doc_type is set
                 payload["doc_type"] = meta.get("type", "webpage")
+                if embedding:
+                    payload["embedding"] = embedding
+            elif target == "memories":
+                # memories table needs date field
+                payload["date"] = meta.get("date", datetime.now().strftime("%Y-%m-%d"))
+                payload["category"] = meta.get("category", "Chat")
+                payload["tags"] = meta.get("tags", [])
+                payload["is_ai"] = meta.get("is_ai", True)
+                # Try with embedding first, fall back without
+                if embedding:
+                    try:
+                        payload_embed = {**payload, "embedding": embedding}
+                        from app.core.database import safe_write
+                        safe_write(supabase.table(target), payload_embed, operation_type="insert")
+                        logger.info(f"[Memory Write] Saved with embedding: {text[:60]}")
+                        return 1
+                    except Exception:
+                        logger.warning("[Memory Write] Embedding insert failed, falling back to text-only insert.")
             
             from app.core.database import safe_write
             safe_write(supabase.table(target), payload, operation_type="insert")
+            logger.info(f"[Memory Write] Saved (text-only): {text[:60]}")
             return 1
         except Exception as e:
             logger.error(f"Text ingest failed for target {target}: {e}")
