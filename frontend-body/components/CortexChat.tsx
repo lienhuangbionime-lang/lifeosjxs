@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Paperclip, MessageSquare, X, Bot, User, Loader2, Maximize2, Minimize2, Trash2, Settings, Terminal, Sparkles, Link2, Zap, Brain } from 'lucide-react';
+import { Send, Paperclip, MessageSquare, X, Bot, User, Loader2, Maximize2, Minimize2, Trash2, Settings, Terminal, Sparkles, Link2, Zap, Brain, Mic } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { cortex, EvolutionStatus } from '@/lib/api/client';
 import { CaptureView } from './CaptureView';
@@ -12,8 +12,8 @@ interface Message {
     content: string;
 }
 
-export const CortexChat = () => {
-    const [isOpen, setIsOpen] = useState(false);
+export const CortexChat = ({ isInline = false, initialOpen = false }: { isInline?: boolean, initialOpen?: boolean }) => {
+    const [isOpen, setIsOpen] = useState(initialOpen || isInline);
     const [isMaximized, setIsMaximized] = useState(false);
     const [messages, setMessages] = useState<Message[]>([
         { role: 'assistant', content: 'Hello. I am **Cortex**, your digital assistant. How can I help you manage your projects and memories today?' }
@@ -25,15 +25,16 @@ export const CortexChat = () => {
     const [learningStatus, setLearningStatus] = useState<{ total: number; accuracy: number | null; count: number } | null>(null);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [availableModels, setAvailableModels] = useState<Array<{ id: string; name: string }>>([]);
-    const [selectedModel, setSelectedModel] = useState('models/gemini-flash-lite-latest');
+    const [selectedModel, setSelectedModel] = useState('models/gemma-4-31b-it');
     const [isRefreshingModels, setIsRefreshingModels] = useState(false);
     const [apiKey, setApiKey] = useState('');
-    const [activeTab, setActiveTab] = useState<'capture' | 'chat' | 'brain' | 'logic' | 'radar'>('capture');
+    const [activeTab, setActiveTab] = useState<'chat'>('chat');
     const [prompts, setPrompts] = useState<Record<string, string>>({});
     const [selectedPrompt, setSelectedPrompt] = useState('system_cortex');
     const [isSavingPrompt, setIsSavingPrompt] = useState(false);
     const [brainContext, setBrainContext] = useState<any | null>(null); // [New] Sovereign Context
     const [currentThought, setCurrentThought] = useState(''); // [New] Thinking Stream
+    const [isRecording, setIsRecording] = useState(false);
 
     const scrollRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -108,20 +109,46 @@ export const CortexChat = () => {
         }
     };
 
-    // Fetch prompt content when activeTab or selectedPrompt changes
+
+    // Voice Recognition
     useEffect(() => {
-        if (activeTab === 'logic') {
-            const fetchPrompt = async () => {
-                try {
-                    const data = await cortex.getPrompt(selectedPrompt);
-                    setPrompts(prev => ({ ...prev, [selectedPrompt]: data.content }));
-                } catch (e) {
-                    console.error("Failed to fetch prompt", e);
-                }
-            };
-            fetchPrompt();
+        let recognition: any;
+        if (isRecording) {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                // @ts-ignore
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = true;
+                recognition.lang = 'zh-TW';
+
+                recognition.onresult = (event: any) => {
+                    let finalTranscript = '';
+                    for (let i = event.resultIndex; i < event.results.length; ++i) {
+                        if (event.results[i].isFinal) {
+                            finalTranscript += event.results[i][0].transcript;
+                        }
+                    }
+                    if (finalTranscript) {
+                        setInput(prev => prev + (prev ? ' ' : '') + finalTranscript);
+                    }
+                };
+
+                recognition.onerror = (event: any) => {
+                    setIsRecording(false);
+                };
+
+                recognition.start();
+            } else {
+                alert("Voice recognition not supported.");
+                setIsRecording(false);
+            }
         }
-    }, [activeTab, selectedPrompt]);
+        return () => {
+            if (recognition) recognition.stop();
+        };
+    }, [isRecording]);
+
 
     const handleSavePrompt = async () => {
         if (!prompts[selectedPrompt]) return;
@@ -141,10 +168,10 @@ export const CortexChat = () => {
     const [isAnalyzingUrl, setIsAnalyzingUrl] = useState(false);
 
     useEffect(() => {
-        if (scrollRef.current && activeTab === 'chat') {
+        if (scrollRef.current) {
             scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
         }
-    }, [messages, isOpen, activeTab, urlContext]);
+    }, [messages, isOpen, urlContext]);
 
     const checkUrlInInput = async (text: string) => {
         const urlRegex = /(https?:\/\/[^\s]+)/g;
@@ -296,6 +323,127 @@ export const CortexChat = () => {
         );
     }
 
+    if (isInline) {
+        return (
+            <div className="flex flex-col w-full h-[calc(100vh-120px)] bg-white border border-slate-200 rounded-[32px] overflow-hidden shadow-sm">
+                <div className="bg-slate-50 border-b border-slate-200 p-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center text-white">
+                            <Bot size={20} />
+                        </div>
+                        <div>
+                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-tight">Cortex Sovereign Engine</h3>
+                            <div className="flex items-center gap-1.5">
+                                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                                <span className="text-[10px] text-slate-500 font-black uppercase tracking-widest">Active • Neural Linked</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button onClick={() => setIsSettingsOpen(!isSettingsOpen)} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-xl transition-colors">
+                            <Settings size={18} />
+                        </button>
+                        <button onClick={clearChat} className="p-2 text-slate-400 hover:text-red-600 hover:bg-slate-100 rounded-xl transition-colors">
+                            <Trash2 size={18} />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Tab Navigation (Simple) */}
+                <div className="flex bg-slate-50/50 border-b border-slate-100 px-6 py-2 gap-8 overflow-x-auto no-scrollbar">
+                    <button
+                        className="text-[11px] font-black uppercase tracking-[0.2em] pb-1 border-b-2 text-indigo-600 border-indigo-600"
+                    >
+                        Neural Dialogue
+                    </button>
+                </div>
+
+                {isSettingsOpen && (
+                    <div className="absolute inset-x-0 top-[110px] bottom-0 bg-white/95 backdrop-blur-md z-50 p-8 flex flex-col animate-in fade-in slide-in-from-top-2 duration-200">
+                        <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] mb-6">Sovereign Configurations</h4>
+                        {/* reuse setting content or just link it */}
+                        <div className="space-y-6 max-w-md">
+                            <div>
+                                <label className="block text-[10px] font-black text-slate-500 uppercase mb-2">Neural Model</label>
+                                <select
+                                    value={selectedModel}
+                                    onChange={(e) => setSelectedModel(e.target.value)}
+                                    className="w-full bg-slate-900 border border-slate-800 text-white rounded-2xl p-3 text-sm outline-none"
+                                >
+                                    {availableModels.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                                </select>
+                            </div>
+                        </div>
+                        <button onClick={saveSettings} className="mt-8 bg-indigo-600 text-white p-4 rounded-2xl font-black uppercase tracking-widest text-xs">Authorize Changes</button>
+                    </div>
+                )}
+
+                {/* Chat content - flex-1 */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-white scroll-smooth" ref={scrollRef}>
+                    {messages.map((m, i) => (
+                        <div key={i} className={`flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                            <div className={`shrink-0 w-10 h-10 rounded-2xl flex items-center justify-center shadow-lg ${m.role === 'user' ? 'bg-indigo-600 text-white' : 'bg-slate-900 text-slate-300'}`}>
+                                {m.role === 'user' ? <User size={20} /> : <Bot size={20} />}
+                            </div>
+                            <div className={`max-w-[80%] rounded-[24px] p-5 text-sm leading-relaxed shadow-xl border
+                                ${m.role === 'user'
+                                    ? 'bg-indigo-600 text-white rounded-tr-none border-indigo-500'
+                                    : 'bg-slate-50 text-slate-800 border-slate-100 rounded-tl-none'}`}
+                            >
+                                {m.role === 'assistant' ? (
+                                    <div className="markdown-content">
+                                        <ReactMarkdown
+                                            components={{
+                                                h1: ({ ...props }) => <h1 className="text-slate-900 font-bold text-lg mb-2" {...props} />,
+                                                p: ({ ...props }) => <p className="mb-2 last:mb-0" {...props} />,
+                                                code: ({ ...props }) => <code className="bg-slate-200 text-indigo-700 rounded px-1" {...props} />,
+                                                pre: ({ ...props }) => <pre className="bg-slate-900 text-slate-100 p-4 rounded-2xl my-3 overflow-x-auto text-xs" {...props} />
+                                            }}
+                                        >
+                                            {m.content}
+                                        </ReactMarkdown>
+                                    </div>
+                                ) : (
+                                    <div className="whitespace-pre-wrap">{m.content}</div>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                    {isLoading && (
+                        <div className="text-xs text-indigo-500 font-black tracking-widest uppercase flex items-center gap-2 animate-pulse pl-14">
+                            <Sparkles size={14} /> Neural processing...
+                        </div>
+                    )}
+                </div>
+
+                {/* Input area */}
+                <div className="p-6 bg-slate-50/30 border-t border-slate-100">
+                    <div className="bg-white border-2 border-slate-100 rounded-[28px] p-2 flex items-end gap-3 shadow-lg focus-within:border-indigo-500/30 transition-all">
+                        <button onClick={() => fileInputRef.current?.click()} className="p-3 text-slate-400 hover:text-indigo-600 rounded-2xl transition-all"><Paperclip size={20} /></button>
+                        <button onClick={() => setIsRecording(!isRecording)} className={`p-3 rounded-2xl transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse shadow-lg' : 'text-slate-400 hover:text-indigo-600'}`}><Mic size={20} /></button>
+                        <textarea
+                            value={input}
+                            onChange={e => { setInput(e.target.value); checkUrlInInput(e.target.value); }}
+                            placeholder="Interrogate Cortex..."
+                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend(); } }}
+                            className="flex-1 bg-transparent border-0 px-3 py-3 text-sm text-slate-800 outline-none resize-none h-12 max-h-48"
+                        />
+                        <button onClick={handleSend} disabled={isLoading || (!input.trim() && !urlContext)} className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center hover:bg-indigo-700 transition-all shadow-lg active:scale-95 disabled:opacity-30"><Send size={20} /></button>
+                    </div>
+                    {(urlContext || isAnalyzingUrl) && (
+                        <div className="mt-4 p-3 bg-indigo-600/5 border border-indigo-500/10 rounded-2xl flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <Link2 size={16} className="text-indigo-500" />
+                                <span className="text-xs font-bold text-indigo-900 truncate">{urlContext?.title || 'Analyzing URL...'}</span>
+                            </div>
+                            <button onClick={() => setUrlContext(null)} className="text-indigo-400 hover:text-indigo-600"><X size={16} /></button>
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div
             className={`fixed transition-all duration-300 z-[100] shadow-2xl flex flex-col bg-white border border-slate-200 overflow-hidden
@@ -337,34 +485,10 @@ export const CortexChat = () => {
             {/* Tab Navigation */}
             <div className="flex bg-slate-50/50 border-b border-slate-100 px-3 py-1 gap-4 shrink-0 overflow-x-auto no-scrollbar">
                 <button
-                    onClick={() => setActiveTab('capture')}
-                    className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all shrink-0 ${activeTab === 'capture' ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
-                >
-                    📝 Capture
-                </button>
-                <button
                     onClick={() => setActiveTab('chat')}
                     className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all shrink-0 ${activeTab === 'chat' ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
                 >
                     Chat
-                </button>
-                <button
-                    onClick={() => setActiveTab('brain')}
-                    className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all shrink-0 ${activeTab === 'brain' ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
-                >
-                    🧠 Brain
-                </button>
-                <button
-                    onClick={() => setActiveTab('logic')}
-                    className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all shrink-0 ${activeTab === 'logic' ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
-                >
-                    Logic
-                </button>
-                <button
-                    onClick={() => setActiveTab('radar')}
-                    className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all shrink-0 ${activeTab === 'radar' ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
-                >
-                    📡 Radar
                 </button>
             </div>
 
@@ -430,110 +554,7 @@ export const CortexChat = () => {
                 </div>
             )}
 
-            {/* Capture Tab Body */}
-            {activeTab === 'capture' && (
-                <div className="flex-1 overflow-y-auto p-4 bg-slate-950 custom-scrollbar">
-                    <CaptureView onSave={(entry) => {
-                        console.log("Capture from Chat Hub:", entry);
-                    }} />
-                </div>
-            )}
 
-            {/* Radar Tab Body */}
-            {activeTab === 'radar' && (
-                <div className="flex-1 overflow-hidden p-4 bg-slate-950">
-                    <RadarView />
-                </div>
-            )}
-
-            {/* Brain Tab Body */}
-            {activeTab === 'brain' && (
-                <div className="flex-1 flex flex-col p-4 bg-slate-900 border-t border-slate-800 overflow-y-auto custom-scrollbar font-mono">
-                    <div className="mb-6">
-                        <div className="flex items-center gap-2 mb-3 text-indigo-400">
-                            <Zap size={14} className={brainContext?.status && brainContext.status !== 'IDLE' ? 'animate-pulse' : ''} />
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Neural Thinking Stream</span>
-                        </div>
-                        <div className="p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl min-h-[120px]">
-                            <p className="text-[11px] text-indigo-300 leading-relaxed italic whitespace-pre-wrap">
-                                {currentThought || (isLoading ? 'Neural pathways firing...' : 'System idle. Awaiting command.')}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="mb-6">
-                        <div className="flex items-center gap-2 mb-3 text-slate-400">
-                            <Bot size={14} />
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Active Focus</span>
-                        </div>
-                        <div className="p-4 bg-white/5 border border-white/10 rounded-xl">
-                            <p className="text-xs text-slate-300 leading-relaxed font-sans">
-                                {brainContext?.active_focus || 'Standby Mode.'}
-                            </p>
-                        </div>
-                    </div>
-
-                    <div className="mb-6">
-                        <div className="flex items-center gap-2 mb-3 text-slate-400">
-                            <Link2 size={14} />
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Sovereign Skill Manifest</span>
-                        </div>
-                        <div className="grid grid-cols-2 gap-2">
-                            {['Search', 'Task', 'Project', 'Growth', 'Archiver', 'Reasoner'].map(skill => (
-                                <div key={skill} className="bg-white/5 border border-white/10 rounded-lg p-2 flex items-center gap-2">
-                                    <div className="w-1 h-1 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
-                                    <span className="text-[10px] text-slate-400 font-bold">{skill.toUpperCase()}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Meta Info */}
-                    <div className="mt-auto pt-4 border-t border-white/5 space-y-2 opacity-40 text-[9px]">
-                        <div className="flex justify-between">
-                            <span>LAST_SYNC:</span>
-                            <span>{brainContext?.last_updated ? new Date(brainContext.last_updated).toLocaleTimeString() : 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span>INTEGRITY:</span>
-                            <span>SHIELD_ACTIVE</span>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Logic Tab Body */}
-            {activeTab === 'logic' && (
-                <div className="flex-1 flex flex-col p-4 bg-slate-50 overflow-hidden">
-                    <div className="flex items-center justify-between mb-4">
-                        <select
-                            value={selectedPrompt}
-                            onChange={(e) => setSelectedPrompt(e.target.value)}
-                            className="bg-white border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-bold text-slate-600 outline-none"
-                        >
-                            <option value="system_cortex">Core Philosophy</option>
-                            <option value="system_daily">Daily Analysis Logic</option>
-                        </select>
-                        <button
-                            onClick={handleSavePrompt}
-                            disabled={isSavingPrompt}
-                            className="text-[10px] bg-indigo-600 text-white px-3 py-1.5 rounded-lg font-bold hover:bg-indigo-700 disabled:opacity-50"
-                        >
-                            {isSavingPrompt ? 'Saving...' : 'Update Brain'}
-                        </button>
-                    </div>
-                    <textarea
-                        value={prompts[selectedPrompt] || 'Loading...'}
-                        onChange={(e) => setPrompts(prev => ({ ...prev, [selectedPrompt]: e.target.value }))}
-                        className="flex-1 w-full bg-white border border-slate-200 rounded-xl p-3 text-xs font-mono text-slate-700 outline-none resize-none focus:ring-2 focus:ring-indigo-100"
-                        placeholder="Customize Cortex's thinking..."
-                    />
-                </div>
-            )}
-
-            {/* Chat Body */}
-            {activeTab === 'chat' && (
-                <>
                     <div
                         className="flex-1 overflow-y-auto p-4 space-y-5 bg-white scroll-smooth"
                         ref={scrollRef}
@@ -613,6 +634,13 @@ export const CortexChat = () => {
                             >
                                 <Paperclip size={18} />
                             </button>
+                            <button
+                                onClick={() => setIsRecording(!isRecording)}
+                                className={`p-2 rounded-xl transition-all ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'text-slate-400 hover:text-indigo-600 hover:bg-white'}`}
+                                title="Voice input"
+                            >
+                                <Mic size={18} />
+                            </button>
                             <input type="file" className="hidden" ref={fileInputRef} onChange={handleFileUpload} accept=".pdf,.txt,.md,.jpg,.jpeg,.png,.webp,.svg" />
 
                             <textarea
@@ -684,8 +712,7 @@ export const CortexChat = () => {
                             </div>
                         </div>
                     </div>
-                </>
-            )}
+
 
             <style jsx global>{`
                 .scrollbar-hide::-webkit-scrollbar { display: none; }

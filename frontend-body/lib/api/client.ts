@@ -279,7 +279,7 @@ export const cortex = {
   },
 
   ingest: {
-    submit: async (data: { content: string; habits: string[]; skipAi?: boolean; date?: string; mode?: 'overwrite' | 'append'; source?: string }): Promise<IngestResponse> => {
+    submit: async (data: { content: string; habits: string[]; skipAi?: boolean; preview?: boolean; date?: string; mode?: 'overwrite' | 'append'; source?: string }): Promise<IngestResponse> => {
       return await fetchProxy<IngestResponse>("/api/v1/ingest", {
         method: "POST",
         body: JSON.stringify({
@@ -287,6 +287,7 @@ export const cortex = {
           content: data.content,
           habits: data.habits,
           skipAi: data.skipAi,
+          preview: data.preview || false,
           mode: data.mode || 'append',
           source: data.source || 'web_terminal'
         }),

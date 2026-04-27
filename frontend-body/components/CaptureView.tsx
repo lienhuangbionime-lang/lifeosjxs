@@ -114,10 +114,20 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
   const [showToast, setShowToast] = useState(false);
   const [toastMsg, setToastMsg] = useState('Neural Capture Complete');
   const [analysis, setAnalysis] = useState<string | null>(null);
+  const [lastSubmittedText, setLastSubmittedText] = useState('');
 
-  const handleSubmit = async (skipAi: boolean = false, mode: 'overwrite' | 'append' = 'append') => {
+  const handleClear = () => {
+    setText('');
+    setAnalysis(null);
+    setLastSubmittedText('');
+    localStorage.removeItem('lifeos_capture_draft');
+    setActiveHabits({});
+  };
+
+  const handleSubmit = async (skipAi: boolean = false, mode: 'overwrite' | 'append' = 'append', preview: boolean = false) => {
     if (!text.trim() || isSubmitting) return;
     setIsSubmitting(true);
+    setLastSubmittedText(text);
 
     try {
       const selectedHabits = Object.keys(activeHabits).filter(id => activeHabits[id]);
@@ -129,6 +139,7 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
         content: text,
         habits: habitLabels,
         skipAi: skipAi,
+        preview: preview,
         mode: mode,
         source: "capture"
       });
@@ -143,18 +154,15 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
       setShowToast(true);
       setTimeout(() => setShowToast(false), 3000);
 
-      if (skipAi) {
-        setText('');
-        localStorage.removeItem('lifeos_capture_draft');
-        setActiveHabits({});
-      }
-
-      if (onSave) {
-        onSave({
-          date: response.data?.meta?.date || new Date().toLocaleDateString('en-CA'),
-          content: response.data?.markdown_body || text,
-          isAi: !skipAi
-        });
+      if (skipAi || (!preview && response.status === 'synced')) {
+        if (onSave) {
+          onSave({
+            date: response.data?.meta?.date || new Date().toLocaleDateString('en-CA'),
+            content: response.data?.markdown_body || text,
+            isAi: !skipAi
+          });
+        }
+        handleClear();
       }
     } catch (error: any) {
       alert(`Submission failed: ${error.message}`);
@@ -267,9 +275,19 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
               <button onClick={() => setAnalysis(null)} className="absolute top-4 right-4 text-slate-600 hover:text-white">
                 <X size={20} />
               </button>
-              <pre className="whitespace-pre-wrap font-mono text-sm text-indigo-100/90 max-h-[400px] overflow-y-auto">
+              <pre className="whitespace-pre-wrap font-mono text-sm text-indigo-100/90 max-h-[400px] overflow-y-auto mb-6">
                 {analysis}
               </pre>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => handleSubmit(false, 'append', false)}
+                  disabled={isSubmitting}
+                  className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-500 transition-all shadow-lg flex items-center gap-2"
+                >
+                  {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle size={16} />}
+                  ✅ 確認內容並正式存檔
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
@@ -303,14 +321,14 @@ export const CaptureView = ({ onSave }: CaptureViewProps) => {
           disabled={!text.trim() || isSubmitting}
           className="px-6 py-4 bg-slate-800 text-slate-300 rounded-2xl font-bold text-sm hover:bg-slate-700 hover:text-white transition-all shadow-lg disabled:opacity-50 flex items-center gap-2"
         >
-          <Save size={18} /> SAVE
+          <Save size={18} /> SAVE (RAW)
         </button>
         <button
-          onClick={() => handleSubmit(false)}
+          onClick={() => handleSubmit(false, 'append', true)}
           disabled={!text.trim() || isSubmitting}
           className="px-8 py-4 bg-indigo-600 text-white rounded-2xl font-black text-sm hover:bg-indigo-500 transition-all shadow-xl shadow-indigo-500/20 flex items-center gap-2 uppercase tracking-wider"
         >
-          {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />} ANALYZE & INGEST
+          {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <Sparkles size={18} />} ANALYZE & PREVIEW
         </button>
       </div>
 

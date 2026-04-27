@@ -1,6 +1,7 @@
 import React from 'react';
 import './globals.css'; // 我們等下會建立這個
 import { Inter } from 'next/font/google';
+import Heartbeat from './Heartbeat';
 
 const inter = Inter({ subsets: ['latin'] });
 
@@ -17,6 +18,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} bg-slate-950 text-slate-100 overflow-hidden`}>
+        <Heartbeat />
         {children}
       </body>
     </html>

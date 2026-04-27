@@ -6,6 +6,7 @@ import { Menu, X, PenTool, Layers, List as ListIcon, Activity, Settings, LayoutT
 // Components
 // Components
 import { CaptureView } from '@/components/CaptureView';
+import { CortexChat } from '@/components/CortexChat';
 import { NeuralGraph } from '@/components/NeuralGraph';
 import { HistoryView } from '@/components/HistoryView';
 import { SettingsView } from '@/components/SettingsView';
@@ -26,13 +27,10 @@ export default function Home() {
   const [logs, setLogs] = useState<any[]>([]);
 
   // [Phase F] Guest Mode Default Routing
-  const getInitialTab = () => {
-    if (typeof window !== 'undefined' && localStorage.getItem('life-os-guest-mode') === 'true') {
-      return 'dashboard';
-    }
+  const getInitialTab = (): 'capture' | 'graph' | 'list' | 'settings' | 'dashboard' | 'project' => {
     return 'capture';
   };
-  const [activeTab, setActiveTab] = useState<'capture' | 'graph' | 'list' | 'settings' | 'dashboard' | 'project'>(getInitialTab);
+  const [activeTab, setActiveTab] = useState<'capture' | 'graph' | 'list' | 'settings' | 'dashboard' | 'project'>(getInitialTab());
 
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
@@ -185,20 +183,7 @@ export default function Home() {
       <main className="flex-1 overflow-y-auto overflow-x-hidden relative flex flex-col items-center justify-start w-full">
         <div className="w-full max-w-7xl px-4 sm:px-6 lg:px-8 py-4">
           {!isGuest && activeTab === 'capture' && (
-            <CaptureView
-              onSave={(entry) => {
-                // Update local state immediately
-                setLogs(prev => {
-                  // Check if date already exists (upsert)
-                  const exists = prev.find(l => l.date === entry.date);
-                  if (exists) {
-                    return prev.map(l => l.date === entry.date ? { ...l, ...entry } : l);
-                  }
-                  return [entry, ...prev];
-                });
-                console.log("Locally saved:", entry);
-              }}
-            />
+            <CortexChat isInline={true} />
           )}
 
           {activeTab === 'graph' && (
