@@ -56,17 +56,31 @@ def fetch_youtube_transcript(video_id: str) -> tuple[str, str]:
         return title, text
     except Exception as e:
         logger.warning(f"Transcript fetch failed: {e}")
-        # Fallback: try English only
+        # Next attempt: try any available transcript
         try:
             from youtube_transcript_api import YouTubeTranscriptApi
             transcript_list = YouTubeTranscriptApi.get_transcript(video_id)
             text = " ".join([t['text'] for t in transcript_list])
             return f"YouTube Video ({video_id})", text
         except Exception as e2:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Cannot fetch transcript for this video. It may have no captions. ({e2})"
-            )
+            logger.warning(f"All transcript attempts failed: {e2}")
+            # Final Fallback: Fetch basic video info from page title/meta
+            try:
+                import requests
+                from bs4 import BeautifulSoup
+                url = f"https://www.youtube.com/watch?v={video_id}"
+                headers = {'User-Agent': 'Mozilla/5.0'}
+                resp = requests.get(url, headers=headers, timeout=10)
+                soup = BeautifulSoup(resp.text, 'html.parser')
+                title = soup.title.string.replace(" - YouTube", "") if soup.title else f"YouTube Video {video_id}"
+                desc = soup.find("meta", property="og:description")
+                desc_text = desc.get("content", "") if desc else "No description available."
+                return title, f"[No Transcript Available]\n\nDescription: {desc_text}"
+            except Exception as e3:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Cannot fetch transcript or metadata for this video ({e3})"
+                )
 
 
 def fetch_webpage_content(url: str) -> tuple[str, str]:
