@@ -332,12 +332,10 @@ export const CortexChat = () => {
                     </div>
                     <div>
                         <h3 className="text-sm font-bold text-slate-800">Cortex AI</h3>
-                        {!isConversationMode && (
-                            <div className="flex items-center gap-1.5">
-                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                <span className="text-[10px] text-slate-500 font-medium uppercase tracking-tight">Active</span>
-                            </div>
-                        )}
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                            <span className="text-[10px] text-slate-500 font-medium uppercase tracking-tight">Active</span>
+                        </div>
                     </div>
                 </div>
 
@@ -369,8 +367,7 @@ export const CortexChat = () => {
             </div>
 
             {/* Tab Navigation */}
-            {!isConversationMode && (
-                <div className="flex bg-slate-50/50 border-b border-slate-100 px-3 py-1 gap-4 shrink-0 overflow-x-auto no-scrollbar">
+            <div className="flex bg-slate-50/50 border-b border-slate-100 px-3 py-1 gap-4 shrink-0 overflow-x-auto no-scrollbar">
                 <button
                     onClick={() => setActiveTab('chat')}
                     className={`text-[10px] font-bold uppercase tracking-widest pb-1 border-b-2 transition-all shrink-0 ${activeTab === 'chat' ? 'text-indigo-600 border-indigo-600' : 'text-slate-400 border-transparent hover:text-slate-600'}`}
@@ -378,7 +375,6 @@ export const CortexChat = () => {
                     Chat
                 </button>
             </div>
-            )}
 
             {/* Settings Overlay */}
             {isSettingsOpen && (
@@ -581,27 +577,25 @@ export const CortexChat = () => {
                         )}
 
                         {/* Stats */}
-                        {!isConversationMode && (
-                            <div className="flex justify-between items-center px-2 mt-2">
-                                <div className="flex gap-4">
-                                    <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest shrink-0" title="Current Model">
-                                        {systemStatus?.current_model?.replace('models/', '') || 'GEMINI-PRO'}
+                        <div className="flex justify-between items-center px-2 mt-2">
+                            <div className="flex gap-4">
+                                <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest shrink-0" title="Current Model">
+                                    {systemStatus?.current_model?.replace('models/', '') || 'GEMINI-PRO'}
+                                </div>
+                                {learningStatus && (
+                                    <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest hidden sm:flex gap-2" title="AI Evolution Metrics">
+                                        <span>🧠 MEM: {learningStatus.total}</span>
+                                        <span>|</span>
+                                        <span className={learningStatus.accuracy && learningStatus.accuracy > 70 ? 'text-emerald-500' : ''}>
+                                            ACC: {learningStatus.accuracy !== null ? `${learningStatus.accuracy}%` : 'N/A'}
+                                        </span>
                                     </div>
-                                    {learningStatus && (
-                                        <div className="text-[9px] text-slate-400 font-bold uppercase tracking-widest hidden sm:flex gap-2" title="AI Evolution Metrics">
-                                            <span>🧠 MEM: {learningStatus.total}</span>
-                                            <span>|</span>
-                                            <span className={learningStatus.accuracy && learningStatus.accuracy > 70 ? 'text-emerald-500' : ''}>
-                                                ACC: {learningStatus.accuracy !== null ? `${learningStatus.accuracy}%` : 'N/A'}
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest shrink-0 text-right">
-                                    {systemStatus?.remaining_requests || '0'} REQ LEFT
-                                </div>
+                                )}
                             </div>
-                        )}
+                            <div className="text-[9px] text-indigo-400 font-bold uppercase tracking-widest shrink-0 text-right">
+                                {systemStatus?.remaining_requests || '0'} REQ LEFT
+                            </div>
+                        </div>
                     </div>
 
 
